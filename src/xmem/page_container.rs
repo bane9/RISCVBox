@@ -1,4 +1,4 @@
-use crate::xmem::page_common::{ PageAllocator, AllocationError };
+use crate::xmem::page_common::{AllocationError, PageAllocator};
 
 #[cfg(target_os = "windows")]
 use crate::xmem::page_win32::Win32Allocator as XmemAllocator;
@@ -12,6 +12,13 @@ pub struct Xmem {
 }
 
 impl Xmem {
+    pub fn new_empty() -> Xmem {
+        Xmem {
+            ptr: std::ptr::null_mut(),
+            npages: 0,
+        }
+    }
+
     pub fn new(initial_npages: usize) -> Result<Xmem, AllocationError> {
         let ptr = XmemAllocator::alloc(initial_npages)?;
         Ok(Xmem {
@@ -36,6 +43,14 @@ impl Xmem {
     }
 
     pub fn dealloc(&mut self) {
-        XmemAllocator::dealloc(self.ptr, self.npages);
+        XmemAllocator::dealloc(self.ptr, self.npages)
+    }
+
+    pub fn as_ptr(&self) -> *mut u8 {
+        self.ptr
+    }
+
+    pub fn page_size() -> usize {
+        XmemAllocator::page_size()
     }
 }

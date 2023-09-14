@@ -1,14 +1,17 @@
+mod util;
 mod xmem;
 use xmem::page_container::Xmem;
+mod backend;
+mod cpu;
+mod frontend;
 
 fn main() {
-    let mut xmem = Xmem::new(1).unwrap();
-    xmem.mark_rw().unwrap();
-    xmem.mark_rx().unwrap();
-    xmem.realloc(2).unwrap();
-    xmem.mark_rw().unwrap();
-    xmem.mark_rx().unwrap();
-    xmem.dealloc();
+    let file = "test.bin";
+    let rom = util::read_file(file).unwrap();
+
+    let mut core = frontend::core::Core::new(rom, 4096 * 1024);
+
+    core.parse(0, 4).unwrap();
 
     println!("done");
 }

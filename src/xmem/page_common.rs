@@ -1,7 +1,11 @@
 pub trait PageAllocator {
     fn alloc(npages: usize) -> Result<*mut u8, AllocationError>;
 
-    fn realloc(ptr: *mut u8,  old_npages: usize, new_npages: usize) -> Result<*mut u8, AllocationError>;
+    fn realloc(
+        ptr: *mut u8,
+        old_npages: usize,
+        new_npages: usize,
+    ) -> Result<*mut u8, AllocationError>;
 
     fn mark_rw(ptr: *mut u8, npages: usize) -> Result<(), AllocationError>;
 

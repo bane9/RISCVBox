@@ -1,5 +1,5 @@
-pub mod page_container;
 mod page_common;
+pub mod page_container;
 
 #[cfg(target_os = "windows")]
 mod page_win32;
