@@ -8,6 +8,11 @@ pub enum JitError {
 
 pub type PtrT = *mut u8;
 
+pub trait BackendCore {
+    fn fill_with_target_nop(ptr: PtrT, size: usize);
+    fn fill_with_target_exc(ptr: PtrT, size: usize);
+}
+
 pub trait Rvi {
     fn emit_addi(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> Result<(), JitError>;
     fn emit_add(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> Result<(), JitError>;
@@ -78,6 +83,7 @@ pub trait Rva {
         aq: bool,
         rl: bool,
     ) -> Result<(), JitError>;
+
     fn emit_sc_w(
         ptr: PtrT,
         cpu: &mut Cpu,
@@ -97,6 +103,7 @@ pub trait Rva {
         aq: bool,
         rl: bool,
     ) -> Result<(), JitError>;
+
     fn emit_amoadd_w(
         ptr: PtrT,
         cpu: &mut Cpu,
@@ -106,6 +113,7 @@ pub trait Rva {
         aq: bool,
         rl: bool,
     ) -> Result<(), JitError>;
+
     fn emit_amoxor_w(
         ptr: PtrT,
         cpu: &mut Cpu,
@@ -115,6 +123,7 @@ pub trait Rva {
         aq: bool,
         rl: bool,
     ) -> Result<(), JitError>;
+
     fn emit_amoor_w(
         ptr: PtrT,
         cpu: &mut Cpu,
@@ -124,6 +133,7 @@ pub trait Rva {
         aq: bool,
         rl: bool,
     ) -> Result<(), JitError>;
+
     fn emit_amoand_w(
         ptr: PtrT,
         cpu: &mut Cpu,
@@ -133,6 +143,7 @@ pub trait Rva {
         aq: bool,
         rl: bool,
     ) -> Result<(), JitError>;
+
     fn emit_amomin_w(
         ptr: PtrT,
         cpu: &mut Cpu,
@@ -142,6 +153,7 @@ pub trait Rva {
         aq: bool,
         rl: bool,
     ) -> Result<(), JitError>;
+
     fn emit_amomax_w(
         ptr: PtrT,
         cpu: &mut Cpu,
@@ -151,6 +163,7 @@ pub trait Rva {
         aq: bool,
         rl: bool,
     ) -> Result<(), JitError>;
+
     fn emit_amominu_w(
         ptr: PtrT,
         cpu: &mut Cpu,
@@ -160,6 +173,7 @@ pub trait Rva {
         aq: bool,
         rl: bool,
     ) -> Result<(), JitError>;
+
     fn emit_amomaxu_w(
         ptr: PtrT,
         cpu: &mut Cpu,

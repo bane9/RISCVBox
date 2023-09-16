@@ -1,5 +1,7 @@
 use crate::xmem::page_common::{AllocationError, PageAllocator};
-use libc::{mmap, mprotect, munmap, MAP_ANON, MAP_PRIVATE, PROT_EXEC, PROT_READ, PROT_WRITE};
+use libc::{
+    mmap, mprotect, munmap, MAP_ANON, MAP_PRIVATE, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE,
+};
 use std::ptr;
 
 const PAGE_SIZE: usize = 4096;
@@ -72,6 +74,10 @@ impl PageAllocator for PosixAllocator {
 
     fn mark_rx(ptr: *mut u8, npages: usize) -> Result<(), AllocationError> {
         posix_mark_page(ptr, npages, PROT_READ | PROT_EXEC)
+    }
+
+    fn mark_invalid(ptr: *mut u8, npages: usize) -> Result<(), AllocationError> {
+        posix_mark_page(ptr, npages, PROT_NONE)
     }
 
     fn dealloc(ptr: *mut u8, npages: usize) {

@@ -9,9 +9,9 @@ fn main() {
     let file = "test.bin";
     let rom = util::read_file(file).unwrap();
 
-    let mut core = frontend::core::Core::new(rom, 4096 * 1024);
+    let mut parse_core = frontend::parse_core::Core::new(rom, 4096 * 1024);
 
-    core.parse(0, 4).unwrap();
+    parse_core.parse_ahead().unwrap();
 
     println!("done");
 }

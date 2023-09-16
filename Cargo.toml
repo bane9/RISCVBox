@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3.9",  features = ["winuser", "memoryapi"] }
+winapi = { version = "0.3.9", features = ["winuser", "memoryapi"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.148"

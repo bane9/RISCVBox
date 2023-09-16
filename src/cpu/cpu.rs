@@ -1,9 +1,3 @@
-pub enum PrivMode {
-    User = 0,
-    Supervisor = 1,
-    Machine = 3,
-}
-
 pub enum OpType {
     L = 0x03,
 
@@ -41,6 +35,12 @@ impl OpType {
     }
 }
 
+pub enum PrivMode {
+    User = 0,
+    Supervisor = 1,
+    Machine = 3,
+}
+
 pub struct Cpu {
     pub pc: u64,
     pub regs: [u64; 32],
@@ -50,12 +50,12 @@ pub struct Cpu {
 }
 
 impl Cpu {
-    pub fn new() -> Cpu {
+    pub fn new(mem: *mut u8) -> Cpu {
         Cpu {
             pc: 0,
             regs: [0; 32],
             csr: [0; 4096],
-            mem: std::ptr::null_mut(),
+            mem,
             mode: PrivMode::Machine,
         }
     }

@@ -4,7 +4,11 @@
         "editor.formatOnSave": true,
     },
     "rust-analyzer.linkedProjects": [
-        ".\\Cargo.toml",
+        "${workspaceFolder}/Cargo.toml",
     ],
     "rust-analyzer.showUnlinkedFileNotification": false,
+    "rust-analyzer.diagnostics.warningsAsHint": [
+        "dead_code",
+        "unused_variables"
+    ],
 }

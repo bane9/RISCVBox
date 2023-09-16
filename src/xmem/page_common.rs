@@ -11,6 +11,8 @@ pub trait PageAllocator {
 
     fn mark_rx(ptr: *mut u8, npages: usize) -> Result<(), AllocationError>;
 
+    fn mark_invalid(ptr: *mut u8, npages: usize) -> Result<(), AllocationError>;
+
     fn dealloc(ptr: *mut u8, npages: usize);
 
     fn page_size() -> usize;

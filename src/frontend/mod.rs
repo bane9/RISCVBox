@@ -1,4 +1,4 @@
-pub mod core;
+pub mod parse_core;
 
 mod csr;
 mod privledged;

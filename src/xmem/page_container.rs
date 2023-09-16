@@ -34,16 +34,25 @@ impl Xmem {
         Ok(())
     }
 
-    pub fn mark_rw(&mut self) -> Result<(), AllocationError> {
-        XmemAllocator::mark_rw(self.ptr, self.npages)
+    pub fn mark_rw(page: *mut u8) -> Result<(), AllocationError> {
+        assert!(page as usize % XmemAllocator::page_size() == 0);
+        XmemAllocator::mark_rw(page, 1)
     }
 
-    pub fn mark_rx(&mut self) -> Result<(), AllocationError> {
-        XmemAllocator::mark_rx(self.ptr, self.npages)
+    pub fn mark_rx(page: *mut u8) -> Result<(), AllocationError> {
+        assert!(page as usize % XmemAllocator::page_size() == 0);
+        XmemAllocator::mark_rx(page, 1)
+    }
+
+    pub fn mark_invalid(page: *mut u8) -> Result<(), AllocationError> {
+        assert!(page as usize % XmemAllocator::page_size() == 0);
+        XmemAllocator::mark_rx(page, 1)
     }
 
     pub fn dealloc(&mut self) {
-        XmemAllocator::dealloc(self.ptr, self.npages)
+        XmemAllocator::dealloc(self.ptr, self.npages);
+        self.ptr = std::ptr::null_mut();
+        self.npages = 0;
     }
 
     pub fn as_ptr(&self) -> *mut u8 {
