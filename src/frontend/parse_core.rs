@@ -15,7 +15,7 @@ pub const CODE_PAGE_READAHEAD: usize = 1;
 
 pub const INSN_SIZE: usize = 4; // Unlikely for rvc to be supported
 
-pub type DecoderFn = fn(&mut cpu::Cpu, *mut u8, u32) -> Result<(), JitCommon::JitError>;
+pub type DecoderFn = fn(&mut cpu::Cpu, *mut u8, u32) -> JitCommon::DecodeRet;
 
 pub struct Core {
     cpu: cpu::Cpu,
@@ -40,7 +40,7 @@ impl Core {
         let pages = pages + pages / 2;
         xmem.realloc(pages).unwrap();
 
-        BackendCoreImpl::fill_with_target_exc(xmem.as_ptr(), pages * Xmem::page_size());
+        BackendCoreImpl::fill_with_target_nop(xmem.as_ptr(), pages * Xmem::page_size());
 
         let mut ram = rom.clone();
 
@@ -56,9 +56,100 @@ impl Core {
             total_ram_size,
         };
 
-        core.mark_page_range(0, pages, PageState::Invalid);
-
         core
+    }
+
+    pub fn parse_ahead(&mut self) -> Result<(), JitCommon::JitError> {
+        let start = self.offset;
+
+        if start >= self.total_ram_size {
+            return Ok(());
+        }
+
+        let end = std::cmp::min(
+            start + CODE_PAGE_SIZE * CODE_PAGE_READAHEAD,
+            self.total_ram_size,
+        );
+
+        self.parse(start, end)?;
+
+        self.offset = end;
+
+        Ok(())
+    }
+
+    pub fn parse(&mut self, start: usize, end: usize) -> Result<(), JitCommon::JitError> {
+        let end = std::cmp::min(end, self.total_ram_size);
+        assert!(start < end);
+        let mut insn: u32 = 0;
+
+        let ptr = self.xmem.as_ptr().wrapping_add(start);
+
+        for i in (start..end).step_by(INSN_SIZE) {
+            unsafe {
+                std::ptr::copy_nonoverlapping(
+                    self.ram.as_ptr().add(i),
+                    &mut insn as *mut u32 as *mut u8,
+                    INSN_SIZE,
+                );
+            }
+
+            self.offset += self.exec(ptr.wrapping_add(i), insn, end)?;
+
+            self.cpu.pc += INSN_SIZE as u64;
+        }
+
+        self.mark_page_range(
+            start % Xmem::page_size(),
+            end % Xmem::page_size(),
+            PageState::RX,
+        );
+
+        Ok(())
+    }
+
+    // Make sure ptr is at rw page
+    fn exec(
+        &mut self,
+        ptr: *mut u8,
+        insn: u32,
+        block_boundary: usize,
+    ) -> Result<usize, JitCommon::JitError> {
+        static DECODERS: [DecoderFn; 5] = [
+            rvi::decode_rvi,
+            rvm::decode_rvm,
+            rva::decode_rva,
+            csr::decode_csr,
+            privledged::decode_privledged,
+        ];
+
+        let mut out_res: JitCommon::DecodeRet = Err(JitCommon::JitError::InvalidInstruction(insn));
+
+        for decode in &DECODERS {
+            let result = decode(&mut self.cpu, ptr, insn);
+            if let Err(JitCommon::JitError::InvalidInstruction(_)) = result {
+                continue;
+            } else {
+                out_res = result;
+                break;
+            }
+        }
+
+        if out_res.is_err() {
+            return Err(out_res.err().unwrap());
+        }
+
+        let out_res = out_res.unwrap();
+
+        if (ptr.wrapping_add(out_res.size()) as usize) >= block_boundary {
+            return Err(JitCommon::JitError::ReachedBlockBoundary);
+        }
+
+        unsafe {
+            std::ptr::copy_nonoverlapping(out_res.as_ptr(), ptr as *mut u8, out_res.size());
+        }
+
+        Ok(out_res.size())
     }
 
     fn mark_page_range(&self, start: usize, end: usize, state: PageState) {
@@ -82,90 +173,5 @@ impl Core {
                 }
             }
         }
-    }
-
-    pub fn parse(&mut self, start: usize, end: usize) -> Result<(), JitCommon::JitError> {
-        let end = std::cmp::min(end, self.total_ram_size);
-        assert!(start < end);
-        let mut insn: u32 = 0;
-
-        self.mark_page_range(
-            start % Xmem::page_size(),
-            end % Xmem::page_size(),
-            PageState::RW,
-        );
-
-        let mut ptr = self.xmem.as_ptr().wrapping_add(start);
-
-        for i in (start..end).step_by(INSN_SIZE) {
-            unsafe {
-                std::ptr::copy_nonoverlapping(
-                    self.ram.as_ptr().add(i),
-                    &mut insn as *mut u32 as *mut u8,
-                    INSN_SIZE,
-                );
-            }
-
-            match self.exec(ptr, insn) {
-                Ok(_) => ptr = ptr.wrapping_add(INSN_SIZE),
-                Err(e) => {
-                    self.mark_page_range(
-                        start % Xmem::page_size(),
-                        end % Xmem::page_size(),
-                        PageState::RX,
-                    );
-                    return Err(e);
-                }
-            }
-        }
-
-        self.mark_page_range(
-            start % Xmem::page_size(),
-            end % Xmem::page_size(),
-            PageState::RX,
-        );
-
-        Ok(())
-    }
-
-    pub fn parse_ahead(&mut self) -> Result<(), JitCommon::JitError> {
-        let start = self.offset;
-
-        if start >= self.total_ram_size {
-            return Ok(());
-        }
-
-        let end = std::cmp::min(
-            start + CODE_PAGE_SIZE * CODE_PAGE_READAHEAD,
-            self.total_ram_size,
-        );
-
-        self.parse(start, end)?;
-
-        self.offset = end;
-
-        Ok(())
-    }
-
-    // Make sure ptr is at rw page
-    pub fn exec(&mut self, ptr: *mut u8, insn: u32) -> Result<(), JitCommon::JitError> {
-        static DECODERS: [DecoderFn; 5] = [
-            rvi::decode_rvi,
-            rvm::decode_rvm,
-            rva::decode_rva,
-            csr::decode_csr,
-            privledged::decode_privledged,
-        ];
-
-        for decode in &DECODERS {
-            let result = decode(&mut self.cpu, ptr, insn);
-            if let Err(JitCommon::JitError::InvalidInstruction(_)) = result {
-                continue;
-            } else {
-                return result;
-            }
-        }
-
-        Err(JitCommon::JitError::InvalidInstruction(insn))
     }
 }

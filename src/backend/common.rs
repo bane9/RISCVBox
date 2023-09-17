@@ -1,186 +1,104 @@
 use crate::cpu::Cpu;
+use crate::util::EncodedInsn;
 
 #[derive(Debug)]
 pub enum JitError {
     InvalidInstruction(u32),
+    ReachedBlockBoundary,
     UnknownError,
 }
 
 pub type PtrT = *mut u8;
+pub type HostInsnT = u8;
+pub const HOST_INSN_MAX_SIZE: usize = 16; // TODO: check worst case later
+pub type HostEncodedInsn = EncodedInsn<HostInsnT, HOST_INSN_MAX_SIZE>;
+pub type DecodeRet = Result<HostEncodedInsn, JitError>;
 
 pub trait BackendCore {
     fn fill_with_target_nop(ptr: PtrT, size: usize);
-    fn fill_with_target_exc(ptr: PtrT, size: usize);
 }
 
 pub trait Rvi {
-    fn emit_addi(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> Result<(), JitError>;
-    fn emit_add(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> Result<(), JitError>;
-    fn emit_sub(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> Result<(), JitError>;
-    fn emit_slli(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, shamt: u8) -> Result<(), JitError>;
-    fn emit_slti(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> Result<(), JitError>;
-    fn emit_sltiu(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> Result<(), JitError>;
-    fn emit_xori(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> Result<(), JitError>;
-    fn emit_srli(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, shamt: u8) -> Result<(), JitError>;
-    fn emit_srai(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, shamt: u8) -> Result<(), JitError>;
-    fn emit_ori(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> Result<(), JitError>;
-    fn emit_andi(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> Result<(), JitError>;
-    fn emit_xor(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> Result<(), JitError>;
-    fn emit_srl(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> Result<(), JitError>;
-    fn emit_sra(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> Result<(), JitError>;
-    fn emit_or(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> Result<(), JitError>;
-    fn emit_and(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> Result<(), JitError>;
-    fn emit_sll(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> Result<(), JitError>;
-    fn emit_slt(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> Result<(), JitError>;
-    fn emit_sltu(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> Result<(), JitError>;
+    fn emit_addi(cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet;
+    fn emit_add(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_sub(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_slli(cpu: &mut Cpu, rd: u8, rs1: u8, shamt: u8) -> DecodeRet;
+    fn emit_slti(cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet;
+    fn emit_sltiu(cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet;
+    fn emit_xori(cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet;
+    fn emit_srli(cpu: &mut Cpu, rd: u8, rs1: u8, shamt: u8) -> DecodeRet;
+    fn emit_srai(cpu: &mut Cpu, rd: u8, rs1: u8, shamt: u8) -> DecodeRet;
+    fn emit_ori(cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet;
+    fn emit_andi(cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet;
+    fn emit_xor(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_srl(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_sra(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_or(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_and(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_sll(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_slt(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_sltu(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
 
-    fn emit_lui(ptr: PtrT, cpu: &mut Cpu, rd: u8, imm: i32) -> Result<(), JitError>;
-    fn emit_auipc(ptr: PtrT, cpu: &mut Cpu, rd: u8, imm: i32) -> Result<(), JitError>;
-    fn emit_jal(ptr: PtrT, cpu: &mut Cpu, rd: u8, imm: i32) -> Result<(), JitError>;
-    fn emit_jalr(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> Result<(), JitError>;
-    fn emit_beq(ptr: PtrT, cpu: &mut Cpu, rs1: u8, rs2: u8, imm: i32) -> Result<(), JitError>;
-    fn emit_bne(ptr: PtrT, cpu: &mut Cpu, rs1: u8, rs2: u8, imm: i32) -> Result<(), JitError>;
-    fn emit_blt(ptr: PtrT, cpu: &mut Cpu, rs1: u8, rs2: u8, imm: i32) -> Result<(), JitError>;
-    fn emit_bge(ptr: PtrT, cpu: &mut Cpu, rs1: u8, rs2: u8, imm: i32) -> Result<(), JitError>;
-    fn emit_bltu(ptr: PtrT, cpu: &mut Cpu, rs1: u8, rs2: u8, imm: i32) -> Result<(), JitError>;
-    fn emit_bgeu(ptr: PtrT, cpu: &mut Cpu, rs1: u8, rs2: u8, imm: i32) -> Result<(), JitError>;
+    fn emit_lui(cpu: &mut Cpu, rd: u8, imm: i32) -> DecodeRet;
+    fn emit_auipc(cpu: &mut Cpu, rd: u8, imm: i32) -> DecodeRet;
+    fn emit_jal(cpu: &mut Cpu, rd: u8, imm: i32) -> DecodeRet;
+    fn emit_jalr(cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet;
+    fn emit_beq(cpu: &mut Cpu, rs1: u8, rs2: u8, imm: i32) -> DecodeRet;
+    fn emit_bne(cpu: &mut Cpu, rs1: u8, rs2: u8, imm: i32) -> DecodeRet;
+    fn emit_blt(cpu: &mut Cpu, rs1: u8, rs2: u8, imm: i32) -> DecodeRet;
+    fn emit_bge(cpu: &mut Cpu, rs1: u8, rs2: u8, imm: i32) -> DecodeRet;
+    fn emit_bltu(cpu: &mut Cpu, rs1: u8, rs2: u8, imm: i32) -> DecodeRet;
+    fn emit_bgeu(cpu: &mut Cpu, rs1: u8, rs2: u8, imm: i32) -> DecodeRet;
 
-    fn emit_lb(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> Result<(), JitError>;
-    fn emit_lh(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> Result<(), JitError>;
-    fn emit_lw(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> Result<(), JitError>;
-    fn emit_lbu(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> Result<(), JitError>;
-    fn emit_lhu(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> Result<(), JitError>;
+    fn emit_lb(cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet;
+    fn emit_lh(cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet;
+    fn emit_lw(cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet;
+    fn emit_lbu(cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet;
+    fn emit_lhu(cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet;
 
-    fn emit_sb(ptr: PtrT, cpu: &mut Cpu, rs1: u8, rs2: u8, imm: i32) -> Result<(), JitError>;
-    fn emit_sh(ptr: PtrT, cpu: &mut Cpu, rs1: u8, rs2: u8, imm: i32) -> Result<(), JitError>;
-    fn emit_sw(ptr: PtrT, cpu: &mut Cpu, rs1: u8, rs2: u8, imm: i32) -> Result<(), JitError>;
+    fn emit_sb(cpu: &mut Cpu, rs1: u8, rs2: u8, imm: i32) -> DecodeRet;
+    fn emit_sh(cpu: &mut Cpu, rs1: u8, rs2: u8, imm: i32) -> DecodeRet;
+    fn emit_sw(cpu: &mut Cpu, rs1: u8, rs2: u8, imm: i32) -> DecodeRet;
 
-    fn emit_fence(ptr: PtrT, cpu: &mut Cpu, pred: u8, succ: u8) -> Result<(), JitError>;
-    fn emit_fence_i(ptr: PtrT, cpu: &mut Cpu) -> Result<(), JitError>;
+    fn emit_fence(cpu: &mut Cpu, pred: u8, succ: u8) -> DecodeRet;
+    fn emit_fence_i(cpu: &mut Cpu) -> DecodeRet;
 
-    fn emit_ecall(ptr: PtrT, cpu: &mut Cpu) -> Result<(), JitError>;
-    fn emit_ebreak(ptr: PtrT, cpu: &mut Cpu) -> Result<(), JitError>;
+    fn emit_ecall(cpu: &mut Cpu) -> DecodeRet;
+    fn emit_ebreak(cpu: &mut Cpu) -> DecodeRet;
 }
 
 pub trait Rvm {
-    fn emit_mul(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> Result<(), JitError>;
-    fn emit_mulh(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> Result<(), JitError>;
-    fn emit_mulhsu(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> Result<(), JitError>;
-    fn emit_mulhu(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> Result<(), JitError>;
+    fn emit_mul(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_mulh(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_mulhsu(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_mulhu(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
 
-    fn emit_div(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> Result<(), JitError>;
-    fn emit_divu(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> Result<(), JitError>;
-    fn emit_rem(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> Result<(), JitError>;
-    fn emit_remu(ptr: PtrT, cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> Result<(), JitError>;
+    fn emit_div(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_divu(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_rem(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_remu(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
 }
 
 pub trait Rva {
-    fn emit_lr_w(
-        ptr: PtrT,
-        cpu: &mut Cpu,
-        rd: u8,
-        rs1: u8,
-        aq: bool,
-        rl: bool,
-    ) -> Result<(), JitError>;
+    fn emit_lr_w(cpu: &mut Cpu, rd: u8, rs1: u8, aq: bool, rl: bool) -> DecodeRet;
 
-    fn emit_sc_w(
-        ptr: PtrT,
-        cpu: &mut Cpu,
-        rd: u8,
-        rs1: u8,
-        rs2: u8,
-        aq: bool,
-        rl: bool,
-    ) -> Result<(), JitError>;
+    fn emit_sc_w(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
 
-    fn emit_amoswap_w(
-        ptr: PtrT,
-        cpu: &mut Cpu,
-        rd: u8,
-        rs1: u8,
-        rs2: u8,
-        aq: bool,
-        rl: bool,
-    ) -> Result<(), JitError>;
+    fn emit_amoswap_w(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
 
-    fn emit_amoadd_w(
-        ptr: PtrT,
-        cpu: &mut Cpu,
-        rd: u8,
-        rs1: u8,
-        rs2: u8,
-        aq: bool,
-        rl: bool,
-    ) -> Result<(), JitError>;
+    fn emit_amoadd_w(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
 
-    fn emit_amoxor_w(
-        ptr: PtrT,
-        cpu: &mut Cpu,
-        rd: u8,
-        rs1: u8,
-        rs2: u8,
-        aq: bool,
-        rl: bool,
-    ) -> Result<(), JitError>;
+    fn emit_amoxor_w(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
 
-    fn emit_amoor_w(
-        ptr: PtrT,
-        cpu: &mut Cpu,
-        rd: u8,
-        rs1: u8,
-        rs2: u8,
-        aq: bool,
-        rl: bool,
-    ) -> Result<(), JitError>;
+    fn emit_amoor_w(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
 
-    fn emit_amoand_w(
-        ptr: PtrT,
-        cpu: &mut Cpu,
-        rd: u8,
-        rs1: u8,
-        rs2: u8,
-        aq: bool,
-        rl: bool,
-    ) -> Result<(), JitError>;
+    fn emit_amoand_w(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
 
-    fn emit_amomin_w(
-        ptr: PtrT,
-        cpu: &mut Cpu,
-        rd: u8,
-        rs1: u8,
-        rs2: u8,
-        aq: bool,
-        rl: bool,
-    ) -> Result<(), JitError>;
+    fn emit_amomin_w(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
 
-    fn emit_amomax_w(
-        ptr: PtrT,
-        cpu: &mut Cpu,
-        rd: u8,
-        rs1: u8,
-        rs2: u8,
-        aq: bool,
-        rl: bool,
-    ) -> Result<(), JitError>;
+    fn emit_amomax_w(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
 
-    fn emit_amominu_w(
-        ptr: PtrT,
-        cpu: &mut Cpu,
-        rd: u8,
-        rs1: u8,
-        rs2: u8,
-        aq: bool,
-        rl: bool,
-    ) -> Result<(), JitError>;
+    fn emit_amominu_w(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
 
-    fn emit_amomaxu_w(
-        ptr: PtrT,
-        cpu: &mut Cpu,
-        rd: u8,
-        rs1: u8,
-        rs2: u8,
-        aq: bool,
-        rl: bool,
-    ) -> Result<(), JitError>;
+    fn emit_amomaxu_w(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
 }
