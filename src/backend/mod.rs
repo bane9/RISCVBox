@@ -12,10 +12,7 @@ pub use aarch64 as target;
 
 pub use target::*;
 
-pub mod setjmp_common;
-
-#[cfg(unix)]
-pub mod setjmp_posix;
+pub mod setjmp;
 
 pub mod common;
 pub use common::*;

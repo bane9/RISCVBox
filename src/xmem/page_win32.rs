@@ -4,7 +4,9 @@ extern crate winapi;
 
 use std::ptr;
 use winapi::um::memoryapi::{VirtualAlloc, VirtualFree, VirtualProtect};
-use winapi::um::winnt::{MEM_COMMIT, MEM_RELEASE, PAGE_EXECUTE_READ, PAGE_READWRITE};
+use winapi::um::winnt::{
+    MEM_COMMIT, MEM_RELEASE, PAGE_EXECUTE_READ, PAGE_NOACCESS, PAGE_READWRITE,
+};
 
 const PAGE_SIZE: usize = 4096;
 
@@ -68,6 +70,10 @@ impl PageAllocator for Win32Allocator {
 
     fn mark_rx(ptr: *mut u8, npages: usize) -> Result<(), AllocationError> {
         win32_mark_page(ptr, npages, PAGE_EXECUTE_READ)
+    }
+
+    fn mark_invalid(ptr: *mut u8, npages: usize) -> Result<(), AllocationError> {
+        win32_mark_page(ptr, npages, PAGE_NOACCESS)
     }
 
     fn dealloc(ptr: *mut u8, _npages: usize) {

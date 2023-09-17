@@ -1,3 +1,5 @@
+pub mod core;
+
 pub mod csr;
 pub mod privledged;
 pub mod rva;

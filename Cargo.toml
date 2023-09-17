@@ -8,7 +8,6 @@ winapi = { version = "0.3.9", features = ["winuser", "memoryapi"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.148"
-setjmp = "0.1.4"
 
 [dependencies]
 lazy_static = "1.4.0"
