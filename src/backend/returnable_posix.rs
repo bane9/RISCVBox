@@ -19,7 +19,7 @@ thread_local! {
 pub struct ReturnableImpl;
 
 impl ReturnableHandler for ReturnableImpl {
-    fn handle(closure: ReturnableClosure) -> ReturnStatus {
+    fn handle<F: Fn() -> ()>(closure: F) -> ReturnStatus {
         let jmp_buf = JUMP_BUF.with(|buf| (*buf.borrow()).as_ptr());
 
         let i = unsafe { setjmp(jmp_buf as *mut c_void) };

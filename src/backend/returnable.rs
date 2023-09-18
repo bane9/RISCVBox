@@ -1,7 +1,5 @@
 pub use crate::backend::ReturnableImpl;
 
-pub type ReturnableClosure = fn();
-
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ReturnStatus {
     ReturnOk,
@@ -9,7 +7,7 @@ pub enum ReturnStatus {
 }
 
 pub trait ReturnableHandler {
-    fn handle(closure: ReturnableClosure) -> ReturnStatus;
+    fn handle<F: Fn() -> ()>(closure: F) -> ReturnStatus;
     fn return_ok() -> !;
     fn return_notify() -> !;
 }

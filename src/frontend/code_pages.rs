@@ -25,7 +25,8 @@ impl CodePages {
     }
 
     pub fn get_xmem_from_ptr(&self, ptr: *mut u8) -> Option<Xmem> {
-        let page = ptr as usize / Xmem::page_size();
+        let first_page = self.xmem[0].as_ptr() as usize;
+        let page: usize = (ptr as usize - first_page) / Xmem::page_size();
 
         if page >= self.pages_total {
             return None;

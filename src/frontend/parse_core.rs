@@ -7,6 +7,8 @@ use crate::frontend::code_pages;
 use crate::xmem::page_container;
 use crate::xmem::page_container::Xmem;
 
+use crate::backend::{ReturnableHandler, ReturnableImpl};
+
 use crate::frontend::csr;
 use crate::frontend::privledged;
 use crate::frontend::rva;
@@ -37,20 +39,25 @@ impl Core {
         let pages = rom.len() / Xmem::page_size();
         let pages = pages + pages / 2;
         let pages = std::cmp::max(pages, 1);
-        let mut code_pages = code_pages::CodePages::new(pages, 1);
+        let mut code_pages = code_pages::CodePages::new(pages, CODE_PAGE_READAHEAD);
 
         BackendCoreImpl::fill_with_target_nop(code_pages.as_ptr(), pages * Xmem::page_size());
 
-        let ok_jump = BackendCoreImpl::emit_void_call(returnable::c_return_ok);
+        let ok_jump = BackendCoreImpl::emit_void_call(returnable::c_return_notify);
 
-        code_pages.apply_reserved_insn_all(ok_jump);
+        code_pages.apply_insn(code_pages.as_ptr(), ok_jump);
 
         code_pages.mark_all_pages(page_container::PageState::ReadExecute);
 
         unsafe {
             let as_fn = std::mem::transmute::<*mut u8, fn()>(code_pages.as_ptr());
 
-            as_fn();
+            let closure = || {
+                as_fn();
+            };
+
+            let result = ReturnableImpl::handle(closure);
+            println!("result: {:?}", result);
         }
 
         rom.resize(total_ram_size, 0);

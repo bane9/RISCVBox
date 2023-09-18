@@ -8,7 +8,7 @@ pub struct ReturnableImpl;
 use std::arch::asm;
 
 impl ReturnableHandler for ReturnableImpl {
-    fn handle(closure: ReturnableClosure) -> ReturnStatus {
+    fn handle<F: Fn() -> ()>(closure: F) -> ReturnStatus {
         let res = microseh::try_seh(closure);
 
         match res {
