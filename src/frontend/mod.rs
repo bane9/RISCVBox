@@ -1,3 +1,4 @@
+mod code_pages;
 pub mod parse_core;
 
 mod csr;

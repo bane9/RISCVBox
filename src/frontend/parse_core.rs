@@ -1,7 +1,10 @@
 use crate::backend::common as JitCommon;
 use crate::backend::common::BackendCore;
+use crate::backend::returnable;
 use crate::backend::target::core::BackendCoreImpl;
 use crate::cpu;
+use crate::frontend::code_pages;
+use crate::xmem::page_container;
 use crate::xmem::page_container::Xmem;
 
 use crate::frontend::csr;
@@ -9,6 +12,8 @@ use crate::frontend::privledged;
 use crate::frontend::rva;
 use crate::frontend::rvi;
 use crate::frontend::rvm;
+
+use super::code_pages::CodePages;
 
 pub const CODE_PAGE_SIZE: usize = 4096;
 pub const CODE_PAGE_READAHEAD: usize = 1;
@@ -19,39 +24,43 @@ pub type DecoderFn = fn(&mut cpu::Cpu, *mut u8, u32) -> JitCommon::DecodeRet;
 
 pub struct Core {
     cpu: cpu::Cpu,
-    xmem: Xmem,
+    code_pages: CodePages,
     ram: Vec<u8>,
     offset: usize,
     total_ram_size: usize,
 }
 
-enum PageState {
-    Invalid,
-    RW,
-    RX,
-}
-
 impl Core {
-    pub fn new(rom: Vec<u8>, total_ram_size: usize) -> Core {
+    pub fn new(mut rom: Vec<u8>, total_ram_size: usize) -> Core {
         assert!(rom.len() < total_ram_size);
 
-        let mut xmem = Xmem::new_empty();
         let pages = rom.len() / Xmem::page_size();
         let pages = pages + pages / 2;
-        xmem.realloc(pages).unwrap();
+        let pages = std::cmp::max(pages, 1);
+        let mut code_pages = code_pages::CodePages::new(pages, 1);
 
-        BackendCoreImpl::fill_with_target_nop(xmem.as_ptr(), pages * Xmem::page_size());
+        BackendCoreImpl::fill_with_target_nop(code_pages.as_ptr(), pages * Xmem::page_size());
 
-        let mut ram = rom.clone();
+        let ok_jump = BackendCoreImpl::emit_void_call(returnable::c_return_ok);
 
-        ram.resize(total_ram_size, 0);
+        code_pages.apply_reserved_insn_all(ok_jump);
 
-        let cpu = cpu::Cpu::new(ram.as_ptr() as *mut u8);
+        code_pages.mark_all_pages(page_container::PageState::ReadExecute);
+
+        unsafe {
+            let as_fn = std::mem::transmute::<*mut u8, fn()>(code_pages.as_ptr());
+
+            as_fn();
+        }
+
+        rom.resize(total_ram_size, 0);
+
+        let cpu = cpu::Cpu::new(rom.as_ptr() as *mut u8);
 
         let core = Core {
             cpu,
-            xmem,
-            ram,
+            code_pages,
+            ram: rom,
             offset: 0,
             total_ram_size,
         };
@@ -83,7 +92,7 @@ impl Core {
         assert!(start < end);
         let mut insn: u32 = 0;
 
-        let ptr = self.xmem.as_ptr().wrapping_add(start);
+        let ptr = self.code_pages.as_ptr().wrapping_add(start);
 
         for i in (start..end).step_by(INSN_SIZE) {
             unsafe {
@@ -94,27 +103,25 @@ impl Core {
                 );
             }
 
-            self.offset += self.exec(ptr.wrapping_add(i), insn, end)?;
+            let result = self.decode_single(ptr.wrapping_add(i), insn, end);
 
-            self.cpu.pc += INSN_SIZE as u64;
+            if let Err(JitCommon::JitError::ReachedBlockBoundary) = result {
+                break;
+            } else if result.is_err() {
+                return result;
+            }
         }
-
-        self.mark_page_range(
-            start % Xmem::page_size(),
-            end % Xmem::page_size(),
-            PageState::RX,
-        );
 
         Ok(())
     }
 
     // Make sure ptr is at rw page
-    fn exec(
+    fn decode_single(
         &mut self,
         ptr: *mut u8,
         insn: u32,
         block_boundary: usize,
-    ) -> Result<usize, JitCommon::JitError> {
+    ) -> Result<(), JitCommon::JitError> {
         static DECODERS: [DecoderFn; 5] = [
             rvi::decode_rvi,
             rvm::decode_rvm,
@@ -141,37 +148,16 @@ impl Core {
 
         let out_res = out_res.unwrap();
 
-        if (ptr.wrapping_add(out_res.size()) as usize) >= block_boundary {
+        let result = self.code_pages.apply_insn(ptr, out_res);
+
+        if result.is_none() {
             return Err(JitCommon::JitError::ReachedBlockBoundary);
         }
 
-        unsafe {
-            std::ptr::copy_nonoverlapping(out_res.as_ptr(), ptr as *mut u8, out_res.size());
-        }
+        self.cpu.pc += INSN_SIZE as u64;
 
-        Ok(out_res.size())
-    }
+        self.offset += out_res.size();
 
-    fn mark_page_range(&self, start: usize, end: usize, state: PageState) {
-        match state {
-            PageState::Invalid => {
-                for i in start..end {
-                    Xmem::mark_invalid(self.xmem.as_ptr().wrapping_add(i * Xmem::page_size()))
-                        .expect_err("Failed to mark xmem invalid");
-                }
-            }
-            PageState::RW => {
-                for i in start..end {
-                    Xmem::mark_rw(self.xmem.as_ptr().wrapping_add(i * Xmem::page_size()))
-                        .expect_err("Failed to mark xmem rw");
-                }
-            }
-            PageState::RX => {
-                for i in start..end {
-                    Xmem::mark_rx(self.xmem.as_ptr().wrapping_add(i * Xmem::page_size()))
-                        .expect_err("Failed to mark xmem rx");
-                }
-            }
-        }
+        Ok(())
     }
 }

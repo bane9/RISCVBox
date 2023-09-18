@@ -15,11 +15,41 @@ impl<T, const N: usize> EncodedInsn<T, N> {
         }
     }
 
+    pub fn new_from_slice(insn: &[T]) -> EncodedInsn<T, N>
+    where
+        T: Default + Copy,
+    {
+        assert!(insn.len() <= N);
+
+        let mut encoded_insn = EncodedInsn::new();
+
+        for i in 0..insn.len() {
+            encoded_insn.insn[i] = insn[i];
+        }
+
+        encoded_insn.size = insn.len();
+
+        encoded_insn
+    }
+
     pub fn push(&mut self, insn: T) {
         assert!(self.size < N);
 
         self.insn[self.size] = insn;
         self.size += 1;
+    }
+
+    pub fn push_arr(&mut self, insn: &[T])
+    where
+        T: Copy,
+    {
+        assert!(self.size + insn.len() <= N);
+
+        for i in 0..insn.len() {
+            self.insn[self.size + i] = insn[i];
+        }
+
+        self.size += insn.len();
     }
 
     pub fn as_ptr(&self) -> *const T {

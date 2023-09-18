@@ -8,13 +8,6 @@ mod frontend;
 use crate::backend::ReturnableHandler;
 use backend::ReturnableImpl;
 
-fn fault() {
-    println!("fault");
-    ReturnableImpl::return_notify();
-}
-
 fn main() {
-    let res = ReturnableImpl::handle(fault);
-
-    println!("res: {:?}", res);
+    let mut core = frontend::parse_core::Core::new(Vec::new(), 4096);
 }

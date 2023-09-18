@@ -30,7 +30,7 @@ impl ReturnableHandler for ReturnableImpl {
 
         match i {
             1 => ReturnStatus::ReturnOk,
-            2 => ReturnStatus::ReturnException,
+            2 => ReturnStatus::ReturnNotify,
             _ => panic!("unknown return status"),
         }
     }
@@ -43,7 +43,7 @@ impl ReturnableHandler for ReturnableImpl {
         }
     }
 
-    fn return_exception() -> ! {
+    fn return_notify() -> ! {
         let jmp_buf = JUMP_BUF.with(|buf| (*buf.borrow()).as_ptr());
 
         unsafe {

@@ -16,6 +16,7 @@ pub type DecodeRet = Result<HostEncodedInsn, JitError>;
 
 pub trait BackendCore {
     fn fill_with_target_nop(ptr: PtrT, size: usize);
+    fn emit_void_call(fn_ptr: extern "C" fn()) -> HostEncodedInsn;
 }
 
 pub trait Rvi {
