@@ -45,7 +45,9 @@ impl Core {
 
         let ok_jump = BackendCoreImpl::emit_void_call(returnable::c_return_notify);
 
-        code_pages.apply_insn(code_pages.as_ptr(), ok_jump);
+        // code_pages.apply_insn(code_pages.as_ptr(), ok_jump);
+
+        code_pages.apply_reserved_insn_all(ok_jump);
 
         code_pages.mark_all_pages(page_container::PageState::ReadExecute);
 

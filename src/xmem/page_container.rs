@@ -25,24 +25,24 @@ pub struct Xmem {
 impl Xmem {
     pub fn new_as_list(
         pages_total: usize,
-        xmem_per_page: usize,
+        pages_per_xmem: usize,
     ) -> Result<Vec<Xmem>, AllocationError> {
         assert!(
             pages_total > 0
-                && xmem_per_page > 0
-                && pages_total % xmem_per_page == 0
-                && pages_total >= xmem_per_page
+                && pages_per_xmem > 0
+                && pages_total % pages_per_xmem == 0
+                && pages_total >= pages_per_xmem
         );
 
         let mut xmem_list: Vec<Xmem> = Vec::new();
 
         let ptr = XmemAllocator::alloc(pages_total)?;
 
-        for i in 0..pages_total / xmem_per_page {
+        for i in 0..pages_total / pages_per_xmem {
             let xmem = Xmem {
-                ptr: unsafe { ptr.add(i * xmem_per_page * XmemAllocator::page_size()) },
-                npages: xmem_per_page,
-                non_reserved_bytes: xmem_per_page * XmemAllocator::page_size(),
+                ptr: unsafe { ptr.add(i * pages_per_xmem * XmemAllocator::page_size()) },
+                npages: pages_per_xmem,
+                non_reserved_bytes: pages_per_xmem * XmemAllocator::page_size(),
                 used_bytes: 0,
                 page_state: PageState::ReadWrite,
             };

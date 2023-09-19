@@ -86,7 +86,7 @@ impl CodePages {
             }
 
             unsafe {
-                std::ptr::copy_nonoverlapping(new_ptr, xmem.as_ptr(), insn.size());
+                std::ptr::copy_nonoverlapping(insn.as_ptr(), new_ptr, insn.size());
             }
 
             xmem.non_reserved_bytes -= insn.size();

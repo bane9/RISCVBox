@@ -22,23 +22,13 @@ impl BackendCore for BackendCoreImpl {
 
     fn emit_void_call(fn_ptr: extern "C" fn()) -> HostEncodedInsn {
         let mut fn_call = [
-            0x49 as u8, 0xBB, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x41, 0xFF, 0xD3,
+            0x49, 0xBB, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x41, 0xFF, 0xD3,
         ];
 
-        let fn_as_u8 = fn_ptr as *mut u8 as usize;
+        let fn_addr_bytes: [u8; 8] = unsafe { std::mem::transmute(fn_ptr as usize) };
 
-        for i in 0..8 {
-            fn_call[2 + i] = (fn_as_u8 >> (i * 8)) as u8;
-        }
+        fn_call[2..10].copy_from_slice(&fn_addr_bytes);
 
-        println!("fn_ptr: {:x}", fn_ptr as *mut u8 as usize);
-
-        for i in 0..fn_call.len() {
-            print!("{:x} ", fn_call[i]);
-        }
-
-        println!();
-
-        HostEncodedInsn::new_from_slice(fn_call.as_ref())
+        HostEncodedInsn::new_from_slice(&fn_call)
     }
 }
