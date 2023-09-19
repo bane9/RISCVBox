@@ -41,10 +41,12 @@ pub enum PrivMode {
     Machine = 3,
 }
 
+pub type CpuReg = u32;
+
 pub struct Cpu {
-    pub pc: u64,
-    pub regs: [u64; 32],
-    pub csr: [u64; 4096],
+    pub pc: CpuReg,
+    pub regs: [CpuReg; 32],
+    pub csr: [CpuReg; 4096],
     pub mode: PrivMode,
 }
 

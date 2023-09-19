@@ -1,6 +1,6 @@
 use crate::backend::{
     common::{BackendCore, PtrT},
-    DecodeRet, HostEncodedInsn, HostInsnT,
+    HostEncodedInsn,
 };
 
 pub struct BackendCoreImpl;

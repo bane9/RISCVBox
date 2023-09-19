@@ -41,6 +41,8 @@ impl ReturnableHandler for ReturnableImpl {
         unsafe {
             longjmp(jmp_buf as *mut c_void, 1);
         }
+
+        unreachable!();
     }
 
     fn return_notify() -> ! {
@@ -49,5 +51,7 @@ impl ReturnableHandler for ReturnableImpl {
         unsafe {
             longjmp(jmp_buf as *mut c_void, 2);
         }
+
+        unreachable!();
     }
 }

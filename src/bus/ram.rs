@@ -11,27 +11,19 @@ impl Ram {
 }
 
 impl BusDevice for Ram {
-    fn read(&self, addr: BusType) -> Result<BusType, BusError> {
-        let addr = addr as usize - self.get_begin_addr() as usize;
+    fn read(&mut self, addr: BusType) -> Result<BusType, BusError> {
+        let adj_addr = (addr as usize) - (self.get_begin_addr() as usize);
 
-        if addr >= self.mem.len() {
-            return Err(BusError::InvalidAddress);
-        }
-
-        Ok(self.mem[addr] as BusType)
+        Ok(self.mem[adj_addr] as BusType)
     }
 
     fn write(&mut self, addr: BusType, data: BusType, size: BusType) -> Result<(), BusError> {
-        let addr = addr as usize - self.get_begin_addr() as usize;
-
-        if addr >= self.mem.len() {
-            return Err(BusError::InvalidAddress);
-        }
+        let adj_addr = (addr as usize) - (self.get_begin_addr() as usize);
 
         unsafe {
             std::ptr::copy_nonoverlapping(
                 &data as *const BusType as *const u8,
-                self.mem.as_mut_ptr().add(addr),
+                self.mem.as_mut_ptr().add(adj_addr),
                 size as usize,
             );
         }

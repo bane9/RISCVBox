@@ -148,7 +148,7 @@ impl ParseCore {
             return Err(JitCommon::JitError::ReachedBlockBoundary);
         }
 
-        cpu.pc += INSN_SIZE as u64;
+        cpu.pc += INSN_SIZE as u32;
 
         self.offset += out_res.size();
 

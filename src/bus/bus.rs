@@ -8,7 +8,7 @@ pub enum BusError {
 pub type BusType = u32;
 
 pub trait BusDevice {
-    fn read(&self, addr: BusType) -> Result<BusType, BusError>;
+    fn read(&mut self, addr: BusType) -> Result<BusType, BusError>;
     fn write(&mut self, addr: BusType, data: BusType, size: BusType) -> Result<(), BusError>;
     fn get_begin_addr(&self) -> BusType;
     fn get_end_addr(&self) -> BusType;
@@ -30,8 +30,8 @@ impl Bus {
         self.devices.push(device);
     }
 
-    pub fn read(&self, addr: BusType) -> Result<BusType, BusError> {
-        for device in &self.devices {
+    pub fn read(&mut self, addr: BusType) -> Result<BusType, BusError> {
+        for device in &mut self.devices {
             if addr >= device.get_begin_addr() && addr < device.get_end_addr() {
                 return device.read(addr);
             }
