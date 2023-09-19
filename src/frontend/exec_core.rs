@@ -1,14 +1,17 @@
 use crate::backend::{ReturnableHandler, ReturnableImpl};
+use crate::cpu::Cpu;
 pub use crate::frontend::parse_core::*;
 
 pub struct ExecCore {
     parse_core: ParseCore,
+    cpu: Cpu,
 }
 
 impl ExecCore {
     pub fn new(rom: Vec<u8>) -> Self {
         Self {
             parse_core: ParseCore::new(rom),
+            cpu: Cpu::new(),
         }
     }
 

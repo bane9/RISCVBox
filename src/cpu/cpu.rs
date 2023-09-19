@@ -45,17 +45,15 @@ pub struct Cpu {
     pub pc: u64,
     pub regs: [u64; 32],
     pub csr: [u64; 4096],
-    pub mem: *mut u8,
     pub mode: PrivMode,
 }
 
 impl Cpu {
-    pub fn new(mem: *mut u8) -> Cpu {
+    pub fn new() -> Cpu {
         Cpu {
             pc: 0,
             regs: [0; 32],
             csr: [0; 4096],
-            mem,
             mode: PrivMode::Machine,
         }
     }

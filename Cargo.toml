@@ -12,3 +12,4 @@ libc = "0.2.148"
 
 [dependencies]
 lazy_static = "1.4.0"
+arc-swap = "1.6.0"
