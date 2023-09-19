@@ -7,6 +7,7 @@ pub enum ReturnStatus {
 }
 
 pub trait ReturnableHandler {
+    #[must_use]
     fn handle<F: Fn() -> ()>(closure: F) -> ReturnStatus;
     fn return_ok() -> !;
     fn return_notify() -> !;

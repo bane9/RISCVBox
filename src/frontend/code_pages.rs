@@ -46,9 +46,7 @@ impl CodePages {
 
         xmem.used_bytes += insn.size();
 
-        if xmem.get_state() != PageState::ReadWrite {
-            xmem.mark_rw().unwrap();
-        }
+        xmem.mark_rw().unwrap();
 
         unsafe {
             std::ptr::copy_nonoverlapping(insn.as_ptr(), ptr, insn.size());
@@ -64,9 +62,7 @@ impl CodePages {
 
         let new_ptr = xmem.end().wrapping_sub(insn.size());
 
-        if xmem.get_state() != PageState::ReadWrite {
-            xmem.mark_rw().unwrap();
-        }
+        xmem.mark_rw().unwrap();
 
         unsafe {
             std::ptr::copy_nonoverlapping(new_ptr, ptr, insn.size());
@@ -81,9 +77,7 @@ impl CodePages {
 
             let new_ptr = xmem.end().wrapping_sub(insn.size());
 
-            if xmem.get_state() != PageState::ReadWrite {
-                xmem.mark_rw().unwrap();
-            }
+            xmem.mark_rw().unwrap();
 
             unsafe {
                 std::ptr::copy_nonoverlapping(insn.as_ptr(), new_ptr, insn.size());

@@ -7,8 +7,6 @@ use crate::frontend::code_pages;
 use crate::xmem::page_container;
 use crate::xmem::page_container::Xmem;
 
-use crate::backend::{ReturnableHandler, ReturnableImpl};
-
 use crate::frontend::csr;
 use crate::frontend::privledged;
 use crate::frontend::rva;
@@ -24,18 +22,16 @@ pub const INSN_SIZE: usize = 4; // Unlikely for rvc to be supported
 
 pub type DecoderFn = fn(&mut cpu::Cpu, *mut u8, u32) -> JitCommon::DecodeRet;
 
-pub struct Core {
+pub struct ParseCore {
     cpu: cpu::Cpu,
     code_pages: CodePages,
-    ram: Vec<u8>,
+    rom: Vec<u8>,
     offset: usize,
     total_ram_size: usize,
 }
 
-impl Core {
-    pub fn new(mut rom: Vec<u8>, total_ram_size: usize) -> Core {
-        assert!(rom.len() < total_ram_size);
-
+impl ParseCore {
+    pub fn new(rom: Vec<u8>) -> ParseCore {
         let pages = rom.len() / Xmem::page_size();
         let pages = pages + pages / 2;
         let pages = std::cmp::max(pages, 1);
@@ -43,35 +39,20 @@ impl Core {
 
         BackendCoreImpl::fill_with_target_nop(code_pages.as_ptr(), pages * Xmem::page_size());
 
-        let ok_jump = BackendCoreImpl::emit_void_call(returnable::c_return_notify);
-
-        // code_pages.apply_insn(code_pages.as_ptr(), ok_jump);
+        let ok_jump = BackendCoreImpl::emit_void_call(returnable::c_return_ok);
 
         code_pages.apply_reserved_insn_all(ok_jump);
 
         code_pages.mark_all_pages(page_container::PageState::ReadExecute);
 
-        unsafe {
-            let as_fn = std::mem::transmute::<*mut u8, fn()>(code_pages.as_ptr());
-
-            let closure = || {
-                as_fn();
-            };
-
-            let result = ReturnableImpl::handle(closure);
-            println!("result: {:?}", result);
-        }
-
-        rom.resize(total_ram_size, 0);
-
         let cpu = cpu::Cpu::new(rom.as_ptr() as *mut u8);
 
-        let core = Core {
+        let core = ParseCore {
             cpu,
             code_pages,
-            ram: rom,
+            rom,
             offset: 0,
-            total_ram_size,
+            total_ram_size: pages * Xmem::page_size(),
         };
 
         core
@@ -106,7 +87,7 @@ impl Core {
         for i in (start..end).step_by(INSN_SIZE) {
             unsafe {
                 std::ptr::copy_nonoverlapping(
-                    self.ram.as_ptr().add(i),
+                    self.rom.as_ptr().add(i),
                     &mut insn as *mut u32 as *mut u8,
                     INSN_SIZE,
                 );
@@ -121,10 +102,12 @@ impl Core {
             }
         }
 
+        self.code_pages
+            .mark_all_pages(page_container::PageState::ReadExecute);
+
         Ok(())
     }
 
-    // Make sure ptr is at rw page
     fn decode_single(
         &mut self,
         ptr: *mut u8,
@@ -168,5 +151,9 @@ impl Core {
         self.offset += out_res.size();
 
         Ok(())
+    }
+
+    pub fn get_exec_ptr(&self) -> *mut u8 {
+        self.code_pages.as_ptr().wrapping_add(self.offset)
     }
 }

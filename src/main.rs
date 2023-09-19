@@ -1,13 +1,15 @@
-mod util;
-mod xmem;
-use xmem::page_container::Xmem;
 mod backend;
 mod cpu;
 mod frontend;
+mod util;
+mod xmem;
 
-use crate::backend::ReturnableHandler;
-use backend::ReturnableImpl;
+use frontend::exec_core::ExecCoreThreadPool;
 
 fn main() {
-    let mut core = frontend::parse_core::Core::new(Vec::new(), 4096);
+    let rom = util::read_file("test.bin").unwrap();
+
+    let exec_thread_pool = ExecCoreThreadPool::new(rom, 1);
+
+    exec_thread_pool.join();
 }

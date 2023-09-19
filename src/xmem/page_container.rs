@@ -13,7 +13,7 @@ pub enum PageState {
     ReadExecute,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Xmem {
     ptr: *mut u8,
     npages: usize,
@@ -71,18 +71,30 @@ impl Xmem {
     }
 
     pub fn mark_rw(&mut self) -> Result<(), AllocationError> {
+        if self.page_state == PageState::ReadWrite {
+            return Ok(());
+        }
+
         XmemAllocator::mark_rw(self.ptr, self.npages)?;
         self.page_state = PageState::ReadWrite;
         Ok(())
     }
 
     pub fn mark_rx(&mut self) -> Result<(), AllocationError> {
+        if self.page_state == PageState::ReadExecute {
+            return Ok(());
+        }
+
         XmemAllocator::mark_rx(self.ptr, self.npages)?;
         self.page_state = PageState::ReadExecute;
         Ok(())
     }
 
     pub fn mark_invalid(&mut self) -> Result<(), AllocationError> {
+        if self.page_state == PageState::Invalid {
+            return Ok(());
+        }
+
         XmemAllocator::mark_invalid(self.ptr, self.npages)?;
         self.page_state = PageState::Invalid;
         Ok(())
