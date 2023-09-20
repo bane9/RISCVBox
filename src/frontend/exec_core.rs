@@ -1,5 +1,5 @@
 use crate::backend::{ReturnableHandler, ReturnableImpl};
-use crate::cpu::Cpu;
+use crate::cpu;
 pub use crate::frontend::parse_core::*;
 
 pub struct ExecCore {
@@ -15,12 +15,16 @@ impl ExecCore {
 
     pub fn exec_loop(&mut self) {
         let ptr = self.parse_core.get_exec_ptr();
-
+        let cpu = cpu::get_cpu();
+        cpu.ret_status = cpu::RunState::Running as usize;
         loop {
             let callable: extern "C" fn() = unsafe { std::mem::transmute(ptr) };
             let result = ReturnableImpl::handle(|| callable());
             println!("result: {:?}", result);
-            // callable();
+            println!(
+                "ret_status: {:?}",
+                cpu::RunState::from_usize(cpu.ret_status)
+            );
             break;
         }
     }

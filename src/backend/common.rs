@@ -1,4 +1,4 @@
-use crate::cpu::Cpu;
+use crate::cpu::{Cpu, RunState};
 use crate::util::EncodedInsn;
 
 #[derive(Debug)]
@@ -16,6 +16,8 @@ pub type DecodeRet = Result<HostEncodedInsn, JitError>;
 
 pub trait BackendCore {
     fn fill_with_target_nop(ptr: PtrT, size: usize);
+    fn fill_with_target_ret(ptr: PtrT, size: usize);
+    fn emit_ret_with_status(state: RunState) -> HostEncodedInsn;
     fn emit_void_call(fn_ptr: extern "C" fn()) -> HostEncodedInsn;
     fn find_guest_pc_from_host_stack_frame(caller_ret_addr: *mut u8) -> Option<u32>;
 }

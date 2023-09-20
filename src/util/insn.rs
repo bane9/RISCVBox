@@ -39,7 +39,7 @@ impl<T, const N: usize> EncodedInsn<T, N> {
         self.size += 1;
     }
 
-    pub fn push_arr(&mut self, insn: &[T])
+    pub fn push_slice(&mut self, insn: &[T])
     where
         T: Copy,
     {
@@ -62,6 +62,44 @@ impl<T, const N: usize> EncodedInsn<T, N> {
 
     pub fn size(&self) -> usize {
         self.size
+    }
+}
+
+impl<T, const N: usize> core::fmt::Debug for EncodedInsn<T, N>
+where
+    T: core::fmt::Debug + core::fmt::LowerHex + Copy,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "[")?;
+
+        for i in 0..self.size {
+            write!(f, "{:x}", self.insn[i])?;
+
+            if i < self.size - 1 {
+                write!(f, ", ")?;
+            }
+        }
+
+        write!(f, "]")
+    }
+}
+
+impl<T, const N: usize> core::fmt::Display for EncodedInsn<T, N>
+where
+    T: core::fmt::Debug + core::fmt::LowerHex + Copy,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "[")?;
+
+        for i in 0..self.size {
+            write!(f, "{:x}", self.insn[i])?;
+
+            if i < self.size - 1 {
+                write!(f, ", ")?;
+            }
+        }
+
+        write!(f, "]")
     }
 }
 

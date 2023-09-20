@@ -2,6 +2,7 @@ use crate::backend::PtrT;
 use crate::bus::bus::BusType;
 use crate::util::BiMap;
 use std::cell::RefCell;
+use std::collections::HashMap;
 
 pub enum OpType {
     L = 0x03,
@@ -46,6 +47,27 @@ pub enum PrivMode {
     Machine = 3,
 }
 
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum RunState {
+    None = 0,
+    Running = 1,
+    Exception = 2,
+    BlockExit = 3,
+    Unknown = 0xff,
+}
+
+impl RunState {
+    pub fn from_usize(val: usize) -> RunState {
+        match val {
+            0 => RunState::None,
+            1 => RunState::Running,
+            2 => RunState::Exception,
+            3 => RunState::BlockExit,
+            _ => RunState::Unknown,
+        }
+    }
+}
+
 pub type CpuReg = BusType;
 
 pub struct Cpu {
@@ -54,6 +76,9 @@ pub struct Cpu {
     pub csr: [CpuReg; 4096],
     pub mode: PrivMode,
     pub insn_map: BiMap<PtrT, CpuReg>,
+    pub missing_insn_map: HashMap<CpuReg, PtrT>,
+    pub run_state: RunState,
+    pub ret_status: usize,
 }
 
 impl Cpu {
@@ -64,6 +89,9 @@ impl Cpu {
             csr: [0; 4096],
             mode: PrivMode::Machine,
             insn_map: BiMap::new(),
+            missing_insn_map: HashMap::new(),
+            run_state: RunState::None,
+            ret_status: 0,
         }
     }
 }

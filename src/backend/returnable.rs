@@ -18,9 +18,6 @@ pub trait ReturnableHandler {
 }
 
 pub extern "C" fn c_return_ok() {
-    let ret = host_get_return_addr!();
-    let pc = BackendCoreImpl::find_guest_pc_from_host_stack_frame(ret);
-    println!("return_ok: {:?} {:p}", pc, ret);
     ReturnableImpl::return_ok()
 }
 

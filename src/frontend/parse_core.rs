@@ -38,16 +38,14 @@ impl ParseCore {
 
         BackendCoreImpl::fill_with_target_nop(code_pages.as_ptr(), pages * Xmem::page_size());
 
-        let cpu = cpu::get_cpu();
-
-        for i in 0..4096 {
-            cpu.insn_map
-                .insert(code_pages.as_ptr().wrapping_add(i), i as u32);
-        }
-
-        let ok_jump = BackendCoreImpl::emit_void_call(returnable::c_return_ok);
+        let ok_jump = BackendCoreImpl::emit_ret_with_status(cpu::RunState::BlockExit);
 
         code_pages.apply_reserved_insn_all(ok_jump);
+
+        code_pages.apply_insn(
+            code_pages.as_ptr(),
+            BackendCoreImpl::emit_ret_with_status(cpu::RunState::Exception),
+        );
 
         code_pages.mark_all_pages(page_container::PageState::ReadExecute);
 
@@ -161,6 +159,6 @@ impl ParseCore {
     }
 
     pub fn get_exec_ptr(&self) -> *mut u8 {
-        self.code_pages.as_ptr().wrapping_add(self.offset)
+        self.code_pages.as_ptr()
     }
 }
