@@ -1,4 +1,8 @@
+use crate::backend::common::BackendCore;
+use crate::backend::target::core::BackendCoreImpl;
 pub use crate::backend::ReturnableImpl;
+use crate::host_get_return_addr;
+use std::arch::asm;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ReturnStatus {
@@ -14,6 +18,9 @@ pub trait ReturnableHandler {
 }
 
 pub extern "C" fn c_return_ok() {
+    let ret = host_get_return_addr!();
+    let pc = BackendCoreImpl::find_guest_pc_from_host_stack_frame(ret);
+    println!("return_ok: {:?} {:p}", pc, ret);
     ReturnableImpl::return_ok()
 }
 

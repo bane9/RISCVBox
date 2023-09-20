@@ -10,13 +10,14 @@ pub enum JitError {
 
 pub type PtrT = *mut u8;
 pub type HostInsnT = u8;
-pub const HOST_INSN_MAX_SIZE: usize = 16; // TODO: check worst case later
+pub const HOST_INSN_MAX_SIZE: usize = 64; // TODO: check worst case later
 pub type HostEncodedInsn = EncodedInsn<HostInsnT, HOST_INSN_MAX_SIZE>;
 pub type DecodeRet = Result<HostEncodedInsn, JitError>;
 
 pub trait BackendCore {
     fn fill_with_target_nop(ptr: PtrT, size: usize);
     fn emit_void_call(fn_ptr: extern "C" fn()) -> HostEncodedInsn;
+    fn find_guest_pc_from_host_stack_frame(caller_ret_addr: *mut u8) -> Option<u32>;
 }
 
 pub trait Rvi {

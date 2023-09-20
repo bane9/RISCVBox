@@ -1,3 +1,6 @@
+use crate::backend::PtrT;
+use crate::bus::bus::BusType;
+use crate::util::BiMap;
 use std::cell::RefCell;
 
 pub enum OpType {
@@ -43,13 +46,14 @@ pub enum PrivMode {
     Machine = 3,
 }
 
-pub type CpuReg = u32;
+pub type CpuReg = BusType;
 
 pub struct Cpu {
     pub pc: CpuReg,
     pub regs: [CpuReg; 32],
     pub csr: [CpuReg; 4096],
     pub mode: PrivMode,
+    pub insn_map: BiMap<PtrT, CpuReg>,
 }
 
 impl Cpu {
@@ -59,6 +63,7 @@ impl Cpu {
             regs: [0; 32],
             csr: [0; 4096],
             mode: PrivMode::Machine,
+            insn_map: BiMap::new(),
         }
     }
 }

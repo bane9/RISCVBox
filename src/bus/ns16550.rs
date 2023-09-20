@@ -56,7 +56,7 @@ impl Ns16550 {
             fcr: 0,
             lcr: 0,
             mcr: 0,
-            lsr: 0,
+            lsr: LSR_TEMT | LSR_THRE,
             msr: 0,
             scr: 0,
             val: 0,

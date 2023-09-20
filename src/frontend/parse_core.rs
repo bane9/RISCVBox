@@ -38,6 +38,13 @@ impl ParseCore {
 
         BackendCoreImpl::fill_with_target_nop(code_pages.as_ptr(), pages * Xmem::page_size());
 
+        let cpu = cpu::get_cpu();
+
+        for i in 0..4096 {
+            cpu.insn_map
+                .insert(code_pages.as_ptr().wrapping_add(i), i as u32);
+        }
+
         let ok_jump = BackendCoreImpl::emit_void_call(returnable::c_return_ok);
 
         code_pages.apply_reserved_insn_all(ok_jump);
@@ -142,7 +149,11 @@ impl ParseCore {
             return Err(JitCommon::JitError::ReachedBlockBoundary);
         }
 
-        cpu::get_cpu().pc += INSN_SIZE as u32;
+        let cpu = cpu::get_cpu();
+
+        cpu.insn_map.insert(ptr, cpu.pc);
+
+        cpu.pc += INSN_SIZE as u32;
 
         self.offset += out_res.size();
 

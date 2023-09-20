@@ -4,14 +4,12 @@ pub use crate::frontend::parse_core::*;
 
 pub struct ExecCore {
     parse_core: ParseCore,
-    cpu: Cpu,
 }
 
 impl ExecCore {
     pub fn new(rom: Vec<u8>) -> Self {
         Self {
             parse_core: ParseCore::new(rom),
-            cpu: Cpu::new(),
         }
     }
 
@@ -22,6 +20,7 @@ impl ExecCore {
             let callable: extern "C" fn() = unsafe { std::mem::transmute(ptr) };
             let result = ReturnableImpl::handle(|| callable());
             println!("result: {:?}", result);
+            // callable();
             break;
         }
     }
