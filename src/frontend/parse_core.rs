@@ -20,7 +20,7 @@ pub const CODE_PAGE_READAHEAD: usize = 1;
 
 pub const INSN_SIZE: usize = 4; // Unlikely for rvc to be supported
 
-pub type DecoderFn = fn(&mut cpu::Cpu, *mut u8, u32) -> JitCommon::DecodeRet;
+pub type DecoderFn = fn(u32) -> JitCommon::DecodeRet;
 
 pub struct ParseCore {
     code_pages: CodePages,
@@ -54,7 +54,7 @@ impl ParseCore {
         core
     }
 
-    pub fn parse_ahead(&mut self, cpu: &mut cpu::Cpu) -> Result<(), JitCommon::JitError> {
+    pub fn parse_ahead(&mut self) -> Result<(), JitCommon::JitError> {
         let start = self.offset;
 
         if start >= self.total_ram_size {
@@ -66,19 +66,14 @@ impl ParseCore {
             self.total_ram_size,
         );
 
-        self.parse(cpu, start, end)?;
+        self.parse(start, end)?;
 
         self.offset = end;
 
         Ok(())
     }
 
-    pub fn parse(
-        &mut self,
-        cpu: &mut cpu::Cpu,
-        start: usize,
-        end: usize,
-    ) -> Result<(), JitCommon::JitError> {
+    pub fn parse(&mut self, start: usize, end: usize) -> Result<(), JitCommon::JitError> {
         let end = std::cmp::min(end, self.total_ram_size);
         assert!(start < end);
         let mut insn: u32 = 0;
@@ -94,7 +89,7 @@ impl ParseCore {
                 );
             }
 
-            let result = self.decode_single(cpu, ptr.wrapping_add(i), insn, end);
+            let result = self.decode_single(ptr.wrapping_add(i), insn, end);
 
             if let Err(JitCommon::JitError::ReachedBlockBoundary) = result {
                 break;
@@ -111,7 +106,6 @@ impl ParseCore {
 
     fn decode_single(
         &mut self,
-        cpu: &mut cpu::Cpu,
         ptr: *mut u8,
         insn: u32,
         block_boundary: usize,
@@ -127,7 +121,7 @@ impl ParseCore {
         let mut out_res: JitCommon::DecodeRet = Err(JitCommon::JitError::InvalidInstruction(insn));
 
         for decode in &DECODERS {
-            let result = decode(cpu, ptr, insn);
+            let result = decode(insn);
             if let Err(JitCommon::JitError::InvalidInstruction(_)) = result {
                 continue;
             } else {
@@ -148,7 +142,7 @@ impl ParseCore {
             return Err(JitCommon::JitError::ReachedBlockBoundary);
         }
 
-        cpu.pc += INSN_SIZE as u32;
+        cpu::get_cpu().pc += INSN_SIZE as u32;
 
         self.offset += out_res.size();
 

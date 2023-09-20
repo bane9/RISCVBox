@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 pub enum OpType {
     L = 0x03,
 
@@ -59,4 +61,12 @@ impl Cpu {
             mode: PrivMode::Machine,
         }
     }
+}
+
+thread_local! {
+    static CPU: RefCell<Cpu> = RefCell::new(Cpu::new());
+}
+
+pub fn get_cpu() -> &'static mut Cpu {
+    CPU.with(|cpu| unsafe { &mut *cpu.as_ptr() })
 }

@@ -4,123 +4,123 @@ use common::DecodeRet;
 pub struct RviImpl;
 
 impl common::Rvi for RviImpl {
-    fn emit_addi(cpu: &mut crate::cpu::Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet {
+    fn emit_addi(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_add(cpu: &mut crate::cpu::Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
+    fn emit_add(rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
         todo!()
     }
 
-    fn emit_sub(cpu: &mut crate::cpu::Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
+    fn emit_sub(rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
         todo!()
     }
 
-    fn emit_slli(cpu: &mut crate::cpu::Cpu, rd: u8, rs1: u8, shamt: u8) -> DecodeRet {
+    fn emit_slli(rd: u8, rs1: u8, shamt: u8) -> DecodeRet {
         todo!()
     }
 
-    fn emit_slti(cpu: &mut crate::cpu::Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet {
+    fn emit_slti(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_sltiu(cpu: &mut crate::cpu::Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet {
+    fn emit_sltiu(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_xori(cpu: &mut crate::cpu::Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet {
+    fn emit_xori(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_srli(cpu: &mut crate::cpu::Cpu, rd: u8, rs1: u8, shamt: u8) -> DecodeRet {
+    fn emit_srli(rd: u8, rs1: u8, shamt: u8) -> DecodeRet {
         todo!()
     }
 
-    fn emit_srai(cpu: &mut crate::cpu::Cpu, rd: u8, rs1: u8, shamt: u8) -> DecodeRet {
+    fn emit_srai(rd: u8, rs1: u8, shamt: u8) -> DecodeRet {
         todo!()
     }
 
-    fn emit_ori(cpu: &mut crate::cpu::Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet {
+    fn emit_ori(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_andi(cpu: &mut crate::cpu::Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet {
+    fn emit_andi(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_lui(cpu: &mut crate::cpu::Cpu, rd: u8, imm: i32) -> DecodeRet {
+    fn emit_lui(rd: u8, imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_auipc(cpu: &mut crate::cpu::Cpu, rd: u8, imm: i32) -> DecodeRet {
+    fn emit_auipc(rd: u8, imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_jal(cpu: &mut crate::cpu::Cpu, rd: u8, imm: i32) -> DecodeRet {
+    fn emit_jal(rd: u8, imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_jalr(cpu: &mut crate::cpu::Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet {
+    fn emit_jalr(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_beq(cpu: &mut crate::cpu::Cpu, rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
+    fn emit_beq(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_bne(cpu: &mut crate::cpu::Cpu, rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
+    fn emit_bne(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_blt(cpu: &mut crate::cpu::Cpu, rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
+    fn emit_blt(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_bge(cpu: &mut crate::cpu::Cpu, rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
+    fn emit_bge(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_bltu(cpu: &mut crate::cpu::Cpu, rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
+    fn emit_bltu(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_bgeu(cpu: &mut crate::cpu::Cpu, rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
+    fn emit_bgeu(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_lb(cpu: &mut crate::cpu::Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet {
+    fn emit_lb(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_lh(cpu: &mut crate::cpu::Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet {
+    fn emit_lh(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_lw(cpu: &mut crate::cpu::Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet {
+    fn emit_lw(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_lbu(cpu: &mut crate::cpu::Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet {
+    fn emit_lbu(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_lhu(cpu: &mut crate::cpu::Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet {
+    fn emit_lhu(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_sb(cpu: &mut crate::cpu::Cpu, rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
+    fn emit_sb(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_sh(cpu: &mut crate::cpu::Cpu, rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
+    fn emit_sh(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_sw(cpu: &mut crate::cpu::Cpu, rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
+    fn emit_sw(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_fence(cpu: &mut crate::cpu::Cpu, pred: u8, succ: u8) -> DecodeRet {
+    fn emit_fence(pred: u8, succ: u8) -> DecodeRet {
         todo!()
     }
 
@@ -136,35 +136,35 @@ impl common::Rvi for RviImpl {
         todo!()
     }
 
-    fn emit_xor(cpu: &mut crate::cpu::Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
+    fn emit_xor(rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
         todo!()
     }
 
-    fn emit_srl(cpu: &mut crate::cpu::Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
+    fn emit_srl(rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
         todo!()
     }
 
-    fn emit_sra(cpu: &mut crate::cpu::Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
+    fn emit_sra(rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
         todo!()
     }
 
-    fn emit_or(cpu: &mut crate::cpu::Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
+    fn emit_or(rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
         todo!()
     }
 
-    fn emit_and(cpu: &mut crate::cpu::Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
+    fn emit_and(rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
         todo!()
     }
 
-    fn emit_sll(cpu: &mut crate::cpu::Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
+    fn emit_sll(rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
         todo!()
     }
 
-    fn emit_slt(cpu: &mut crate::cpu::Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
+    fn emit_slt(rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
         todo!()
     }
 
-    fn emit_sltu(cpu: &mut crate::cpu::Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
+    fn emit_sltu(rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
         todo!()
     }
 }

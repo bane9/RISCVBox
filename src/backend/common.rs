@@ -20,48 +20,48 @@ pub trait BackendCore {
 }
 
 pub trait Rvi {
-    fn emit_addi(cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet;
-    fn emit_add(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
-    fn emit_sub(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
-    fn emit_slli(cpu: &mut Cpu, rd: u8, rs1: u8, shamt: u8) -> DecodeRet;
-    fn emit_slti(cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet;
-    fn emit_sltiu(cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet;
-    fn emit_xori(cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet;
-    fn emit_srli(cpu: &mut Cpu, rd: u8, rs1: u8, shamt: u8) -> DecodeRet;
-    fn emit_srai(cpu: &mut Cpu, rd: u8, rs1: u8, shamt: u8) -> DecodeRet;
-    fn emit_ori(cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet;
-    fn emit_andi(cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet;
-    fn emit_xor(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
-    fn emit_srl(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
-    fn emit_sra(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
-    fn emit_or(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
-    fn emit_and(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
-    fn emit_sll(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
-    fn emit_slt(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
-    fn emit_sltu(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_addi(rd: u8, rs1: u8, imm: i32) -> DecodeRet;
+    fn emit_add(rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_sub(rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_slli(rd: u8, rs1: u8, shamt: u8) -> DecodeRet;
+    fn emit_slti(rd: u8, rs1: u8, imm: i32) -> DecodeRet;
+    fn emit_sltiu(rd: u8, rs1: u8, imm: i32) -> DecodeRet;
+    fn emit_xori(rd: u8, rs1: u8, imm: i32) -> DecodeRet;
+    fn emit_srli(rd: u8, rs1: u8, shamt: u8) -> DecodeRet;
+    fn emit_srai(rd: u8, rs1: u8, shamt: u8) -> DecodeRet;
+    fn emit_ori(rd: u8, rs1: u8, imm: i32) -> DecodeRet;
+    fn emit_andi(rd: u8, rs1: u8, imm: i32) -> DecodeRet;
+    fn emit_xor(rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_srl(rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_sra(rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_or(rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_and(rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_sll(rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_slt(rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_sltu(rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
 
-    fn emit_lui(cpu: &mut Cpu, rd: u8, imm: i32) -> DecodeRet;
-    fn emit_auipc(cpu: &mut Cpu, rd: u8, imm: i32) -> DecodeRet;
-    fn emit_jal(cpu: &mut Cpu, rd: u8, imm: i32) -> DecodeRet;
-    fn emit_jalr(cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet;
-    fn emit_beq(cpu: &mut Cpu, rs1: u8, rs2: u8, imm: i32) -> DecodeRet;
-    fn emit_bne(cpu: &mut Cpu, rs1: u8, rs2: u8, imm: i32) -> DecodeRet;
-    fn emit_blt(cpu: &mut Cpu, rs1: u8, rs2: u8, imm: i32) -> DecodeRet;
-    fn emit_bge(cpu: &mut Cpu, rs1: u8, rs2: u8, imm: i32) -> DecodeRet;
-    fn emit_bltu(cpu: &mut Cpu, rs1: u8, rs2: u8, imm: i32) -> DecodeRet;
-    fn emit_bgeu(cpu: &mut Cpu, rs1: u8, rs2: u8, imm: i32) -> DecodeRet;
+    fn emit_lui(rd: u8, imm: i32) -> DecodeRet;
+    fn emit_auipc(rd: u8, imm: i32) -> DecodeRet;
+    fn emit_jal(rd: u8, imm: i32) -> DecodeRet;
+    fn emit_jalr(rd: u8, rs1: u8, imm: i32) -> DecodeRet;
+    fn emit_beq(rs1: u8, rs2: u8, imm: i32) -> DecodeRet;
+    fn emit_bne(rs1: u8, rs2: u8, imm: i32) -> DecodeRet;
+    fn emit_blt(rs1: u8, rs2: u8, imm: i32) -> DecodeRet;
+    fn emit_bge(rs1: u8, rs2: u8, imm: i32) -> DecodeRet;
+    fn emit_bltu(rs1: u8, rs2: u8, imm: i32) -> DecodeRet;
+    fn emit_bgeu(rs1: u8, rs2: u8, imm: i32) -> DecodeRet;
 
-    fn emit_lb(cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet;
-    fn emit_lh(cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet;
-    fn emit_lw(cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet;
-    fn emit_lbu(cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet;
-    fn emit_lhu(cpu: &mut Cpu, rd: u8, rs1: u8, imm: i32) -> DecodeRet;
+    fn emit_lb(rd: u8, rs1: u8, imm: i32) -> DecodeRet;
+    fn emit_lh(rd: u8, rs1: u8, imm: i32) -> DecodeRet;
+    fn emit_lw(rd: u8, rs1: u8, imm: i32) -> DecodeRet;
+    fn emit_lbu(rd: u8, rs1: u8, imm: i32) -> DecodeRet;
+    fn emit_lhu(rd: u8, rs1: u8, imm: i32) -> DecodeRet;
 
-    fn emit_sb(cpu: &mut Cpu, rs1: u8, rs2: u8, imm: i32) -> DecodeRet;
-    fn emit_sh(cpu: &mut Cpu, rs1: u8, rs2: u8, imm: i32) -> DecodeRet;
-    fn emit_sw(cpu: &mut Cpu, rs1: u8, rs2: u8, imm: i32) -> DecodeRet;
+    fn emit_sb(rs1: u8, rs2: u8, imm: i32) -> DecodeRet;
+    fn emit_sh(rs1: u8, rs2: u8, imm: i32) -> DecodeRet;
+    fn emit_sw(rs1: u8, rs2: u8, imm: i32) -> DecodeRet;
 
-    fn emit_fence(cpu: &mut Cpu, pred: u8, succ: u8) -> DecodeRet;
+    fn emit_fence(pred: u8, succ: u8) -> DecodeRet;
     fn emit_fence_i(cpu: &mut Cpu) -> DecodeRet;
 
     fn emit_ecall(cpu: &mut Cpu) -> DecodeRet;
@@ -69,37 +69,37 @@ pub trait Rvi {
 }
 
 pub trait Rvm {
-    fn emit_mul(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
-    fn emit_mulh(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
-    fn emit_mulhsu(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
-    fn emit_mulhu(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_mul(rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_mulh(rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_mulhsu(rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_mulhu(rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
 
-    fn emit_div(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
-    fn emit_divu(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
-    fn emit_rem(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
-    fn emit_remu(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_div(rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_divu(rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_rem(rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
+    fn emit_remu(rd: u8, rs1: u8, rs2: u8) -> DecodeRet;
 }
 
 pub trait Rva {
-    fn emit_lr_w(cpu: &mut Cpu, rd: u8, rs1: u8, aq: bool, rl: bool) -> DecodeRet;
+    fn emit_lr_w(rd: u8, rs1: u8, aq: bool, rl: bool) -> DecodeRet;
 
-    fn emit_sc_w(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
+    fn emit_sc_w(rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
 
-    fn emit_amoswap_w(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
+    fn emit_amoswap_w(rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
 
-    fn emit_amoadd_w(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
+    fn emit_amoadd_w(rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
 
-    fn emit_amoxor_w(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
+    fn emit_amoxor_w(rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
 
-    fn emit_amoor_w(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
+    fn emit_amoor_w(rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
 
-    fn emit_amoand_w(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
+    fn emit_amoand_w(rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
 
-    fn emit_amomin_w(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
+    fn emit_amomin_w(rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
 
-    fn emit_amomax_w(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
+    fn emit_amomax_w(rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
 
-    fn emit_amominu_w(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
+    fn emit_amominu_w(rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
 
-    fn emit_amomaxu_w(cpu: &mut Cpu, rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
+    fn emit_amomaxu_w(rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
 }
