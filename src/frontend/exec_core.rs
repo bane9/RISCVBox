@@ -19,8 +19,10 @@ impl ExecCore {
         cpu.ret_status = cpu::RunState::Running as usize;
         loop {
             let callable: extern "C" fn() = unsafe { std::mem::transmute(ptr) };
-            let result = ReturnableImpl::handle(|| callable());
-            println!("result: {:?}", result);
+            //let result = ReturnableImpl::handle(|| callable());
+
+            callable();
+            //println!("result: {:?}", result);
             println!(
                 "ret_status: {:?}",
                 cpu::RunState::from_usize(cpu.ret_status)

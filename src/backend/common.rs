@@ -20,6 +20,14 @@ pub trait BackendCore {
     fn emit_ret_with_status(state: RunState) -> HostEncodedInsn;
     fn emit_void_call(fn_ptr: extern "C" fn()) -> HostEncodedInsn;
     fn find_guest_pc_from_host_stack_frame(caller_ret_addr: *mut u8) -> Option<u32>;
+    fn emit_usize_call_with_4_args(
+        fn_ptr: extern "C" fn(usize, usize, usize, usize) -> usize,
+        arg1: usize,
+        arg2: usize,
+        arg3: usize,
+        arg4: usize,
+    ) -> HostEncodedInsn;
+    fn emit_void_call_with_1_arg(fn_ptr: extern "C" fn(usize), arg1: usize) -> HostEncodedInsn;
 }
 
 pub trait Rvi {
@@ -65,10 +73,10 @@ pub trait Rvi {
     fn emit_sw(rs1: u8, rs2: u8, imm: i32) -> DecodeRet;
 
     fn emit_fence(pred: u8, succ: u8) -> DecodeRet;
-    fn emit_fence_i(cpu: &mut Cpu) -> DecodeRet;
+    fn emit_fence_i() -> DecodeRet;
 
-    fn emit_ecall(cpu: &mut Cpu) -> DecodeRet;
-    fn emit_ebreak(cpu: &mut Cpu) -> DecodeRet;
+    fn emit_ecall() -> DecodeRet;
+    fn emit_ebreak() -> DecodeRet;
 }
 
 pub trait Rvm {

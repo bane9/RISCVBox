@@ -29,6 +29,11 @@ pub struct ParseCore {
     total_ram_size: usize,
 }
 
+extern "C" fn test_4_arg(arg1: usize, arg2: usize, arg3: usize, arg4: usize) -> usize {
+    println!("test_4_arg: {:x} {:x} {:x} {:x}", arg1, arg2, arg3, arg4);
+    0
+}
+
 impl ParseCore {
     pub fn new(rom: Vec<u8>) -> ParseCore {
         let pages = rom.len() / Xmem::page_size();
@@ -44,7 +49,9 @@ impl ParseCore {
 
         code_pages.apply_insn(
             code_pages.as_ptr(),
-            BackendCoreImpl::emit_ret_with_status(cpu::RunState::Exception),
+            BackendCoreImpl::emit_usize_call_with_4_args(
+                test_4_arg, 0xdead, 0xbeef, 0xcafe, 0xface,
+            ),
         );
 
         code_pages.mark_all_pages(page_container::PageState::ReadExecute);

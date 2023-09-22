@@ -1,8 +1,11 @@
-use crate::backend::{
-    common::{BackendCore, PtrT},
-    HostEncodedInsn,
-};
 use crate::cpu::*;
+use crate::{
+    backend::{
+        common::{BackendCore, PtrT},
+        HostEncodedInsn,
+    },
+    util::insn,
+};
 
 use std::arch::asm;
 
@@ -45,6 +48,26 @@ pub mod amd64_reg {
     pub const R15: u8 = 15;
 }
 
+#[cfg(target_os = "windows")]
+pub mod abi_reg {
+    pub use super::amd64_reg;
+
+    pub const ARG1: u8 = amd64_reg::RCX;
+    pub const ARG2: u8 = amd64_reg::RDX;
+    pub const ARG3: u8 = amd64_reg::R8;
+    pub const ARG4: u8 = amd64_reg::R9;
+}
+
+#[cfg(unix)]
+pub mod abi_reg {
+    pub use super::amd64_reg;
+
+    pub const ARG1: u8 = amd64_reg::RDI;
+    pub const ARG2: u8 = amd64_reg::RSI;
+    pub const ARG3: u8 = amd64_reg::RDX;
+    pub const ARG4: u8 = amd64_reg::RCX;
+}
+
 #[macro_export]
 macro_rules! emit_insn {
     ($enc:expr, $insn:expr) => {{
@@ -55,36 +78,63 @@ macro_rules! emit_insn {
 #[macro_export]
 macro_rules! emit_push_reg {
     ($enc:expr, $reg:expr) => {{
-        emit_insn!($enc, [0x50 + $reg as u8]);
+        if $reg < amd64_reg::R8 {
+            emit_insn!($enc, [0x50 + $reg as u8]);
+        } else {
+            emit_insn!($enc, [0x41, 0x50 + $reg as u8 - amd64_reg::R8]);
+        }
     }};
 }
 
 #[macro_export]
 macro_rules! emit_mov_reg_reg {
     ($enc:expr, $dst_reg:expr, $src_reg:expr) => {{
-        emit_insn!($enc, [0x48, 0x89, 0xC0 + ($src_reg << 3) + $dst_reg]);
+        if $dst_reg < amd64_reg::R8 && $src_reg < amd64_reg::R8 {
+            emit_insn!($enc, [0x48, 0x89, 0xC0 + ($src_reg << 3) + $dst_reg]);
+        } else {
+            emit_insn!(
+                $enc,
+                [
+                    0x49,
+                    0x89,
+                    0xC0 + ($src_reg << 3) + $dst_reg - amd64_reg::R8
+                ]
+            );
+        }
     }};
 }
 
 #[macro_export]
 macro_rules! emit_pop_reg {
     ($enc:expr, $reg:expr) => {{
-        emit_insn!($enc, [0x58 + $reg as u8]);
+        if $reg < amd64_reg::R8 {
+            emit_insn!($enc, [0x58 + $reg as u8]);
+        } else {
+            emit_insn!($enc, [0x41, 0x58 + $reg as u8 - amd64_reg::R8]);
+        }
     }};
 }
 
 #[macro_export]
 macro_rules! emit_move_reg_imm {
     ($enc:expr, $reg:expr, $imm:expr) => {{
-        emit_insn!($enc, [0x49, 0xB0 + $reg as u8]);
-        emit_insn!($enc, (($imm) as usize).to_le_bytes());
+        if $reg < amd64_reg::R8 {
+            emit_insn!($enc, [0x48, 0xB8 + $reg as u8]);
+        } else {
+            emit_insn!($enc, [0x49, 0xB8 + $reg as u8 - amd64_reg::R8]);
+        }
+        emit_insn!($enc, (($imm) as u64).to_le_bytes());
     }};
 }
 
 #[macro_export]
 macro_rules! emit_call_reg {
     ($enc:expr, $reg:expr) => {{
-        emit_insn!($enc, [0x41, 0xFF, 0xc8 + $reg as u8]);
+        if $reg < amd64_reg::R8 {
+            emit_insn!($enc, [0xFF, 0xD0 + $reg as u8]);
+        } else {
+            emit_insn!($enc, [0x41, 0xFF, 0xD0 + $reg as u8 - amd64_reg::R8]);
+        }
     }};
 }
 
@@ -105,14 +155,11 @@ macro_rules! emit_ret {
 #[macro_export]
 macro_rules! emit_mov_qword_ptr {
     ($enc:expr, $reg:expr, $imm:expr) => {{
-        emit_insn!(
-            $enc,
-            [
-                0x48 + ($reg > amd64_reg::R8) as u8,
-                0xC7,
-                ($reg as u8) - (($reg > amd64_reg::R8) as u8 * amd64_reg::R8)
-            ]
-        );
+        if $reg < amd64_reg::R8 {
+            emit_insn!($enc, [0x48, 0xC7, $reg as u8]);
+        } else {
+            emit_insn!($enc, [0x49, 0xC7, $reg as u8 - amd64_reg::R8]);
+        }
         emit_insn!($enc, (($imm) as u32).to_le_bytes());
     }};
 }
@@ -197,5 +244,40 @@ impl BackendCore for BackendCoreImpl {
         }
 
         None
+    }
+
+    fn emit_usize_call_with_4_args(
+        fn_ptr: extern "C" fn(usize, usize, usize, usize) -> usize,
+        arg1: usize,
+        arg2: usize,
+        arg3: usize,
+        arg4: usize,
+    ) -> HostEncodedInsn {
+        let mut insn = HostEncodedInsn::new();
+
+        emit_push_reg!(insn, amd64_reg::RBP);
+        emit_mov_reg_reg!(insn, amd64_reg::RBP, amd64_reg::RSP);
+        emit_move_reg_imm!(insn, abi_reg::ARG1, arg1);
+        emit_move_reg_imm!(insn, abi_reg::ARG2, arg2);
+        emit_move_reg_imm!(insn, abi_reg::ARG3, arg3);
+        emit_move_reg_imm!(insn, abi_reg::ARG4, arg4);
+        emit_move_reg_imm!(insn, amd64_reg::R11, fn_ptr);
+        emit_call_reg!(insn, amd64_reg::R11);
+        emit_pop_reg!(insn, amd64_reg::RBP);
+
+        insn
+    }
+
+    fn emit_void_call_with_1_arg(fn_ptr: extern "C" fn(usize), arg1: usize) -> HostEncodedInsn {
+        let mut insn = HostEncodedInsn::new();
+
+        emit_push_reg!(insn, amd64_reg::RBP);
+        emit_mov_reg_reg!(insn, amd64_reg::RBP, amd64_reg::RSP);
+        emit_move_reg_imm!(insn, abi_reg::ARG1, arg1);
+        emit_move_reg_imm!(insn, amd64_reg::R11, fn_ptr);
+        emit_call_reg!(insn, amd64_reg::R11);
+        emit_pop_reg!(insn, amd64_reg::RBP);
+
+        insn
     }
 }

@@ -11,10 +11,13 @@ impl ReturnableHandler for ReturnableImpl {
     fn handle<F: Fn() -> ()>(closure: F) -> ReturnStatus {
         let res = microseh::try_seh(closure);
 
-        match res {
-            Ok(_) => ReturnStatus::ReturnOk,
-            Err(microseh::SEHException::Breakpoint) => ReturnStatus::ReturnOk,
-            Err(microseh::SEHException::IntDivideByZero) => ReturnStatus::ReturnNotify,
+        if let Ok(_) = res {
+            return ReturnStatus::ReturnOk;
+        }
+
+        match res.err().unwrap().code() {
+            microseh::ExceptionCode::Breakpoint => ReturnStatus::ReturnOk,
+            microseh::ExceptionCode::IntDivideByZero => ReturnStatus::ReturnNotify,
             _ => panic!("unknown return status"),
         }
     }
