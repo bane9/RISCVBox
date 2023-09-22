@@ -1,4 +1,5 @@
-use crate::backend::{ReturnableHandler, ReturnableImpl};
+use crate::backend::target::core::BackendCoreImpl;
+use crate::backend::{BackendCore, ReturnableHandler, ReturnableImpl};
 use crate::cpu;
 pub use crate::frontend::parse_core::*;
 
@@ -18,10 +19,12 @@ impl ExecCore {
         let cpu = cpu::get_cpu();
         cpu.ret_status = cpu::RunState::Running as usize;
         loop {
-            let callable: extern "C" fn() = unsafe { std::mem::transmute(ptr) };
+            //let callable: extern "C" fn() = unsafe { std::mem::transmute(ptr) };
             //let result = ReturnableImpl::handle(|| callable());
 
-            callable();
+            unsafe {
+                BackendCoreImpl::call_jit_ptr(ptr);
+            }
             //println!("result: {:?}", result);
             println!(
                 "ret_status: {:?}",

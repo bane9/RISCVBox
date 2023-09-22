@@ -280,4 +280,56 @@ impl BackendCore for BackendCoreImpl {
 
         insn
     }
+
+    #[inline(never)]
+    #[cfg(target_os = "windows")]
+    unsafe fn call_jit_ptr(jit_ptr: *mut u8) {
+        asm!(
+            "sub rsp, 8 * 8",
+            "push rbx",
+            "push rbp",
+            "push rdi",
+            "push rsi",
+            "push r12",
+            "push r13",
+            "push r14",
+            "push r15",
+            "call {0}",
+            "pop r15",
+            "pop r14",
+            "pop r13",
+            "pop r12",
+            "pop rsi",
+            "pop rdi",
+            "pop rbp",
+            "pop rbx",
+            "add rsp, 8 * 8",
+
+            in(reg) jit_ptr,
+        );
+    }
+
+    #[inline(never)]
+    #[cfg(unix)]
+    unsafe fn call_jit_ptr(jit_ptr: *mut u8) {
+        asm!(
+            "sub rsp, 8 * 6",
+            "push rbx",
+            "push rbp",
+            "push r12",
+            "push r13",
+            "push r14",
+            "push r15",
+            "call {0}",
+            "pop r15",
+            "pop r14",
+            "pop r13",
+            "pop r12",
+            "pop rbp",
+            "pop rbx",
+            "add rsp, 8 * 6",
+
+            in(reg) jit_ptr,
+        );
+    }
 }

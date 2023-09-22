@@ -28,6 +28,7 @@ pub trait BackendCore {
         arg4: usize,
     ) -> HostEncodedInsn;
     fn emit_void_call_with_1_arg(fn_ptr: extern "C" fn(usize), arg1: usize) -> HostEncodedInsn;
+    unsafe fn call_jit_ptr(jit_ptr: PtrT);
 }
 
 pub trait Rvi {
