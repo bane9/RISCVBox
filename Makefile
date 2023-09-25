@@ -3,4 +3,8 @@ all:
 	riscv32-unknown-elf-objcopy -O binary test.elf test.bin
 	riscv32-unknown-elf-objdump -d -Mno-aliases test.elf > test.dump
 
-.PHONY: all
+debug_jit_ptr:
+	cargo b
+	lldb -s lldb.txt
+
+.PHONY: all debug_jit_ptr

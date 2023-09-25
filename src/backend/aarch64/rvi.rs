@@ -124,15 +124,15 @@ impl common::Rvi for RviImpl {
         todo!()
     }
 
-    fn emit_fence_i(cpu: &mut crate::cpu::Cpu) -> DecodeRet {
+    fn emit_fence_i() -> DecodeRet {
         todo!()
     }
 
-    fn emit_ecall(cpu: &mut crate::cpu::Cpu) -> DecodeRet {
+    fn emit_ecall() -> DecodeRet {
         todo!()
     }
 
-    fn emit_ebreak(cpu: &mut crate::cpu::Cpu) -> DecodeRet {
+    fn emit_ebreak() -> DecodeRet {
         todo!()
     }
 

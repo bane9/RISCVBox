@@ -7,8 +7,8 @@ pub struct CodePages {
 }
 
 impl CodePages {
-    pub fn new(pages_total: usize, xmem_per_page: usize) -> CodePages {
-        let xmem = Xmem::new_as_list(pages_total, xmem_per_page).unwrap();
+    pub fn new(pages_total: usize, pages_per_xmem: usize) -> CodePages {
+        let xmem = Xmem::new_as_list(pages_total, pages_per_xmem).unwrap();
         CodePages { xmem, pages_total }
     }
 

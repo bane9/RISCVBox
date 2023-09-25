@@ -1,0 +1,7 @@
+settings set auto-confirm 1
+file target/debug/rv32jit
+
+breakpoint set --file exec_core.rs --line 23
+run
+si
+dis -c 16
