@@ -65,7 +65,7 @@ impl Ns16550 {
 }
 
 impl BusDevice for Ns16550 {
-    fn read(&mut self, addr: BusType) -> Result<BusType, BusError> {
+    fn read(&mut self, addr: BusType, size: BusType) -> Result<BusType, BusError> {
         let adj_addr = (addr as usize) - (self.get_begin_addr() as usize);
 
         match adj_addr as u64 {

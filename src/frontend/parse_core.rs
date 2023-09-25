@@ -1,5 +1,6 @@
 use crate::backend::common as JitCommon;
 use crate::backend::common::BackendCore;
+use crate::backend::common::HostEncodedInsn;
 use crate::backend::returnable;
 use crate::backend::target::core::BackendCoreImpl;
 use crate::cpu;
@@ -29,11 +30,6 @@ pub struct ParseCore {
     total_ram_size: usize,
 }
 
-extern "C" fn test_4_arg(arg1: usize, arg2: usize, arg3: usize, arg4: usize) -> usize {
-    println!("test_4_arg: {:x} {:x} {:x} {:x}", arg1, arg2, arg3, arg4);
-    0
-}
-
 impl ParseCore {
     pub fn new(rom: Vec<u8>) -> ParseCore {
         let pages = rom.len() / Xmem::page_size();
@@ -46,13 +42,6 @@ impl ParseCore {
         let ok_jump = BackendCoreImpl::emit_ret_with_status(cpu::RunState::BlockExit);
 
         code_pages.apply_reserved_insn_all(ok_jump);
-
-        code_pages.apply_insn(
-            code_pages.as_ptr(),
-            BackendCoreImpl::emit_usize_call_with_4_args(
-                test_4_arg, 0xdead, 0xbeef, 0xcafe, 0xface,
-            ),
-        );
 
         code_pages.mark_all_pages(page_container::PageState::ReadExecute);
 
@@ -69,43 +58,43 @@ impl ParseCore {
     pub fn parse_ahead(&mut self) -> Result<(), JitCommon::JitError> {
         let start = self.offset;
 
-        if start >= self.total_ram_size {
+        if start >= self.rom.len() {
             return Ok(());
         }
 
-        let end = std::cmp::min(
-            start + CODE_PAGE_SIZE * CODE_PAGE_READAHEAD,
-            self.total_ram_size,
-        );
+        let end = std::cmp::min(start + CODE_PAGE_SIZE * CODE_PAGE_READAHEAD, self.rom.len());
 
-        self.parse(start, end)?;
+        self.parse(end)?;
 
         self.offset = end;
 
         Ok(())
     }
 
-    pub fn parse(&mut self, start: usize, end: usize) -> Result<(), JitCommon::JitError> {
-        let end = std::cmp::min(end, self.total_ram_size);
-        assert!(start < end);
+    pub fn parse(&mut self, end: usize) -> Result<(), JitCommon::JitError> {
+        let end = std::cmp::min(end, self.rom.len());
         let mut insn: u32 = 0;
 
-        let ptr = self.code_pages.as_ptr().wrapping_add(start);
+        let ptr = self.code_pages.as_ptr().wrapping_add(self.offset);
 
-        for i in (start..end).step_by(INSN_SIZE) {
+        while (cpu::get_cpu().pc as usize) < end {
+            let pc = cpu::get_cpu().pc as usize;
+
             unsafe {
                 std::ptr::copy_nonoverlapping(
-                    self.rom.as_ptr().add(i),
+                    self.rom.as_ptr().add(pc),
                     &mut insn as *mut u32 as *mut u8,
                     INSN_SIZE,
                 );
             }
 
-            let result = self.decode_single(ptr.wrapping_add(i), insn, end);
+            let result = self.decode_single(ptr.wrapping_add(pc), insn);
 
             if let Err(JitCommon::JitError::ReachedBlockBoundary) = result {
                 break;
             } else if result.is_err() {
+                self.code_pages
+                    .mark_all_pages(page_container::PageState::ReadExecute);
                 return result;
             }
         }
@@ -116,12 +105,7 @@ impl ParseCore {
         Ok(())
     }
 
-    fn decode_single(
-        &mut self,
-        ptr: *mut u8,
-        insn: u32,
-        block_boundary: usize,
-    ) -> Result<(), JitCommon::JitError> {
+    fn decode_single(&mut self, ptr: *mut u8, insn: u32) -> Result<(), JitCommon::JitError> {
         static DECODERS: [DecoderFn; 5] = [
             rvi::decode_rvi,
             rvm::decode_rvm,
@@ -142,13 +126,21 @@ impl ParseCore {
             }
         }
 
-        if out_res.is_err() {
-            return Err(out_res.err().unwrap());
+        let insn_res: HostEncodedInsn;
+
+        match out_res {
+            Ok(insn) => {
+                insn_res = out_res.unwrap();
+            }
+            Err(JitCommon::JitError::InvalidInstruction(_)) => {
+                insn_res = BackendCoreImpl::emit_ret_with_status(cpu::RunState::InvalidInstruction);
+            }
+            _ => {
+                return Err(out_res.err().unwrap());
+            }
         }
 
-        let out_res = out_res.unwrap();
-
-        let result = self.code_pages.apply_insn(ptr, out_res);
+        let result = self.code_pages.apply_insn(ptr, insn_res);
 
         if result.is_none() {
             return Err(JitCommon::JitError::ReachedBlockBoundary);
@@ -160,7 +152,7 @@ impl ParseCore {
 
         cpu.pc += INSN_SIZE as u32;
 
-        self.offset += out_res.size();
+        self.offset += insn_res.size();
 
         Ok(())
     }

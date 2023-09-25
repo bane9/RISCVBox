@@ -3,15 +3,17 @@ use crate::backend::{BackendCore, ReturnableHandler, ReturnableImpl};
 use crate::cpu;
 pub use crate::frontend::parse_core::*;
 
+use super::parse_core;
+
 pub struct ExecCore {
     parse_core: ParseCore,
 }
 
 impl ExecCore {
     pub fn new(rom: Vec<u8>) -> Self {
-        Self {
-            parse_core: ParseCore::new(rom),
-        }
+        let mut parse_core = ParseCore::new(rom);
+        parse_core.parse_ahead().unwrap();
+        Self { parse_core }
     }
 
     pub fn exec_loop(&mut self) {

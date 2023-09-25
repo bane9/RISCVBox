@@ -53,6 +53,7 @@ pub enum RunState {
     Running = 1,
     Exception = 2,
     BlockExit = 3,
+    InvalidInstruction = 4,
     Unknown = 0xff,
 }
 

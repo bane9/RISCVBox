@@ -5,4 +5,5 @@ test.elf:     file format elf32-littleriscv
 Disassembly of section .text:
 
 00010074 <_start>:
-   10074:	0000006f          	jal	zero,10074 <_start>
+   10074:	10000537          	lui	a0,0x10000
+   10078:	06100593          	addi	a1,zero,97

@@ -1,11 +1,8 @@
-use crate::cpu::*;
-use crate::{
-    backend::{
-        common::{BackendCore, PtrT},
-        HostEncodedInsn,
-    },
-    util::insn,
+pub use crate::backend::{
+    common::{BackendCore, PtrT},
+    HostEncodedInsn,
 };
+use crate::cpu::*;
 
 use std::arch::asm;
 
@@ -165,12 +162,66 @@ macro_rules! emit_mov_qword_ptr {
 }
 
 #[macro_export]
-macro_rules! emit_mov_dword_ptr {
+macro_rules! emit_mov_dword_ptr_imm {
     ($enc:expr, $reg:expr, $imm:expr) => {{
-        if reg < amd64_reg::R8 {
+        if $reg < amd64_reg::R8 {
             emit_insn!($enc, [0xC7, $reg as u8]);
         } else {
             emit_insn!($enc, [0x41, 0xC7, $reg as u8 - amd64_reg::R8]);
+        }
+        emit_insn!($enc, (($imm) as u32).to_le_bytes());
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_mov_dword_ptr_reg {
+    ($enc:expr, $dst_reg:expr, $src_reg:expr) => {{
+        if $dst_reg < amd64_reg::R8 && $src_reg < amd64_reg::R8 {
+            emit_insn!($enc, [0x89, 0x00 + ($src_reg << 3) + $dst_reg]);
+        } else {
+            emit_insn!(
+                $enc,
+                [
+                    0x41,
+                    0x89,
+                    0x00 + ($src_reg << 3) + $dst_reg - amd64_reg::R8
+                ]
+            );
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_shl_reg_imm {
+    ($enc:expr, $reg:expr, $imm:expr) => {{
+        if $reg < amd64_reg::R8 {
+            emit_insn!($enc, [0x48, 0xC1, 0xE0 + $reg as u8]);
+        } else {
+            emit_insn!($enc, [0x49, 0xC1, 0xE0 + $reg as u8 - amd64_reg::R8]);
+        }
+        emit_insn!($enc, [$imm]);
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_shr_reg_imm {
+    ($enc:expr, $reg:expr, $imm:expr) => {{
+        if $reg < amd64_reg::R8 {
+            emit_insn!($enc, [0x48, 0xC1, 0xE8 + $reg as u8]);
+        } else {
+            emit_insn!($enc, [0x49, 0xC1, 0xE8 + $reg as u8 - amd64_reg::R8]);
+        }
+        emit_insn!($enc, [$imm]);
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_add_reg_imm {
+    ($enc:expr, $reg:expr, $imm:expr) => {{
+        if $reg < amd64_reg::R8 {
+            emit_insn!($enc, [0x48, 0x81, 0xC0 + $reg as u8]);
+        } else {
+            emit_insn!($enc, [0x49, 0x81, 0xC0 + $reg as u8 - amd64_reg::R8]);
         }
         emit_insn!($enc, (($imm) as u32).to_le_bytes());
     }};

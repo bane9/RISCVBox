@@ -24,7 +24,7 @@ impl CodePages {
         Some(self.xmem[page].clone())
     }
 
-    pub fn get_xmem_from_ptr(&self, ptr: *mut u8) -> Option<Xmem> {
+    pub fn get_xmem_from_ptr(&self, ptr: *mut u8) -> Option<usize> {
         let first_page = self.xmem[0].as_ptr() as usize;
         let page: usize = (ptr as usize - first_page) / Xmem::page_size();
 
@@ -32,11 +32,12 @@ impl CodePages {
             return None;
         }
 
-        Some(self.xmem[page].clone())
+        Some(page)
     }
 
     pub fn apply_insn(&mut self, ptr: *mut u8, insn: HostEncodedInsn) -> Option<*mut u8> {
-        let xmem = &mut self.get_xmem_from_ptr(ptr).unwrap();
+        let xmem_idx = self.get_xmem_from_ptr(ptr).unwrap();
+        let xmem = &mut self.xmem[xmem_idx];
 
         if insn.size() > xmem.non_reserved_bytes {
             return None;
@@ -56,7 +57,8 @@ impl CodePages {
     }
 
     pub fn apply_reserved_insn(&mut self, ptr: *mut u8, insn: HostEncodedInsn) {
-        let xmem = &mut self.get_xmem_from_ptr(ptr).unwrap();
+        let xmem_idx = self.get_xmem_from_ptr(ptr).unwrap();
+        let xmem = &mut self.xmem[xmem_idx];
 
         assert!(xmem.non_reserved_bytes == xmem.get_size());
 
