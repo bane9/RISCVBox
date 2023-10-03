@@ -74,10 +74,10 @@ pub extern "C" fn c_bus_access(
     addr_reg: usize,
     data_reg: usize,
     imm_write_size_signed: usize,
-    guest_pc: usize,
+    _guest_pc: usize,
 ) -> usize {
     let bus = get_bus();
-    let sign = imm_write_size_signed & 0x1;
+    let _sign = imm_write_size_signed & 0x1;
     let write = (imm_write_size_signed >> 1) & 0x1;
     let size = ((imm_write_size_signed >> 2) & 0x8) * 8;
     let imm = (imm_write_size_signed >> 8) & 0xffff;

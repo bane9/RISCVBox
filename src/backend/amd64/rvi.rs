@@ -50,43 +50,43 @@ impl common::Rvi for RviImpl {
         Ok(insn)
     }
 
-    fn emit_add(rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
+    fn emit_add(_rd: u8, _rs1: u8, _rs2: u8) -> DecodeRet {
         todo!()
     }
 
-    fn emit_sub(rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
+    fn emit_sub(_rd: u8, _rs1: u8, _rs2: u8) -> DecodeRet {
         todo!()
     }
 
-    fn emit_slli(rd: u8, rs1: u8, shamt: u8) -> DecodeRet {
+    fn emit_slli(_rd: u8, _rs1: u8, _shamt: u8) -> DecodeRet {
         todo!()
     }
 
-    fn emit_slti(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
+    fn emit_slti(_rd: u8, _rs1: u8, _imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_sltiu(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
+    fn emit_sltiu(_rd: u8, _rs1: u8, _imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_xori(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
+    fn emit_xori(_rd: u8, _rs1: u8, _imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_srli(rd: u8, rs1: u8, shamt: u8) -> DecodeRet {
+    fn emit_srli(_rd: u8, _rs1: u8, _shamt: u8) -> DecodeRet {
         todo!()
     }
 
-    fn emit_srai(rd: u8, rs1: u8, shamt: u8) -> DecodeRet {
+    fn emit_srai(_rd: u8, _rs1: u8, _shamt: u8) -> DecodeRet {
         todo!()
     }
 
-    fn emit_ori(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
+    fn emit_ori(_rd: u8, _rs1: u8, _imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_andi(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
+    fn emit_andi(_rd: u8, _rs1: u8, _imm: i32) -> DecodeRet {
         todo!()
     }
 
@@ -107,39 +107,39 @@ impl common::Rvi for RviImpl {
         Ok(insn)
     }
 
-    fn emit_auipc(rd: u8, imm: i32) -> DecodeRet {
+    fn emit_auipc(_rd: u8, _imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_jal(rd: u8, imm: i32) -> DecodeRet {
+    fn emit_jal(_rd: u8, _imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_jalr(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
+    fn emit_jalr(_rd: u8, _rs1: u8, _imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_beq(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
+    fn emit_beq(_rs1: u8, _rs2: u8, _imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_bne(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
+    fn emit_bne(_rs1: u8, _rs2: u8, _imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_blt(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
+    fn emit_blt(_rs1: u8, _rs2: u8, _imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_bge(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
+    fn emit_bge(_rs1: u8, _rs2: u8, _imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_bltu(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
+    fn emit_bltu(_rs1: u8, _rs2: u8, _imm: i32) -> DecodeRet {
         todo!()
     }
 
-    fn emit_bgeu(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
+    fn emit_bgeu(_rs1: u8, _rs2: u8, _imm: i32) -> DecodeRet {
         todo!()
     }
 
@@ -185,7 +185,7 @@ impl common::Rvi for RviImpl {
         Ok(insn)
     }
 
-    fn emit_sw(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
+    fn emit_sw(_rs1: u8, _rs2: u8, _imm: i32) -> DecodeRet {
         //let insn = emit_bus_access!(rs1, rs2, 4, imm, true, true);
 
         let mut insn = HostEncodedInsn::new();
@@ -195,7 +195,7 @@ impl common::Rvi for RviImpl {
         Ok(insn)
     }
 
-    fn emit_fence(pred: u8, succ: u8) -> DecodeRet {
+    fn emit_fence(_pred: u8, _succ: u8) -> DecodeRet {
         todo!()
     }
 
@@ -211,35 +211,35 @@ impl common::Rvi for RviImpl {
         todo!()
     }
 
-    fn emit_xor(rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
+    fn emit_xor(_rd: u8, _rs1: u8, _rs2: u8) -> DecodeRet {
         todo!()
     }
 
-    fn emit_srl(rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
+    fn emit_srl(_rd: u8, _rs1: u8, _rs2: u8) -> DecodeRet {
         todo!()
     }
 
-    fn emit_sra(rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
+    fn emit_sra(_rd: u8, _rs1: u8, _rs2: u8) -> DecodeRet {
         todo!()
     }
 
-    fn emit_or(rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
+    fn emit_or(_rd: u8, _rs1: u8, _rs2: u8) -> DecodeRet {
         todo!()
     }
 
-    fn emit_and(rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
+    fn emit_and(_rd: u8, _rs1: u8, _rs2: u8) -> DecodeRet {
         todo!()
     }
 
-    fn emit_sll(rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
+    fn emit_sll(_rd: u8, _rs1: u8, _rs2: u8) -> DecodeRet {
         todo!()
     }
 
-    fn emit_slt(rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
+    fn emit_slt(_rd: u8, _rs1: u8, _rs2: u8) -> DecodeRet {
         todo!()
     }
 
-    fn emit_sltu(rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
+    fn emit_sltu(_rd: u8, _rs1: u8, _rs2: u8) -> DecodeRet {
         todo!()
     }
 }

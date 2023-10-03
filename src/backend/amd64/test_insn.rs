@@ -1,4 +1,5 @@
-use crate::backend::amd64::core::{amd64_reg, HostEncodedInsn};
+#[allow(unused_imports)]
+use crate::backend::target::core::*;
 use crate::*;
 
 test_encoded_insn!(

@@ -1,9 +1,7 @@
 use crate::backend::target::core::BackendCoreImpl;
-use crate::backend::{BackendCore, ReturnableHandler, ReturnableImpl};
+use crate::backend::BackendCore;
 use crate::cpu;
 pub use crate::frontend::parse_core::*;
-
-use super::parse_core;
 
 pub struct ExecCore {
     parse_core: ParseCore,

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 mod backend;
 mod bus;
 mod cpu;

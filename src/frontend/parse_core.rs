@@ -1,7 +1,7 @@
 use crate::backend::common as JitCommon;
 use crate::backend::common::BackendCore;
 use crate::backend::common::HostEncodedInsn;
-use crate::backend::returnable;
+
 use crate::backend::target::core::BackendCoreImpl;
 use crate::cpu;
 use crate::frontend::code_pages;
@@ -127,7 +127,7 @@ impl ParseCore {
         let insn_res: HostEncodedInsn;
 
         match out_res {
-            Ok(insn) => {
+            Ok(_insn) => {
                 insn_res = out_res.unwrap();
             }
             Err(JitCommon::JitError::InvalidInstruction(_)) => {

@@ -1,4 +1,4 @@
-use crate::cpu::{Cpu, RunState};
+use crate::cpu::RunState;
 use crate::util::EncodedInsn;
 
 #[derive(Debug)]
