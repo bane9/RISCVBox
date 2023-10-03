@@ -14,6 +14,62 @@ pub const HOST_INSN_MAX_SIZE: usize = 64; // TODO: check worst case later
 pub type HostEncodedInsn = EncodedInsn<HostInsnT, HOST_INSN_MAX_SIZE>;
 pub type DecodeRet = Result<HostEncodedInsn, JitError>;
 
+#[macro_export]
+macro_rules! test_encoded_insn {
+    ($test_name:ident, $insn_macro:expr, $expected:expr) => {
+        #[cfg(test)]
+        #[test]
+        pub fn $test_name() {
+            let mut enc = HostEncodedInsn::new();
+
+            $insn_macro(&mut enc);
+
+            let mut success = true;
+            let mut expected_str = String::new();
+            let mut encoded_str = String::new();
+
+            expected_str.push_str("Expected -> ");
+            encoded_str.push_str("Encoded  -> ");
+
+            for (_, (a, b)) in enc.iter().zip($expected.iter()).enumerate() {
+                if a != b {
+                    success = false;
+
+                    expected_str.push_str(&format!("\x1b[32m{:02x}\x1b[0m ", b));
+                    encoded_str.push_str(&format!("\x1b[31m{:02x}\x1b[0m ", a));
+                } else {
+                    expected_str.push_str(&format!("{:02x} ", b));
+                    encoded_str.push_str(&format!("{:02x} ", a));
+                }
+            }
+
+            for &b in $expected.get(enc.size()..).unwrap_or(&[]) {
+                success = false;
+                expected_str.push_str(&format!("\x1b[32m{:02x}\x1b[0m ", b));
+            }
+
+            for &a in enc.iter().skip($expected.len()) {
+                success = false;
+                encoded_str.push_str(&format!("\x1b[31m{:02x}\x1b[0m ", a));
+            }
+
+            if !success {
+                println!("__________________________________________________________\n");
+                println!(
+                    "Error: Encoding mismatch at \x1b[33m{}\x1b[0m",
+                    &stringify!($insn_macro)[28..].trim().replace(" :: ", "::")
+                );
+
+                println!("{}", expected_str.trim_end());
+                println!("{}", encoded_str.trim_end());
+                println!("__________________________________________________________\n");
+            }
+
+            assert!(success);
+        }
+    };
+}
+
 pub trait BackendCore {
     fn fill_with_target_nop(ptr: PtrT, size: usize);
     fn fill_with_target_ret(ptr: PtrT, size: usize);

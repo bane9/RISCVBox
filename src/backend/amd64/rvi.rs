@@ -27,15 +27,25 @@ impl common::Rvi for RviImpl {
         let mut insn = HostEncodedInsn::new();
         let cpu = cpu::get_cpu();
 
-        emit_move_reg_imm!(insn, amd64_reg::R11, &cpu.regs[rs1 as usize] as *const _);
-        emit_mov_dword_ptr_reg!(insn, amd64_reg::R11, amd64_reg::R11);
-        emit_add_reg_imm!(insn, amd64_reg::R11, imm);
+        if rd == 0 {
+            emit_nop!(insn);
+            return Ok(insn);
+        }
+
+        if rs1 != 0 {
+            emit_move_reg_imm!(insn, amd64_reg::RBX, &cpu.regs[rs1 as usize] as *const _);
+            emit_mov_dword_ptr_reg!(insn, amd64_reg::RBX, amd64_reg::RBX);
+        } else {
+            emit_move_reg_imm!(insn, amd64_reg::RBX, 0);
+        }
+
+        emit_add_reg_imm!(insn, amd64_reg::RBX, imm);
         emit_move_reg_imm!(
             insn,
-            amd64_reg::R10,
+            amd64_reg::RCX,
             &cpu.regs[rd as usize] as *const _ as usize
         );
-        emit_mov_dword_ptr_reg!(insn, amd64_reg::R10, amd64_reg::R11);
+        emit_mov_dword_ptr_reg!(insn, amd64_reg::RCX, amd64_reg::RBX);
 
         Ok(insn)
     }
@@ -81,19 +91,18 @@ impl common::Rvi for RviImpl {
     }
 
     fn emit_lui(rd: u8, imm: i32) -> DecodeRet {
-        // let mut insn = HostEncodedInsn::new();
-        // let cpu = cpu::get_cpu();
-
-        // let rd_addr = &cpu.regs[rd as usize] as *const _ as usize;
-
-        // emit_move_reg_imm!(insn, amd64_reg::R11, rd_addr);
-        // emit_mov_dword_ptr_imm!(insn, amd64_reg::R11, imm as u32);
-
-        // Ok(insn)
-
         let mut insn = HostEncodedInsn::new();
+        let cpu = cpu::get_cpu();
 
-        emit_nop!(insn);
+        if rd == 0 {
+            emit_nop!(insn);
+            return Ok(insn);
+        }
+
+        let rd_addr = &cpu.regs[rd as usize] as *const _ as usize;
+
+        emit_move_reg_imm!(insn, amd64_reg::RBX, rd_addr);
+        emit_mov_dword_ptr_imm!(insn, amd64_reg::RBX, imm << 12 as u32);
 
         Ok(insn)
     }

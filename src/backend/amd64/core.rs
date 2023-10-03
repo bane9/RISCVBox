@@ -83,21 +83,12 @@ macro_rules! emit_push_reg {
     }};
 }
 
+// for reg1 version src and dst must be < R8
 #[macro_export]
-macro_rules! emit_mov_reg_reg {
+macro_rules! emit_mov_reg_reg1 {
     ($enc:expr, $dst_reg:expr, $src_reg:expr) => {{
-        if $dst_reg < amd64_reg::R8 && $src_reg < amd64_reg::R8 {
-            emit_insn!($enc, [0x48, 0x89, 0xC0 + ($src_reg << 3) + $dst_reg]);
-        } else {
-            emit_insn!(
-                $enc,
-                [
-                    0x49,
-                    0x89,
-                    0xC0 + ($src_reg << 3) + $dst_reg - amd64_reg::R8
-                ]
-            );
-        }
+        assert!($dst_reg < amd64_reg::R8 && $src_reg < amd64_reg::R8);
+        emit_insn!($enc, [0x48, 0x89, 0xC0 + ($src_reg << 3) + $dst_reg]);
     }};
 }
 
@@ -173,21 +164,20 @@ macro_rules! emit_mov_dword_ptr_imm {
     }};
 }
 
+// amd64 only supports < R8 for dword ptr
 #[macro_export]
 macro_rules! emit_mov_dword_ptr_reg {
     ($enc:expr, $dst_reg:expr, $src_reg:expr) => {{
-        if $dst_reg < amd64_reg::R8 && $src_reg < amd64_reg::R8 {
-            emit_insn!($enc, [0x89, 0x00 + ($src_reg << 3) + $dst_reg]);
-        } else {
-            emit_insn!(
-                $enc,
-                [
-                    0x41,
-                    0x89,
-                    0x00 + ($src_reg << 3) + $dst_reg - amd64_reg::R8
-                ]
-            );
-        }
+        assert!($dst_reg < amd64_reg::R8 && $src_reg < amd64_reg::R8);
+        emit_insn!(
+            $enc,
+            [
+                0x89,
+                (0x00 as u8)
+                    .wrapping_add($src_reg << 3)
+                    .wrapping_add($dst_reg)
+            ]
+        );
     }};
 }
 
@@ -218,7 +208,9 @@ macro_rules! emit_shr_reg_imm {
 #[macro_export]
 macro_rules! emit_add_reg_imm {
     ($enc:expr, $reg:expr, $imm:expr) => {{
-        if $reg < amd64_reg::R8 {
+        if $reg == amd64_reg::RAX {
+            emit_insn!($enc, [0x48, 0x05]);
+        } else if $reg < amd64_reg::R8 {
             emit_insn!($enc, [0x48, 0x81, 0xC0 + $reg as u8]);
         } else {
             emit_insn!($enc, [0x49, 0x81, 0xC0 + $reg as u8 - amd64_reg::R8]);
@@ -275,7 +267,7 @@ impl BackendCore for BackendCoreImpl {
         let mut insn = HostEncodedInsn::new();
 
         emit_push_reg!(insn, amd64_reg::RBP);
-        emit_mov_reg_reg!(insn, amd64_reg::RBP, amd64_reg::RSP);
+        emit_mov_reg_reg1!(insn, amd64_reg::RBP, amd64_reg::RSP);
         emit_move_reg_imm!(insn, amd64_reg::R11, fn_ptr);
         emit_call_reg!(insn, amd64_reg::R11);
         emit_pop_reg!(insn, amd64_reg::RBP);
@@ -307,7 +299,7 @@ impl BackendCore for BackendCoreImpl {
         let mut insn = HostEncodedInsn::new();
 
         emit_push_reg!(insn, amd64_reg::RBP);
-        emit_mov_reg_reg!(insn, amd64_reg::RBP, amd64_reg::RSP);
+        emit_mov_reg_reg1!(insn, amd64_reg::RBP, amd64_reg::RSP);
         emit_move_reg_imm!(insn, abi_reg::ARG1, arg1);
         emit_move_reg_imm!(insn, abi_reg::ARG2, arg2);
         emit_move_reg_imm!(insn, abi_reg::ARG3, arg3);
@@ -323,7 +315,7 @@ impl BackendCore for BackendCoreImpl {
         let mut insn = HostEncodedInsn::new();
 
         emit_push_reg!(insn, amd64_reg::RBP);
-        emit_mov_reg_reg!(insn, amd64_reg::RBP, amd64_reg::RSP);
+        emit_mov_reg_reg1!(insn, amd64_reg::RBP, amd64_reg::RSP);
         emit_move_reg_imm!(insn, abi_reg::ARG1, arg1);
         emit_move_reg_imm!(insn, amd64_reg::R11, fn_ptr);
         emit_call_reg!(insn, amd64_reg::R11);

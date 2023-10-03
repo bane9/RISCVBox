@@ -52,6 +52,10 @@ impl<T, const N: usize> EncodedInsn<T, N> {
         self.size += insn.len();
     }
 
+    pub fn iter(&self) -> std::slice::Iter<'_, T> {
+        self.insn[..self.size].iter()
+    }
+
     pub fn as_ptr(&self) -> *const T {
         self.insn.as_ptr()
     }

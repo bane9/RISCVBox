@@ -27,7 +27,6 @@ pub struct ParseCore {
     code_pages: CodePages,
     rom: Vec<u8>,
     offset: usize,
-    total_ram_size: usize,
 }
 
 impl ParseCore {
@@ -49,7 +48,6 @@ impl ParseCore {
             code_pages,
             rom,
             offset: 0,
-            total_ram_size: pages * Xmem::page_size(),
         };
 
         core
@@ -88,7 +86,7 @@ impl ParseCore {
                 );
             }
 
-            let result = self.decode_single(ptr.wrapping_add(pc), insn);
+            let result = self.decode_single(ptr.wrapping_add(self.offset), insn);
 
             if let Err(JitCommon::JitError::ReachedBlockBoundary) = result {
                 break;
