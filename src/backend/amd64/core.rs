@@ -206,16 +206,137 @@ macro_rules! emit_shr_reg_imm {
 }
 
 #[macro_export]
+macro_rules! emit_shr_reg_reg {
+    ($enc:expr, $reg1:expr, $reg2:expr) => {{}};
+}
+
+#[macro_export]
+macro_rules! emit_shl_reg_reg {
+    ($enc:expr, $reg1:expr, $reg2:expr) => {{}};
+}
+
+#[macro_export]
 macro_rules! emit_add_reg_imm {
-    ($enc:expr, $reg:expr, $imm:expr) => {{
-        if $reg == amd64_reg::RAX {
-            emit_insn!($enc, [0x48, 0x05]);
-        } else if $reg < amd64_reg::R8 {
-            emit_insn!($enc, [0x48, 0x81, 0xC0 + $reg as u8]);
+    ($enc:expr, $reg:expr, $imm:expr) => {{}};
+}
+
+#[macro_export]
+macro_rules! emit_sub_reg_imm {
+    ($enc:expr, $reg:expr, $imm:expr) => {{}};
+}
+
+#[macro_export]
+macro_rules! emit_sub_reg_reg {
+    ($enc:expr, $reg:expr, $imm:expr) => {{}};
+}
+
+#[macro_export]
+macro_rules! emit_add_reg_reg {
+    ($enc:expr, $reg1:expr, $reg2:expr) => {{}};
+}
+
+#[macro_export]
+macro_rules! emit_mul_reg_imm {
+    ($enc:expr, $reg:expr, $imm:expr) => {{}};
+}
+
+#[macro_export]
+macro_rules! emit_mul_reg_reg {
+    ($enc:expr, $reg1:expr, $reg2:expr) => {{}};
+}
+
+#[macro_export]
+macro_rules! emit_div_reg_imm {
+    ($enc:expr, $reg:expr, $imm:expr) => {{}};
+}
+
+#[macro_export]
+macro_rules! emit_div_reg_reg {
+    ($enc:expr, $reg1:expr, $reg2:expr) => {{}};
+}
+
+#[macro_export]
+macro_rules! emit_xor_reg_imm {
+    ($enc:expr, $reg:expr, $imm:expr) => {{}};
+}
+
+#[macro_export]
+macro_rules! emit_xor_reg_reg {
+    ($enc:expr, $reg1:expr, $reg2:expr) => {{}};
+}
+
+#[macro_export]
+macro_rules! emit_or_reg_imm {
+    ($enc:expr, $reg:expr, $imm:expr) => {{}};
+}
+
+#[macro_export]
+macro_rules! emit_or_reg_reg {
+    ($enc:expr, $reg1:expr, $reg2:expr) => {{}};
+}
+
+#[macro_export]
+macro_rules! emit_and_reg_imm {
+    ($enc:expr, $reg:expr, $imm:expr) => {{}};
+}
+
+#[macro_export]
+macro_rules! emit_and_reg_reg {
+    ($enc:expr, $reg1:expr, $reg2:expr) => {{}};
+}
+
+#[macro_export]
+macro_rules! emit_test_less_reg_imm {
+    ($enc:expr, $reg1:expr, $imm:expr) => {{}};
+}
+
+#[macro_export]
+macro_rules! emit_test_less_reg_reg {
+    ($enc:expr, $reg1:expr, $imm:expr) => {{}};
+}
+
+#[macro_export]
+macro_rules! emit_test_greater_reg_imm {
+    ($enc:expr, $reg1:expr, $imm:expr) => {{}};
+}
+
+#[macro_export]
+macro_rules! emit_test_greater_reg_reg {
+    ($enc:expr, $reg1:expr, $imm:expr) => {{}};
+}
+
+#[macro_export]
+macro_rules! emit_mov_reg_guest_to_host {
+    ($enc:expr, $cpu:expr, $dst_reg:expr, $src_reg:expr) => {{
+        if $src_reg != 0 {
+            emit_move_reg_imm!($enc, $dst_reg, &$cpu.regs[$src_reg as usize] as *const _);
+            emit_mov_dword_ptr_reg!($enc, $dst_reg, $dst_reg);
         } else {
-            emit_insn!($enc, [0x49, 0x81, 0xC0 + $reg as u8 - amd64_reg::R8]);
+            emit_move_reg_imm!($enc, $dst_reg, 0);
         }
-        emit_insn!($enc, (($imm) as u32).to_le_bytes());
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_mov_reg_host_to_guest {
+    ($enc:expr, $cpu:expr, $dst_addr_reg:expr, $dst_val_reg:expr, $src_reg:expr) => {{
+        emit_move_reg_imm!(
+            $enc,
+            $dst_addr_reg,
+            &$cpu.regs[$src_reg as usize] as *const _ as usize
+        );
+
+        emit_mov_dword_ptr_reg!($enc, $dst_addr_reg, $dst_val_reg);
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_check_rd {
+    ($enc:expr, $rd:expr) => {{
+        if $rd == 0 {
+            emit_nop!($enc);
+            return Ok($enc);
+        }
     }};
 }
 
@@ -325,7 +446,7 @@ impl BackendCore for BackendCoreImpl {
     }
 
     #[inline(never)]
-    #[cfg(target_os = "windows")]
+    #[cfg(windows)]
     unsafe fn call_jit_ptr(jit_ptr: *mut u8) {
         asm!(
             "sub rsp, 8 * 8",
