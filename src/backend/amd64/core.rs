@@ -83,7 +83,6 @@ macro_rules! emit_push_reg {
     }};
 }
 
-// for reg1 version src and dst must be < R8
 #[macro_export]
 macro_rules! emit_mov_reg_reg1 {
     ($enc:expr, $dst_reg:expr, $src_reg:expr) => {{
@@ -182,130 +181,6 @@ macro_rules! emit_mov_dword_ptr_reg {
 }
 
 #[macro_export]
-macro_rules! emit_shl_reg_imm {
-    ($enc:expr, $reg:expr, $imm:expr) => {{
-        if $reg < amd64_reg::R8 {
-            emit_insn!($enc, [0x48, 0xC1, 0xE0 + $reg as u8]);
-        } else {
-            emit_insn!($enc, [0x49, 0xC1, 0xE0 + $reg as u8 - amd64_reg::R8]);
-        }
-        emit_insn!($enc, [$imm]);
-    }};
-}
-
-#[macro_export]
-macro_rules! emit_shr_reg_imm {
-    ($enc:expr, $reg:expr, $imm:expr) => {{
-        if $reg < amd64_reg::R8 {
-            emit_insn!($enc, [0x48, 0xC1, 0xE8 + $reg as u8]);
-        } else {
-            emit_insn!($enc, [0x49, 0xC1, 0xE8 + $reg as u8 - amd64_reg::R8]);
-        }
-        emit_insn!($enc, [$imm]);
-    }};
-}
-
-#[macro_export]
-macro_rules! emit_shr_reg_reg {
-    ($enc:expr, $reg1:expr, $reg2:expr) => {{}};
-}
-
-#[macro_export]
-macro_rules! emit_shl_reg_reg {
-    ($enc:expr, $reg1:expr, $reg2:expr) => {{}};
-}
-
-#[macro_export]
-macro_rules! emit_add_reg_imm {
-    ($enc:expr, $reg:expr, $imm:expr) => {{}};
-}
-
-#[macro_export]
-macro_rules! emit_sub_reg_imm {
-    ($enc:expr, $reg:expr, $imm:expr) => {{}};
-}
-
-#[macro_export]
-macro_rules! emit_sub_reg_reg {
-    ($enc:expr, $reg:expr, $imm:expr) => {{}};
-}
-
-#[macro_export]
-macro_rules! emit_add_reg_reg {
-    ($enc:expr, $reg1:expr, $reg2:expr) => {{}};
-}
-
-#[macro_export]
-macro_rules! emit_mul_reg_imm {
-    ($enc:expr, $reg:expr, $imm:expr) => {{}};
-}
-
-#[macro_export]
-macro_rules! emit_mul_reg_reg {
-    ($enc:expr, $reg1:expr, $reg2:expr) => {{}};
-}
-
-#[macro_export]
-macro_rules! emit_div_reg_imm {
-    ($enc:expr, $reg:expr, $imm:expr) => {{}};
-}
-
-#[macro_export]
-macro_rules! emit_div_reg_reg {
-    ($enc:expr, $reg1:expr, $reg2:expr) => {{}};
-}
-
-#[macro_export]
-macro_rules! emit_xor_reg_imm {
-    ($enc:expr, $reg:expr, $imm:expr) => {{}};
-}
-
-#[macro_export]
-macro_rules! emit_xor_reg_reg {
-    ($enc:expr, $reg1:expr, $reg2:expr) => {{}};
-}
-
-#[macro_export]
-macro_rules! emit_or_reg_imm {
-    ($enc:expr, $reg:expr, $imm:expr) => {{}};
-}
-
-#[macro_export]
-macro_rules! emit_or_reg_reg {
-    ($enc:expr, $reg1:expr, $reg2:expr) => {{}};
-}
-
-#[macro_export]
-macro_rules! emit_and_reg_imm {
-    ($enc:expr, $reg:expr, $imm:expr) => {{}};
-}
-
-#[macro_export]
-macro_rules! emit_and_reg_reg {
-    ($enc:expr, $reg1:expr, $reg2:expr) => {{}};
-}
-
-#[macro_export]
-macro_rules! emit_test_less_reg_imm {
-    ($enc:expr, $reg1:expr, $imm:expr) => {{}};
-}
-
-#[macro_export]
-macro_rules! emit_test_less_reg_reg {
-    ($enc:expr, $reg1:expr, $imm:expr) => {{}};
-}
-
-#[macro_export]
-macro_rules! emit_test_greater_reg_imm {
-    ($enc:expr, $reg1:expr, $imm:expr) => {{}};
-}
-
-#[macro_export]
-macro_rules! emit_test_greater_reg_reg {
-    ($enc:expr, $reg1:expr, $imm:expr) => {{}};
-}
-
-#[macro_export]
 macro_rules! emit_mov_reg_guest_to_host {
     ($enc:expr, $cpu:expr, $dst_reg:expr, $src_reg:expr) => {{
         if $src_reg != 0 {
@@ -338,6 +213,253 @@ macro_rules! emit_check_rd {
             return Ok($enc);
         }
     }};
+}
+
+/////////// RVI
+
+#[macro_export]
+macro_rules! emit_shl_reg_imm {
+    ($enc:expr, $reg:expr, $imm:expr) => {{
+        if $reg < amd64_reg::R8 {
+            emit_insn!($enc, [0x48, 0xC1, 0xE0 + $reg as u8]);
+        } else {
+            emit_insn!($enc, [0x49, 0xC1, 0xE0 + $reg as u8 - amd64_reg::R8]);
+        }
+        emit_insn!($enc, [$imm]);
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_shr_reg_imm {
+    ($enc:expr, $reg:expr, $imm:expr) => {{
+        if $reg < amd64_reg::R8 {
+            emit_insn!($enc, [0x48, 0xC1, 0xE8 + $reg as u8]);
+        } else {
+            emit_insn!($enc, [0x49, 0xC1, 0xE8 + $reg as u8 - amd64_reg::R8]);
+        }
+        emit_insn!($enc, [$imm]);
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_mov_cl_imm {
+    ($enc:expr, $imm:expr) => {{
+        emit_insn!($enc, [0xB1]);
+        emit_insn!($enc, [$imm as u8]);
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_shr_reg_cl {
+    ($enc:expr, $reg1:expr) => {{
+        if $reg1 < amd64_reg::R8 {
+            emit_insn!($enc, [0x48, 0xD3, 0xE8 + $reg1 as u8]);
+        } else {
+            emit_insn!($enc, [0x49, 0xD3, 0xE8 + $reg1 as u8 - amd64_reg::R8]);
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_shl_reg_cl {
+    ($enc:expr, $reg1:expr) => {{
+        if $reg1 < amd64_reg::R8 {
+            emit_insn!($enc, [0x48, 0xD3, 0xE0 + $reg1 as u8]);
+        } else {
+            emit_insn!($enc, [0x49, 0xD3, 0xE0 + $reg1 as u8 - amd64_reg::R8]);
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_add_reg_imm {
+    ($enc:expr, $reg:expr, $imm:expr) => {{
+        if $reg == amd64_reg::RAX {
+            emit_insn!($enc, [0x48, 0x05]);
+        } else if $reg < amd64_reg::R8 {
+            emit_insn!($enc, [0x48, 0x81, 0xC0 + $reg as u8]);
+        } else {
+            emit_insn!($enc, [0x49, 0x81, 0xC0 + $reg as u8 - amd64_reg::R8]);
+        }
+
+        emit_insn!($enc, ($imm as u32).to_le_bytes());
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_sub_reg_imm {
+    ($enc:expr, $reg:expr, $imm:expr) => {{
+        if $reg == amd64_reg::RAX {
+            emit_insn!($enc, [0x48, 0x2D]);
+        } else if $reg < amd64_reg::R8 {
+            emit_insn!($enc, [0x48, 0x81, 0xE8 + $reg as u8]);
+        } else {
+            emit_insn!($enc, [0x49, 0x81, 0xE8 + $reg as u8 - amd64_reg::R8]);
+        }
+
+        emit_insn!($enc, ($imm as u32).to_le_bytes());
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_sub_reg_reg {
+    ($enc:expr, $reg1:expr, $reg2:expr) => {{
+        assert!($reg1 < amd64_reg::R8 && $reg2 < amd64_reg::R8);
+        emit_insn!(
+            $enc,
+            [
+                0x48,
+                0x29,
+                (0xC0 as u8).wrapping_add($reg2 << 3).wrapping_add($reg1)
+            ]
+        );
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_add_reg_reg {
+    ($enc:expr, $reg1:expr, $reg2:expr) => {{
+        assert!($reg1 < amd64_reg::R8 && $reg2 < amd64_reg::R8);
+        emit_insn!(
+            $enc,
+            [
+                0x48,
+                0x01,
+                (0xC0 as u8).wrapping_add($reg2 << 3).wrapping_add($reg1)
+            ]
+        );
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_xor_reg_imm {
+    ($enc:expr, $reg:expr, $imm:expr) => {{
+        if $reg == amd64_reg::RAX {
+            emit_insn!($enc, [0x48, 0x35]);
+        } else if $reg < amd64_reg::R8 {
+            emit_insn!($enc, [0x48, 0x81, 0xF0 + $reg as u8]);
+        } else {
+            emit_insn!($enc, [0x49, 0x81, 0xF0 + $reg as u8 - amd64_reg::R8]);
+        }
+        emit_insn!($enc, ($imm as u32).to_le_bytes());
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_xor_reg_reg {
+    ($enc:expr, $reg1:expr, $reg2:expr) => {{
+        assert!($reg1 < amd64_reg::R8 && $reg2 < amd64_reg::R8);
+        emit_insn!(
+            $enc,
+            [
+                0x48,
+                0x31,
+                (0xC0 as u8).wrapping_add($reg2 << 3).wrapping_add($reg1)
+            ]
+        );
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_or_reg_imm {
+    ($enc:expr, $reg:expr, $imm:expr) => {{
+        if $reg == amd64_reg::RAX {
+            emit_insn!($enc, [0x48, 0x0D]);
+        } else if $reg < amd64_reg::R8 {
+            emit_insn!($enc, [0x48, 0x81, 0xC8 + $reg as u8]);
+        } else {
+            emit_insn!($enc, [0x49, 0x81, 0xC8 + $reg as u8 - amd64_reg::R8]);
+        }
+
+        emit_insn!($enc, ($imm as u32).to_le_bytes());
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_or_reg_reg {
+    ($enc:expr, $reg1:expr, $reg2:expr) => {{
+        assert!($reg1 < amd64_reg::R8 && $reg2 < amd64_reg::R8);
+        emit_insn!(
+            $enc,
+            [
+                0x48,
+                0x09,
+                (0xC0 as u8).wrapping_add($reg2 << 3).wrapping_add($reg1)
+            ]
+        );
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_and_reg_imm {
+    ($enc:expr, $reg:expr, $imm:expr) => {{
+        if $reg == amd64_reg::RAX {
+            emit_insn!($enc, [0x48, 0x25]);
+        } else if $reg < amd64_reg::R8 {
+            emit_insn!($enc, [0x48, 0x81, 0xE0 + $reg as u8]);
+        } else {
+            emit_insn!($enc, [0x49, 0x81, 0xE0 + $reg as u8 - amd64_reg::R8]);
+        }
+
+        emit_insn!($enc, ($imm as u32).to_le_bytes());
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_and_reg_reg {
+    ($enc:expr, $reg1:expr, $reg2:expr) => {{
+        assert!($reg1 < amd64_reg::R8 && $reg2 < amd64_reg::R8);
+        emit_insn!(
+            $enc,
+            [
+                0x48,
+                0x21,
+                (0xC0 as u8).wrapping_add($reg2 << 3).wrapping_add($reg1)
+            ]
+        );
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_test_less_reg_imm {
+    ($enc:expr, $reg1:expr, $imm:expr) => {{}};
+}
+
+#[macro_export]
+macro_rules! emit_test_less_reg_reg {
+    ($enc:expr, $reg1:expr, $imm:expr) => {{}};
+}
+
+#[macro_export]
+macro_rules! emit_test_greater_reg_imm {
+    ($enc:expr, $reg1:expr, $imm:expr) => {{}};
+}
+
+#[macro_export]
+macro_rules! emit_test_greater_reg_reg {
+    ($enc:expr, $reg1:expr, $imm:expr) => {{}};
+}
+
+/////////// RVM
+
+#[macro_export]
+macro_rules! emit_mul_reg_imm {
+    ($enc:expr, $reg:expr, $imm:expr) => {{}};
+}
+
+#[macro_export]
+macro_rules! emit_mul_reg_reg {
+    ($enc:expr, $reg1:expr, $reg2:expr) => {{}};
+}
+
+#[macro_export]
+macro_rules! emit_div_reg_imm {
+    ($enc:expr, $reg:expr, $imm:expr) => {{}};
+}
+
+#[macro_export]
+macro_rules! emit_div_reg_reg {
+    ($enc:expr, $reg1:expr, $reg2:expr) => {{}};
 }
 
 pub struct BackendCoreImpl;

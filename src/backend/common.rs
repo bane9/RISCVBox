@@ -17,7 +17,6 @@ pub type DecodeRet = Result<HostEncodedInsn, JitError>;
 #[macro_export]
 macro_rules! test_encoded_insn {
     ($test_name:ident, $insn_macro:expr, $expected:expr) => {
-        #[cfg(test)]
         #[test]
         pub fn $test_name() {
             let mut enc = HostEncodedInsn::new();
@@ -28,8 +27,8 @@ macro_rules! test_encoded_insn {
             let mut expected_str = String::new();
             let mut encoded_str = String::new();
 
-            expected_str.push_str("Expected -> ");
-            encoded_str.push_str("Encoded  -> ");
+            expected_str.push_str("");
+            encoded_str.push_str("");
 
             for (_, (a, b)) in enc.iter().zip($expected.iter()).enumerate() {
                 if a != b {
@@ -60,8 +59,8 @@ macro_rules! test_encoded_insn {
                     &stringify!($insn_macro)[28..].trim().replace(" :: ", "::")
                 );
 
-                println!("{}", expected_str.trim_end());
-                println!("{}", encoded_str.trim_end());
+                println!("Expected -> {}", expected_str.trim_end());
+                println!("Encoded  -> {}", encoded_str.trim_end());
                 println!("__________________________________________________________\n");
             }
 
