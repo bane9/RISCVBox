@@ -215,6 +215,17 @@ macro_rules! emit_check_rd {
     }};
 }
 
+#[macro_export]
+macro_rules! emit_set_exception {
+    ($enc:expr, $cpu:expr, $exception:expr) => {{
+        let rd_addr = &$cpu.exception as *const _ as usize;
+        emit_move_reg_imm!($enc, amd64_reg::RAX, $exception as usize);
+        emit_mov_dword_ptr_imm!($enc, amd64_reg::RAX, rd_addr);
+
+        emit_ret!($enc);
+    }};
+}
+
 /////////// RVI
 
 #[macro_export]
@@ -421,23 +432,94 @@ macro_rules! emit_and_reg_reg {
 }
 
 #[macro_export]
-macro_rules! emit_test_less_reg_imm {
-    ($enc:expr, $reg1:expr, $imm:expr) => {{}};
+macro_rules! emit_setl_al {
+    ($enc:expr) => {{
+        emit_insn!($enc, [0x0F, 0x9C, 0xC0]);
+    }};
 }
 
+#[macro_export]
+macro_rules! emit_setg_al {
+    ($enc:expr) => {{
+        emit_insn!($enc, [0x0F, 0x9F, 0xC0]);
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_movzx_rax_al {
+    ($enc:expr) => {{
+        emit_insn!($enc, [0x48, 0x0F, 0xB6, 0xC0]);
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_reg_reg {
+    ($enc:expr, $reg1:expr, $reg2:expr) => {{
+        assert!($reg1 < amd64_reg::R8 && $reg2 < amd64_reg::R8);
+        emit_insn!(
+            $enc,
+            [
+                0x48,
+                0x89,
+                (0xC0 as u8).wrapping_add($reg2 << 3).wrapping_add($reg1)
+            ]
+        );
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_cmp_reg_imm {
+    ($enc:expr, $reg1:expr, $imm:expr) => {{
+        if $reg1 == amd64_reg::RAX {
+            emit_insn!($enc, [0x48, 0x3D]);
+        } else if $reg1 < amd64_reg::R8 {
+            emit_insn!($enc, [0x48, 0x81, 0xF8 + $reg1 as u8]);
+        } else {
+            emit_insn!($enc, [0x49, 0x81, 0xF8 + $reg1 as u8 - amd64_reg::R8]);
+        }
+
+        emit_insn!($enc, ($imm as u32).to_le_bytes());
+    }};
+}
+
+// reg1 is always RAX
+#[macro_export]
+macro_rules! emit_test_less_reg_imm {
+    ($enc:expr, $imm:expr) => {{
+        emit_cmp_reg_imm!($enc, amd64_reg::RAX, $imm);
+        emit_setl_al!($enc);
+        emit_movzx_rax_al!($enc);
+    }};
+}
+
+// reg1 is always RAX
 #[macro_export]
 macro_rules! emit_test_less_reg_reg {
-    ($enc:expr, $reg1:expr, $imm:expr) => {{}};
+    ($enc:expr, $reg2:expr) => {{
+        emit_cmp_reg_reg!($enc, amd64_reg::RAX, $reg2);
+        emit_setl_al!($enc);
+        emit_movzx_rax_al!($enc);
+    }};
 }
 
+// reg1 is always RAX
 #[macro_export]
 macro_rules! emit_test_greater_reg_imm {
-    ($enc:expr, $reg1:expr, $imm:expr) => {{}};
+    ($enc:expr, $imm:expr) => {{
+        emit_cmp_reg_imm!($enc, amd64_reg::RAX, $imm);
+        emit_setg_al!($enc);
+        emit_movzx_rax_al!($enc);
+    }};
 }
 
+// reg1 is always RAX
 #[macro_export]
 macro_rules! emit_test_greater_reg_reg {
-    ($enc:expr, $reg1:expr, $imm:expr) => {{}};
+    ($enc:expr, $reg2:expr) => {{
+        emit_cmp_reg_reg!($enc, amd64_reg::RAX, $reg2);
+        emit_setg_al!($enc);
+        emit_movzx_rax_al!($enc);
+    }};
 }
 
 /////////// RVM

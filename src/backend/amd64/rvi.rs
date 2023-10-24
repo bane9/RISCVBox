@@ -1,7 +1,7 @@
 use crate::backend::common;
 use crate::backend::target::core::{amd64_reg, BackendCore, BackendCoreImpl};
 use crate::bus::bus::*;
-use crate::cpu;
+use crate::cpu::{self, Exception, PrivMode};
 use crate::*;
 use common::{DecodeRet, HostEncodedInsn};
 
@@ -91,11 +91,11 @@ impl common::Rvi for RviImpl {
 
         emit_check_rd!(insn, rd);
 
-        emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RBX, rs1);
+        emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RAX, rs1);
 
-        emit_test_less_reg_imm!(insn, amd64_reg::RBX, imm);
+        emit_test_less_reg_imm!(insn, imm);
 
-        emit_mov_reg_host_to_guest!(insn, cpu, amd64_reg::RCX, amd64_reg::RBX, rd);
+        emit_mov_reg_host_to_guest!(insn, cpu, amd64_reg::RCX, amd64_reg::RAX, rd);
 
         Ok(insn)
     }
@@ -106,11 +106,11 @@ impl common::Rvi for RviImpl {
 
         emit_check_rd!(insn, rd);
 
-        emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RBX, rs1);
+        emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RAX, rs1);
 
-        emit_test_less_reg_imm!(insn, amd64_reg::RBX, imm);
+        emit_test_less_reg_imm!(insn, imm);
 
-        emit_mov_reg_host_to_guest!(insn, cpu, amd64_reg::RCX, amd64_reg::RBX, rd);
+        emit_mov_reg_host_to_guest!(insn, cpu, amd64_reg::RCX, amd64_reg::RAX, rd);
 
         Ok(insn)
     }
@@ -121,11 +121,11 @@ impl common::Rvi for RviImpl {
 
         emit_check_rd!(insn, rd);
 
-        emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RBX, rs1);
+        emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RAX, rs1);
 
-        emit_test_less_reg_imm!(insn, amd64_reg::RBX, imm);
+        emit_test_less_reg_imm!(insn, imm);
 
-        emit_mov_reg_host_to_guest!(insn, cpu, amd64_reg::RCX, amd64_reg::RBX, rd);
+        emit_mov_reg_host_to_guest!(insn, cpu, amd64_reg::RCX, amd64_reg::RAX, rd);
 
         Ok(insn)
     }
@@ -136,11 +136,11 @@ impl common::Rvi for RviImpl {
 
         emit_check_rd!(insn, rd);
 
-        emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RBX, rs1);
+        emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RAX, rs1);
 
-        emit_shr_reg_imm!(insn, amd64_reg::RBX, shamt as u8);
+        emit_shr_reg_imm!(insn, amd64_reg::RAX, shamt);
 
-        emit_mov_reg_host_to_guest!(insn, cpu, amd64_reg::RCX, amd64_reg::RBX, rd);
+        emit_mov_reg_host_to_guest!(insn, cpu, amd64_reg::RCX, amd64_reg::RAX, rd);
 
         Ok(insn)
     }
@@ -153,7 +153,7 @@ impl common::Rvi for RviImpl {
 
         emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RBX, rs1);
 
-        emit_test_greater_reg_imm!(insn, amd64_reg::RBX, shamt as u8);
+        emit_shr_reg_imm!(insn, amd64_reg::RBX, shamt);
 
         emit_mov_reg_host_to_guest!(insn, cpu, amd64_reg::RCX, amd64_reg::RBX, rd);
 
@@ -204,8 +204,16 @@ impl common::Rvi for RviImpl {
         Ok(insn)
     }
 
-    fn emit_auipc(_rd: u8, _imm: i32) -> DecodeRet {
-        todo!()
+    fn emit_auipc(rd: u8, imm: i32) -> DecodeRet {
+        let mut insn = HostEncodedInsn::new();
+        let cpu = cpu::get_cpu();
+
+        let rd_addr = &cpu.regs[rd as usize] as *const _ as usize;
+
+        emit_move_reg_imm!(insn, amd64_reg::RBX, rd_addr);
+        emit_mov_dword_ptr_imm!(insn, amd64_reg::RBX, cpu.pc + imm as u32);
+
+        Ok(insn)
     }
 
     fn emit_jal(_rd: u8, _imm: i32) -> DecodeRet {
@@ -289,7 +297,11 @@ impl common::Rvi for RviImpl {
     }
 
     fn emit_fence(_pred: u8, _succ: u8) -> DecodeRet {
-        todo!()
+        let mut insn = HostEncodedInsn::new();
+
+        emit_nop!(insn);
+
+        Ok(insn)
     }
 
     fn emit_fence_i() -> DecodeRet {
@@ -301,11 +313,31 @@ impl common::Rvi for RviImpl {
     }
 
     fn emit_ecall() -> DecodeRet {
-        todo!()
+        let mut insn = HostEncodedInsn::new();
+        let cpu = cpu::get_cpu();
+
+        match cpu.mode {
+            PrivMode::User => {
+                emit_set_exception!(insn, cpu, Exception::EnvironmentCallFromUMode);
+            }
+            PrivMode::Supervisor => {
+                emit_set_exception!(insn, cpu, Exception::EnvironmentCallFromSMode);
+            }
+            PrivMode::Machine => {
+                emit_set_exception!(insn, cpu, Exception::EnvironmentCallFromMMode);
+            }
+        }
+
+        Ok(insn)
     }
 
     fn emit_ebreak() -> DecodeRet {
-        todo!()
+        let mut insn = HostEncodedInsn::new();
+        let cpu = cpu::get_cpu();
+
+        emit_set_exception!(insn, cpu, Exception::Breakpoint);
+
+        Ok(insn)
     }
 
     fn emit_xor(rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
@@ -333,7 +365,7 @@ impl common::Rvi for RviImpl {
         emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RBX, rs1);
         emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RCX, rs2);
 
-        //emit_shr_reg_reg!(insn, amd64_reg::RBX, amd64_reg::RCX);
+        emit_shr_reg_cl!(insn, amd64_reg::RBX);
 
         emit_mov_reg_host_to_guest!(insn, cpu, amd64_reg::RCX, amd64_reg::RBX, rd);
 
@@ -346,12 +378,12 @@ impl common::Rvi for RviImpl {
 
         emit_check_rd!(insn, rd);
 
-        emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RBX, rs1);
+        emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RAX, rs1);
         emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RCX, rs2);
 
-        emit_test_greater_reg_imm!(insn, amd64_reg::RBX, amd64_reg::RCX);
+        emit_test_greater_reg_imm!(insn, amd64_reg::RCX);
 
-        emit_mov_reg_host_to_guest!(insn, cpu, amd64_reg::RCX, amd64_reg::RBX, rd);
+        emit_mov_reg_host_to_guest!(insn, cpu, amd64_reg::RCX, amd64_reg::RAX, rd);
 
         Ok(insn)
     }
@@ -397,7 +429,7 @@ impl common::Rvi for RviImpl {
         emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RBX, rs1);
         emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RCX, rs2);
 
-        // emit_shl_reg_reg!(insn, amd64_reg::RBX, amd64_reg::RCX);
+        emit_shl_reg_cl!(insn, amd64_reg::RBX);
 
         emit_mov_reg_host_to_guest!(insn, cpu, amd64_reg::RCX, amd64_reg::RBX, rd);
 
@@ -410,12 +442,12 @@ impl common::Rvi for RviImpl {
 
         emit_check_rd!(insn, rd);
 
-        emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RBX, rs1);
+        emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RAX, rs1);
         emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RCX, rs2);
 
-        emit_test_less_reg_imm!(insn, amd64_reg::RBX, amd64_reg::RCX);
+        emit_test_less_reg_imm!(insn, amd64_reg::RCX);
 
-        emit_mov_reg_host_to_guest!(insn, cpu, amd64_reg::RCX, amd64_reg::RBX, rd);
+        emit_mov_reg_host_to_guest!(insn, cpu, amd64_reg::RCX, amd64_reg::RAX, rd);
 
         Ok(insn)
     }
@@ -426,12 +458,12 @@ impl common::Rvi for RviImpl {
 
         emit_check_rd!(insn, rd);
 
-        emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RBX, rs1);
+        emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RAX, rs1);
         emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RCX, rs2);
 
-        emit_test_less_reg_imm!(insn, amd64_reg::RBX, amd64_reg::RCX);
+        emit_test_less_reg_imm!(insn, amd64_reg::RCX);
 
-        emit_mov_reg_host_to_guest!(insn, cpu, amd64_reg::RCX, amd64_reg::RBX, rd);
+        emit_mov_reg_host_to_guest!(insn, cpu, amd64_reg::RCX, amd64_reg::RAX, rd);
 
         Ok(insn)
     }

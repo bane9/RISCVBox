@@ -69,6 +69,46 @@ impl RunState {
     }
 }
 
+pub enum Exception {
+    InstructionAddressMisaligned = 0,
+    InstructionAccessFault = 1,
+    IllegalInstruction = 2,
+    Breakpoint = 3,
+    LoadAddressMisaligned = 4,
+    LoadAccessFault = 5,
+    StoreAddressMisaligned = 6,
+    StoreAccessFault = 7,
+    EnvironmentCallFromUMode = 8,
+    EnvironmentCallFromSMode = 9,
+    EnvironmentCallFromMMode = 11,
+    InstructionPageFault = 12,
+    LoadPageFault = 13,
+    StorePageFault = 15,
+    None = 0xff,
+}
+
+impl Exception {
+    pub fn from_usize(val: usize) -> Exception {
+        match val {
+            0 => Exception::InstructionAddressMisaligned,
+            1 => Exception::InstructionAccessFault,
+            2 => Exception::IllegalInstruction,
+            3 => Exception::Breakpoint,
+            4 => Exception::LoadAddressMisaligned,
+            5 => Exception::LoadAccessFault,
+            6 => Exception::StoreAddressMisaligned,
+            7 => Exception::StoreAccessFault,
+            8 => Exception::EnvironmentCallFromUMode,
+            9 => Exception::EnvironmentCallFromSMode,
+            11 => Exception::EnvironmentCallFromMMode,
+            12 => Exception::InstructionPageFault,
+            13 => Exception::LoadPageFault,
+            15 => Exception::StorePageFault,
+            _ => Exception::None,
+        }
+    }
+}
+
 pub type CpuReg = BusType;
 
 pub struct Cpu {
@@ -80,6 +120,7 @@ pub struct Cpu {
     pub missing_insn_map: HashMap<CpuReg, PtrT>,
     pub run_state: RunState,
     pub ret_status: usize,
+    pub exception: usize,
 }
 
 impl Cpu {
@@ -93,6 +134,7 @@ impl Cpu {
             missing_insn_map: HashMap::new(),
             run_state: RunState::None,
             ret_status: 0,
+            exception: Exception::None as usize,
         }
     }
 }
