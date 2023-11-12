@@ -9,7 +9,7 @@ pub struct ExecCore {
 
 impl ExecCore {
     pub fn new(rom: Vec<u8>) -> Self {
-        let mut parse_core = ParseCore::new(rom);
+        let mut parse_core = ParseCore::new(rom.len());
         parse_core.parse_ahead().unwrap();
         Self { parse_core }
     }

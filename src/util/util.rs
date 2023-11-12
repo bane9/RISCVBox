@@ -14,8 +14,8 @@ where
 {
     let value = value.into();
     let sign_bit = 1 << (size - 1);
-    let sign_extend_mask = (u64::max_value() & !((1 << size) - 1)) as i64;
     if (value & sign_bit) != 0 {
+        let sign_extend_mask = (u64::max_value() & !((1 << size) - 1)) as i64;
         return value | sign_extend_mask;
     } else {
         return value;

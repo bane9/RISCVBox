@@ -50,6 +50,10 @@ impl Bus {
         Err(BusError::InvalidAddress)
     }
 
+    pub fn fetch(&mut self, addr: BusType, size: BusType) -> Result<BusType, BusError> {
+        self.read(addr, size)
+    }
+
     pub fn write(&mut self, addr: BusType, data: BusType, size: BusType) -> Result<(), BusError> {
         for device in &mut self.devices {
             if addr >= device.get_begin_addr() && addr < device.get_end_addr() {

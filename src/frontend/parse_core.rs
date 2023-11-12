@@ -21,18 +21,19 @@ pub const CODE_PAGE_SIZE: usize = 4096;
 pub const CODE_PAGE_READAHEAD: usize = 1;
 
 pub const INSN_SIZE: usize = 4; // Unlikely for rvc to be supported
+pub const INSN_SIZE_BITS: usize = INSN_SIZE * 8;
 
 pub type DecoderFn = fn(u32) -> JitCommon::DecodeRet;
 
 pub struct ParseCore {
     code_pages: CodePages,
-    rom: Vec<u8>,
+    rom_size: usize,
     offset: usize,
 }
 
 impl ParseCore {
-    pub fn new(rom: Vec<u8>) -> ParseCore {
-        let pages = rom.len() / Xmem::page_size();
+    pub fn new(rom_size: usize) -> ParseCore {
+        let pages = rom_size / Xmem::page_size();
         let pages = pages + pages / 2;
         let pages = std::cmp::max(pages, 1);
         let mut code_pages = code_pages::CodePages::new(pages, CODE_PAGE_READAHEAD);
@@ -47,7 +48,7 @@ impl ParseCore {
 
         let core = ParseCore {
             code_pages,
-            rom,
+            rom_size,
             offset: 0,
         };
 
@@ -57,11 +58,11 @@ impl ParseCore {
     pub fn parse_ahead(&mut self) -> Result<(), JitCommon::JitError> {
         let start = self.offset;
 
-        if start >= self.rom.len() {
+        if start >= self.rom_size {
             return Ok(());
         }
 
-        let end = std::cmp::min(start + CODE_PAGE_SIZE * CODE_PAGE_READAHEAD, self.rom.len());
+        let end = std::cmp::min(start + CODE_PAGE_SIZE * CODE_PAGE_READAHEAD, self.rom_size);
 
         self.parse_until(end)
     }
@@ -75,7 +76,7 @@ impl ParseCore {
     pub fn parse_until(&mut self, end: usize) -> Result<(), JitCommon::JitError> {
         let start = self.offset;
 
-        if start >= self.rom.len() {
+        if start >= self.rom_size {
             return Ok(());
         }
 
@@ -91,12 +92,19 @@ impl ParseCore {
 
         let ptr = self.code_pages.as_ptr().wrapping_add(self.offset);
         let cpu = cpu::get_cpu();
-        let _bus = bus::get_bus();
+        let bus = bus::get_bus();
 
         while (cpu::get_cpu().pc as usize) < end {
+            let loaded_insn = bus.fetch(cpu.pc, INSN_SIZE_BITS as u32);
+
+            // if loaded_insn.is_err() {
+            //     cpu.pc += INSN_SIZE as u32;
+            //     continue;
+            // }
+
             unsafe {
                 std::ptr::copy_nonoverlapping(
-                    self.rom.as_ptr().add(cpu.pc as usize),
+                    &loaded_insn.unwrap() as *const u32 as *const u8,
                     &mut insn as *mut u32 as *mut u8,
                     INSN_SIZE,
                 );
