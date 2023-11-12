@@ -1,5 +1,3 @@
-use crate::cpu;
-
 pub type BusType = u32;
 
 #[derive(Debug)]
@@ -77,40 +75,4 @@ pub fn get_bus() -> &'static mut Bus {
         }
         BUS.as_mut().unwrap()
     }
-}
-
-pub extern "C" fn c_bus_access(
-    addr_reg: usize,
-    data_reg: usize,
-    imm_write_size_signed: usize,
-    _guest_pc: usize,
-) -> usize {
-    let bus = get_bus();
-    let _sign = imm_write_size_signed & 0x1;
-    let write = (imm_write_size_signed >> 1) & 0x1;
-    let size = ((imm_write_size_signed >> 2) & 0x8) * 8;
-    let imm = (imm_write_size_signed >> 8) & 0xffff;
-    let cpu = cpu::get_cpu();
-    let addr = cpu.regs[addr_reg] + imm as BusType; // TODO: signextend
-    let out: usize;
-
-    if write == 0 {
-        match bus.read(addr as BusType, size as BusType) {
-            Ok(data) => out = data as usize,
-            Err(_) => out = 0,
-        }
-    } else {
-        match bus.write(addr as BusType, cpu.regs[data_reg], size as BusType) {
-            Ok(_) => out = 1,
-            Err(_) => out = 0,
-        }
-    }
-
-    if out == 0 {
-        return 0; // TODO: mark exception
-    }
-
-    cpu.regs[data_reg] = out as BusType;
-
-    1
 }

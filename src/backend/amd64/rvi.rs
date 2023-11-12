@@ -1,147 +1,18 @@
 use crate::backend::common;
-use crate::backend::returnable::{ReturnableHandler, ReturnableImpl};
 use crate::backend::target::core::{amd64_reg, BackendCore, BackendCoreImpl};
-use crate::bus::bus::*;
 use crate::cpu::{self, Exception, PrivMode};
 use crate::*;
-use common::{DecodeRet, HostEncodedInsn, JumpCond, JumpVars};
+use common::{
+    BusAccessVars, DecodeRet, HostEncodedInsn, JumpCond, JumpVars, PCAccess, UsizeConversions,
+};
 
 pub struct RviImpl;
 
-macro_rules! emit_bus_access {
-    ($addr_reg:expr, $data_reg:expr, $size:expr, $imm:expr, $write:expr, $signed:expr) => {{
-        BackendCoreImpl::emit_usize_call_with_4_args(
-            c_bus_access,
-            $addr_reg as usize,
-            $data_reg as usize,
-            (($imm as usize) << 8
-                | ($size as usize) << 2
-                | (($write as usize) << 1)
-                | $signed as usize),
-            cpu::get_cpu().pc as usize,
-        )
-    }};
-}
-
-extern "C" fn jump_resolver_cb(jmp_cond: usize) -> usize {
-    let cpu = cpu::get_cpu();
-    let jmp_cond = JumpVars::from_usize(jmp_cond);
-
-    let (jmp_addr, should_jmp) = match jmp_cond.cond {
-        JumpCond::Always => {
-            let pc = jmp_cond.pc as i64;
-            let pc = pc.wrapping_add(jmp_cond.imm as i64);
-
-            (pc as u32, true)
-        }
-        JumpCond::AlwaysAbsolute => {
-            let pc = cpu.regs[jmp_cond.reg2 as usize] as i64;
-            let pc = pc.wrapping_add(jmp_cond.imm as i64);
-
-            (pc as u32, true)
-        }
-        JumpCond::Equal => {
-            if cpu.regs[jmp_cond.reg1 as usize] as i32 == cpu.regs[jmp_cond.reg2 as usize] as i32 {
-                let pc = jmp_cond.pc as i64;
-                let pc = pc.wrapping_add(jmp_cond.imm as i64);
-
-                (pc as u32, true)
-            } else {
-                (0, false)
-            }
-        }
-        JumpCond::NotEqual => {
-            if cpu.regs[jmp_cond.reg1 as usize] as i32 != cpu.regs[jmp_cond.reg2 as usize] as i32 {
-                let pc = jmp_cond.pc as i64;
-                let pc = pc.wrapping_add(jmp_cond.imm as i64);
-
-                (pc as u32, true)
-            } else {
-                (0, false)
-            }
-        }
-        JumpCond::LessThan => {
-            if (cpu.regs[jmp_cond.reg1 as usize] as i32) < (cpu.regs[jmp_cond.reg2 as usize] as i32)
-            {
-                let pc = jmp_cond.pc as i64;
-                let pc = pc.wrapping_add(jmp_cond.imm as i64);
-
-                (pc as u32, true)
-            } else {
-                (0, false)
-            }
-        }
-        JumpCond::GreaterThanEqual => {
-            if (cpu.regs[jmp_cond.reg1 as usize] as i32) < (cpu.regs[jmp_cond.reg2 as usize] as i32)
-            {
-                let pc = jmp_cond.pc as i64;
-                let pc = pc.wrapping_add(jmp_cond.imm as i64);
-
-                (pc as u32, true)
-            } else {
-                (0, false)
-            }
-        }
-        JumpCond::LessThanUnsigned => {
-            if cpu.regs[jmp_cond.reg1 as usize] < cpu.regs[jmp_cond.reg2 as usize] {
-                let pc = jmp_cond.pc as i64;
-                let pc = pc.wrapping_add(jmp_cond.imm as i64);
-
-                (pc as u32, true)
-            } else {
-                (0, false)
-            }
-        }
-        JumpCond::GreaterThanEqualUnsigned => {
-            if cpu.regs[jmp_cond.reg1 as usize] >= cpu.regs[jmp_cond.reg2 as usize] {
-                let pc = jmp_cond.pc as i64;
-                let pc = pc.wrapping_add(jmp_cond.imm as i64);
-
-                (pc as u32, true)
-            } else {
-                (0, false)
-            }
-        }
-    };
-
-    if !should_jmp {
-        return 0;
-    }
-
-    let bus = bus::get_bus();
-
-    let jmp_addr = bus.translate(jmp_addr as BusType);
-
-    if jmp_addr.is_err() {
-        cpu.bus_error = jmp_addr.err().unwrap();
-
-        ReturnableImpl::throw();
-    }
-
-    let jmp_addr = jmp_addr.unwrap();
-
-    let host_addr = cpu.insn_map.get_by_value(jmp_addr);
-
-    if host_addr.is_none() {
-        cpu.bus_error = BusError::ForwardJumpFault(jmp_cond.pc);
-
-        ReturnableImpl::throw();
-    }
-
-    if jmp_cond.reg1 != 0
-        && (jmp_cond.cond == JumpCond::Always || jmp_cond.cond == JumpCond::AlwaysAbsolute)
-    {
-        cpu.regs[jmp_cond.reg1 as usize] = jmp_cond.pc;
-    }
-
-    *host_addr.unwrap()
-}
-
 fn emit_jmp(mut cond: JumpVars) -> HostEncodedInsn {
-    let mut insn = BackendCoreImpl::emit_usize_call_with_1_arg(jump_resolver_cb, cond.to_usize());
+    cond.set_pc(cpu::get_cpu().pc);
 
-    let cpu = cpu::get_cpu();
-    cond.pc = cpu.pc;
+    let mut insn =
+        BackendCoreImpl::emit_usize_call_with_1_arg(common::c_jump_resolver_cb, cond.to_usize());
 
     emit_cmp_reg_imm!(insn, amd64_reg::RAX, 0);
 
@@ -152,6 +23,14 @@ fn emit_jmp(mut cond: JumpVars) -> HostEncodedInsn {
     insn.push_slice(jmp_insn.iter().as_slice());
 
     insn
+}
+
+macro_rules! emit_bus_access {
+    ($cond: expr) => {{
+        $cond.set_pc(cpu::get_cpu().pc);
+
+        BackendCoreImpl::emit_void_call_with_1_arg(common::c_bus_resolver_cb, $cond.to_usize())
+    }};
 }
 
 impl common::Rvi for RviImpl {
@@ -421,51 +300,75 @@ impl common::Rvi for RviImpl {
     }
 
     fn emit_lb(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
-        let insn = emit_bus_access!(rd, rs1, 1, imm, false, true);
-
-        Ok(insn)
+        Ok(emit_bus_access!(BusAccessVars::new(
+            backend::BusAccessCond::LoadByte,
+            imm,
+            rd as u32,
+            rs1 as u32,
+        )))
     }
 
     fn emit_lh(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
-        let insn = emit_bus_access!(rd, rs1, 2, imm, false, true);
-
-        Ok(insn)
+        Ok(emit_bus_access!(BusAccessVars::new(
+            backend::BusAccessCond::LoadHalf,
+            imm,
+            rd as u32,
+            rs1 as u32,
+        )))
     }
 
     fn emit_lw(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
-        let insn = emit_bus_access!(rd, rs1, 4, imm, false, true);
-
-        Ok(insn)
+        Ok(emit_bus_access!(BusAccessVars::new(
+            backend::BusAccessCond::LoadWord,
+            imm,
+            rd as u32,
+            rs1 as u32,
+        )))
     }
 
     fn emit_lbu(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
-        let insn = emit_bus_access!(rd, rs1, 1, imm, false, false);
-
-        Ok(insn)
+        Ok(emit_bus_access!(BusAccessVars::new(
+            backend::BusAccessCond::LoadByteUnsigned,
+            imm,
+            rd as u32,
+            rs1 as u32,
+        )))
     }
 
     fn emit_lhu(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
-        let insn = emit_bus_access!(rd, rs1, 2, imm, false, false);
-
-        Ok(insn)
+        Ok(emit_bus_access!(BusAccessVars::new(
+            backend::BusAccessCond::LoadHalfUnsigned,
+            imm,
+            rd as u32,
+            rs1 as u32,
+        )))
     }
 
     fn emit_sb(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        let insn = emit_bus_access!(rs1, rs2, 1, imm, true, true);
-
-        Ok(insn)
+        Ok(emit_bus_access!(BusAccessVars::new(
+            backend::BusAccessCond::StoreByte,
+            imm,
+            rs1 as u32,
+            rs2 as u32,
+        )))
     }
 
     fn emit_sh(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        let insn = emit_bus_access!(rs1, rs2, 2, imm, true, true);
-
-        Ok(insn)
+        Ok(emit_bus_access!(BusAccessVars::new(
+            backend::BusAccessCond::StoreHalf,
+            imm,
+            rs1 as u32,
+            rs2 as u32,
+        )))
     }
 
     fn emit_sw(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        let insn = emit_bus_access!(rs1, rs2, 4, imm, true, true);
-
-        Ok(insn)
+        Ok(emit_bus_access!(BusAccessVars::new(
+            backend::BusAccessCond::StoreWord,
+            imm,
+            rs1 as u32,
+            rs2 as u32,
+        )))
     }
 
     fn emit_fence(_pred: u8, _succ: u8) -> DecodeRet {

@@ -1,6 +1,10 @@
-use crate::bus::BusType;
-use crate::cpu::{CpuReg, RunState};
+use bus::BusError;
+
+use crate::bus::{bus, BusType};
+use crate::cpu::{cpu, CpuReg, RunState};
 use crate::util::EncodedInsn;
+
+use crate::backend::{ReturnableHandler, ReturnableImpl};
 
 #[derive(Debug)]
 pub enum JitError {
@@ -15,6 +19,11 @@ pub const HOST_INSN_MAX_SIZE: usize = 64; // TODO: check worst case later
 pub type HostEncodedInsn = EncodedInsn<HostInsnT, HOST_INSN_MAX_SIZE>;
 pub type DecodeRet = Result<HostEncodedInsn, JitError>;
 
+pub trait UsizeConversions {
+    fn to_usize(&self) -> usize;
+    fn from_usize(val: usize) -> Self;
+}
+
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum JumpCond {
     Always,
@@ -27,40 +36,22 @@ pub enum JumpCond {
     GreaterThanEqualUnsigned,
 }
 
-pub struct JumpVars {
-    pub cond: JumpCond,
-    pub imm: i32,
-    pub reg1: CpuReg,
-    pub reg2: CpuReg,
-    pub pc: BusType,
-}
-
-impl JumpVars {
-    pub fn new(cond: JumpCond, imm: i32, reg1: CpuReg, reg2: CpuReg) -> JumpVars {
-        JumpVars {
-            cond,
-            imm,
-            reg1,
-            reg2,
-            pc: 0,
+impl UsizeConversions for JumpCond {
+    fn to_usize(&self) -> usize {
+        match self {
+            JumpCond::Always => 0,
+            JumpCond::AlwaysAbsolute => 1,
+            JumpCond::Equal => 2,
+            JumpCond::NotEqual => 3,
+            JumpCond::LessThan => 4,
+            JumpCond::GreaterThanEqual => 5,
+            JumpCond::LessThanUnsigned => 6,
+            JumpCond::GreaterThanEqualUnsigned => 7,
         }
     }
 
-    pub fn to_usize(&self) -> usize {
-        let mut ret = 0;
-
-        // TODO: check if this is correct
-        ret |= (self.cond as usize) << 0;
-        ret |= (self.reg1 as usize) << 3;
-        ret |= (self.reg2 as usize) << 8;
-        ret |= (self.imm as usize) << 13;
-        ret |= (self.pc as usize) << 25;
-
-        ret
-    }
-
-    pub fn from_usize(val: usize) -> JumpVars {
-        let cond = match (val >> 0) & 0x7 {
+    fn from_usize(val: usize) -> JumpCond {
+        match val {
             0 => JumpCond::Always,
             1 => JumpCond::AlwaysAbsolute,
             2 => JumpCond::Equal,
@@ -70,14 +61,101 @@ impl JumpVars {
             6 => JumpCond::LessThanUnsigned,
             7 => JumpCond::GreaterThanEqualUnsigned,
             _ => unreachable!(),
-        };
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum BusAccessCond {
+    LoadByte,
+    LoadHalf,
+    LoadWord,
+    LoadByteUnsigned,
+    LoadHalfUnsigned,
+    StoreByte,
+    StoreHalf,
+    StoreWord,
+}
+
+impl UsizeConversions for BusAccessCond {
+    fn to_usize(&self) -> usize {
+        match self {
+            BusAccessCond::LoadByte => 0,
+            BusAccessCond::LoadHalf => 1,
+            BusAccessCond::LoadWord => 2,
+            BusAccessCond::LoadByteUnsigned => 3,
+            BusAccessCond::LoadHalfUnsigned => 4,
+            BusAccessCond::StoreByte => 5,
+            BusAccessCond::StoreHalf => 6,
+            BusAccessCond::StoreWord => 7,
+        }
+    }
+
+    fn from_usize(val: usize) -> BusAccessCond {
+        match val {
+            0 => BusAccessCond::LoadByte,
+            1 => BusAccessCond::LoadHalf,
+            2 => BusAccessCond::LoadWord,
+            3 => BusAccessCond::LoadByteUnsigned,
+            4 => BusAccessCond::LoadHalfUnsigned,
+            5 => BusAccessCond::StoreByte,
+            6 => BusAccessCond::StoreHalf,
+            7 => BusAccessCond::StoreWord,
+            _ => unreachable!(),
+        }
+    }
+}
+
+pub trait PCAccess {
+    fn get_pc(&self) -> u32;
+    fn set_pc(&mut self, pc: u32);
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct CondVars<T> {
+    pub cond: T,
+    pub imm: i32,
+    pub reg1: CpuReg,
+    pub reg2: CpuReg,
+    pub pc: BusType,
+}
+
+impl<T> PCAccess for CondVars<T> {
+    fn get_pc(&self) -> BusType {
+        self.pc
+    }
+
+    fn set_pc(&mut self, pc: BusType) {
+        self.pc = pc;
+    }
+}
+
+impl<T> UsizeConversions for CondVars<T>
+where
+    T: UsizeConversions,
+{
+    fn to_usize(&self) -> usize {
+        let mut ret = 0;
+
+        // TODO: check if this is correct
+        ret |= (self.cond.to_usize()) << 0;
+        ret |= (self.reg1 as usize) << 3;
+        ret |= (self.reg2 as usize) << 8;
+        ret |= (self.imm as usize) << 13;
+        ret |= (self.pc as usize) << 25;
+
+        ret
+    }
+
+    fn from_usize(val: usize) -> Self {
+        let cond = T::from_usize((val >> 0) & 0x7);
 
         let reg1 = ((val >> 3) & 0x1f) as CpuReg;
         let reg2 = ((val >> 8) & 0x1f) as CpuReg;
         let imm = ((val >> 13) & 0x7fff) as i32;
         let pc = ((val >> 25) & 0x7fffffff) as BusType;
 
-        JumpVars {
+        Self {
             cond,
             imm,
             reg1,
@@ -85,6 +163,219 @@ impl JumpVars {
             pc,
         }
     }
+}
+
+impl<T> CondVars<T> {
+    pub fn new(cond: T, imm: i32, reg1: CpuReg, reg2: CpuReg) -> Self {
+        Self {
+            cond,
+            imm,
+            reg1,
+            reg2,
+            pc: 0,
+        }
+    }
+}
+
+pub type JumpVars = CondVars<JumpCond>;
+pub type BusAccessVars = CondVars<BusAccessCond>;
+
+pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize) -> usize {
+    let cpu = cpu::get_cpu();
+    let jmp_cond = JumpVars::from_usize(jmp_cond);
+
+    let (jmp_addr, should_jmp) = match jmp_cond.cond {
+        JumpCond::Always => {
+            let pc = jmp_cond.pc as i64;
+            let pc = pc.wrapping_add(jmp_cond.imm as i64);
+
+            (pc as u32, true)
+        }
+        JumpCond::AlwaysAbsolute => {
+            let pc = cpu.regs[jmp_cond.reg2 as usize] as i64;
+            let pc = pc.wrapping_add(jmp_cond.imm as i64);
+
+            (pc as u32, true)
+        }
+        JumpCond::Equal => {
+            if cpu.regs[jmp_cond.reg1 as usize] as i32 == cpu.regs[jmp_cond.reg2 as usize] as i32 {
+                let pc = jmp_cond.pc as i64;
+                let pc = pc.wrapping_add(jmp_cond.imm as i64);
+
+                (pc as u32, true)
+            } else {
+                (0, false)
+            }
+        }
+        JumpCond::NotEqual => {
+            if cpu.regs[jmp_cond.reg1 as usize] as i32 != cpu.regs[jmp_cond.reg2 as usize] as i32 {
+                let pc = jmp_cond.pc as i64;
+                let pc = pc.wrapping_add(jmp_cond.imm as i64);
+
+                (pc as u32, true)
+            } else {
+                (0, false)
+            }
+        }
+        JumpCond::LessThan => {
+            if (cpu.regs[jmp_cond.reg1 as usize] as i32) < (cpu.regs[jmp_cond.reg2 as usize] as i32)
+            {
+                let pc = jmp_cond.pc as i64;
+                let pc = pc.wrapping_add(jmp_cond.imm as i64);
+
+                (pc as u32, true)
+            } else {
+                (0, false)
+            }
+        }
+        JumpCond::GreaterThanEqual => {
+            if (cpu.regs[jmp_cond.reg1 as usize] as i32) < (cpu.regs[jmp_cond.reg2 as usize] as i32)
+            {
+                let pc = jmp_cond.pc as i64;
+                let pc = pc.wrapping_add(jmp_cond.imm as i64);
+
+                (pc as u32, true)
+            } else {
+                (0, false)
+            }
+        }
+        JumpCond::LessThanUnsigned => {
+            if cpu.regs[jmp_cond.reg1 as usize] < cpu.regs[jmp_cond.reg2 as usize] {
+                let pc = jmp_cond.pc as i64;
+                let pc = pc.wrapping_add(jmp_cond.imm as i64);
+
+                (pc as u32, true)
+            } else {
+                (0, false)
+            }
+        }
+        JumpCond::GreaterThanEqualUnsigned => {
+            if cpu.regs[jmp_cond.reg1 as usize] >= cpu.regs[jmp_cond.reg2 as usize] {
+                let pc = jmp_cond.pc as i64;
+                let pc = pc.wrapping_add(jmp_cond.imm as i64);
+
+                (pc as u32, true)
+            } else {
+                (0, false)
+            }
+        }
+    };
+
+    if !should_jmp {
+        return 0;
+    }
+
+    let bus = bus::get_bus();
+
+    let jmp_addr = bus.translate(jmp_addr as BusType);
+
+    if jmp_addr.is_err() {
+        cpu.bus_error = jmp_addr.err().unwrap();
+
+        ReturnableImpl::throw();
+    }
+
+    let jmp_addr = jmp_addr.unwrap();
+
+    let host_addr = cpu.insn_map.get_by_value(jmp_addr);
+
+    if host_addr.is_none() {
+        cpu.bus_error = BusError::ForwardJumpFault(jmp_cond.pc);
+
+        ReturnableImpl::throw();
+    }
+
+    if jmp_cond.reg1 != 0
+        && (jmp_cond.cond == JumpCond::Always || jmp_cond.cond == JumpCond::AlwaysAbsolute)
+    {
+        cpu.regs[jmp_cond.reg1 as usize] = jmp_cond.pc;
+    }
+
+    *host_addr.unwrap()
+}
+
+pub extern "C" fn c_bus_resolver_cb(bus_vars: usize) {
+    let cpu = cpu::get_cpu();
+    let bus_vars = BusAccessVars::from_usize(bus_vars);
+
+    let (addres, size, is_load, _is_unsigned) = match bus_vars.cond {
+        BusAccessCond::LoadByte => {
+            let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
+            let addr = addr.wrapping_add(bus_vars.imm as i64);
+
+            (addr as u32, 1, true, false)
+        }
+        BusAccessCond::LoadHalf => {
+            let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
+            let addr = addr.wrapping_add(bus_vars.imm as i64);
+
+            (addr as u32, 2, true, false)
+        }
+        BusAccessCond::LoadWord => {
+            let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
+            let addr = addr.wrapping_add(bus_vars.imm as i64);
+
+            (addr as u32, 4, true, false)
+        }
+        BusAccessCond::LoadByteUnsigned => {
+            let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
+            let addr = addr.wrapping_add(bus_vars.imm as i64);
+
+            (addr as u32, 1, true, true)
+        }
+        BusAccessCond::LoadHalfUnsigned => {
+            let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
+            let addr = addr.wrapping_add(bus_vars.imm as i64);
+
+            (addr as u32, 2, true, true)
+        }
+        BusAccessCond::StoreByte => {
+            let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
+            let addr = addr.wrapping_add(bus_vars.imm as i64);
+
+            (addr as u32, 1, false, false)
+        }
+        BusAccessCond::StoreHalf => {
+            let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
+            let addr = addr.wrapping_add(bus_vars.imm as i64);
+
+            (addr as u32, 2, false, false)
+        }
+        BusAccessCond::StoreWord => {
+            let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
+            let addr = addr.wrapping_add(bus_vars.imm as i64);
+
+            (addr as u32, 4, false, false)
+        }
+    };
+
+    let bus = bus::get_bus();
+
+    if is_load {
+        let data = bus.read(addres, size);
+
+        if data.is_err() {
+            cpu.bus_error = data.err().unwrap();
+
+            ReturnableImpl::throw();
+        }
+
+        let data = data.unwrap();
+
+        if bus_vars.reg1 != 0 {
+            cpu.regs[bus_vars.reg1 as usize] = data;
+        }
+    } else {
+        let data = cpu.regs[bus_vars.reg1 as usize];
+
+        let res = bus.write(addres, size, data);
+
+        if res.is_err() {
+            cpu.bus_error = res.err().unwrap();
+
+            ReturnableImpl::throw();
+        }
+    };
 }
 
 pub fn test_asm_common(enc: &HostEncodedInsn, expected: &[u8], insn_name: &str) {
