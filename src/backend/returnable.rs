@@ -1,8 +1,4 @@
-
-
 pub use crate::backend::ReturnableImpl;
-
-
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ReturnStatus {
@@ -13,14 +9,9 @@ pub enum ReturnStatus {
 pub trait ReturnableHandler {
     #[must_use]
     fn handle<F: Fn() -> ()>(closure: F) -> ReturnStatus;
-    fn return_ok() -> !;
-    fn return_notify() -> !;
+    fn throw() -> !;
 }
 
 pub extern "C" fn c_return_ok() {
-    ReturnableImpl::return_ok()
-}
-
-pub extern "C" fn c_return_notify() {
-    ReturnableImpl::return_notify()
+    ReturnableImpl::throw()
 }

@@ -23,29 +23,15 @@ impl ReturnableHandler for ReturnableImpl {
     }
 
     #[cfg(target_arch = "x86_64")]
-    fn return_ok() -> ! {
+    fn throw() -> ! {
         unsafe { asm!("int3") };
 
         unreachable!();
     }
 
-    #[cfg(target_arch = "x86_64")]
-    fn return_notify() -> ! {
-        unsafe { asm!("mov rax, 0;", "div rax, rax;") };
-
-        unreachable!();
-    }
-
     #[cfg(target_arch = "aarch64")]
-    fn return_ok() -> ! {
+    fn throw() -> ! {
         unsafe { asm!("brk 0;") };
-
-        unreachable!();
-    }
-
-    #[cfg(target_arch = "aarch64")]
-    fn return_notify() -> ! {
-        unsafe { asm!("mov x0, 0;", "udiv x0, x0, x0;") };
 
         unreachable!();
     }

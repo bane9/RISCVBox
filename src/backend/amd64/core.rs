@@ -512,6 +512,14 @@ macro_rules! emit_test_greater_reg_imm {
     }};
 }
 
+#[macro_export]
+macro_rules! emit_jz_imm {
+    ($enc:expr, $imm:expr) => {{
+        emit_insn!($enc, [0x0F, 0x84]);
+        emit_insn!($enc, ($imm as u32).to_le_bytes());
+    }};
+}
+
 // reg1 is always RAX
 #[macro_export]
 macro_rules! emit_test_greater_reg_reg {
@@ -519,6 +527,17 @@ macro_rules! emit_test_greater_reg_reg {
         emit_cmp_reg_reg!($enc, amd64_reg::RAX, $reg2);
         emit_setg_al!($enc);
         emit_movzx_rax_al!($enc);
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_jmp_reg {
+    ($enc:expr, $reg:expr) => {{
+        if $reg < amd64_reg::R8 {
+            emit_insn!($enc, [0xFF, 0xE0 + $reg as u8]);
+        } else {
+            emit_insn!($enc, [0x41, 0xFF, 0xE0 + $reg as u8 - amd64_reg::R8]);
+        }
     }};
 }
 
@@ -606,7 +625,7 @@ impl BackendCore for BackendCoreImpl {
         for i in 0..MAX_WALK_BACK {
             let addr = caller_ret_addr.wrapping_sub(i);
 
-            if let Some(guest_pc) = cpu.insn_map.get_by_key(addr) {
+            if let Some(guest_pc) = cpu.insn_map.get_by_key(addr as usize) {
                 return Some(*guest_pc);
             }
         }
@@ -647,6 +666,15 @@ impl BackendCore for BackendCoreImpl {
         emit_pop_reg!(insn, amd64_reg::RBP);
 
         insn
+    }
+
+    fn emit_usize_call_with_1_arg(
+        fn_ptr: extern "C" fn(usize) -> usize,
+        arg1: usize,
+    ) -> HostEncodedInsn {
+        let fn_ptr = unsafe { std::mem::transmute::<_, extern "C" fn(usize)>(fn_ptr) };
+
+        Self::emit_void_call_with_1_arg(fn_ptr, arg1)
     }
 
     #[inline(never)]

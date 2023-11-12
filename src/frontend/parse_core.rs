@@ -146,7 +146,7 @@ impl ParseCore {
 
         let cpu = cpu::get_cpu();
 
-        cpu.insn_map.insert(ptr, cpu.pc);
+        cpu.insn_map.insert(ptr as usize, cpu.pc);
 
         cpu.pc += INSN_SIZE as u32;
 

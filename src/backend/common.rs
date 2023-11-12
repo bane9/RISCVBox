@@ -1,4 +1,5 @@
-use crate::cpu::RunState;
+use crate::bus::BusType;
+use crate::cpu::{CpuReg, RunState};
 use crate::util::EncodedInsn;
 
 #[derive(Debug)]
@@ -14,6 +15,123 @@ pub const HOST_INSN_MAX_SIZE: usize = 64; // TODO: check worst case later
 pub type HostEncodedInsn = EncodedInsn<HostInsnT, HOST_INSN_MAX_SIZE>;
 pub type DecodeRet = Result<HostEncodedInsn, JitError>;
 
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum JumpCond {
+    Always,
+    AlwaysAbsolute,
+    Equal,
+    NotEqual,
+    LessThan,
+    GreaterThanEqual,
+    LessThanUnsigned,
+    GreaterThanEqualUnsigned,
+}
+
+pub struct JumpVars {
+    pub cond: JumpCond,
+    pub imm: i32,
+    pub reg1: CpuReg,
+    pub reg2: CpuReg,
+    pub pc: BusType,
+}
+
+impl JumpVars {
+    pub fn new(cond: JumpCond, imm: i32, reg1: CpuReg, reg2: CpuReg) -> JumpVars {
+        JumpVars {
+            cond,
+            imm,
+            reg1,
+            reg2,
+            pc: 0,
+        }
+    }
+
+    pub fn to_usize(&self) -> usize {
+        let mut ret = 0;
+
+        // TODO: check if this is correct
+        ret |= (self.cond as usize) << 0;
+        ret |= (self.reg1 as usize) << 3;
+        ret |= (self.reg2 as usize) << 8;
+        ret |= (self.imm as usize) << 13;
+        ret |= (self.pc as usize) << 25;
+
+        ret
+    }
+
+    pub fn from_usize(val: usize) -> JumpVars {
+        let cond = match (val >> 0) & 0x7 {
+            0 => JumpCond::Always,
+            1 => JumpCond::AlwaysAbsolute,
+            2 => JumpCond::Equal,
+            3 => JumpCond::NotEqual,
+            4 => JumpCond::LessThan,
+            5 => JumpCond::GreaterThanEqual,
+            6 => JumpCond::LessThanUnsigned,
+            7 => JumpCond::GreaterThanEqualUnsigned,
+            _ => unreachable!(),
+        };
+
+        let reg1 = ((val >> 3) & 0x1f) as CpuReg;
+        let reg2 = ((val >> 8) & 0x1f) as CpuReg;
+        let imm = ((val >> 13) & 0x7fff) as i32;
+        let pc = ((val >> 25) & 0x7fffffff) as BusType;
+
+        JumpVars {
+            cond,
+            imm,
+            reg1,
+            reg2,
+            pc,
+        }
+    }
+}
+
+pub fn test_asm_common(enc: &HostEncodedInsn, expected: &[u8], insn_name: &str) {
+    let mut success = true;
+    let mut expected_str = String::new();
+    let mut encoded_str = String::new();
+
+    expected_str.push_str("");
+    encoded_str.push_str("");
+
+    for (_, (a, b)) in enc.iter().zip(expected.iter()).enumerate() {
+        if a != b {
+            success = false;
+
+            expected_str.push_str(&format!("\x1b[32m{:02x}\x1b[0m ", b));
+            encoded_str.push_str(&format!("\x1b[31m{:02x}\x1b[0m ", a));
+        } else {
+            expected_str.push_str(&format!("{:02x} ", b));
+            encoded_str.push_str(&format!("{:02x} ", a));
+        }
+    }
+
+    for &b in expected.get(enc.size()..).unwrap_or(&[]) {
+        success = false;
+        expected_str.push_str(&format!("\x1b[32m{:02x}\x1b[0m ", b));
+    }
+
+    for &a in enc.iter().skip(expected.len()) {
+        success = false;
+        encoded_str.push_str(&format!("\x1b[31m{:02x}\x1b[0m ", a));
+    }
+
+    if !success {
+        println!("__________________________________________________________\n");
+        println!(
+            "Error: Encoding mismatch at \x1b[33m{}\x1b[0m",
+            insn_name[28..].trim().replace(" :: ", "::")
+        );
+
+        println!("Expected -> {}", expected_str.trim_end());
+        println!("Encoded  -> {}", encoded_str.trim_end());
+        println!("__________________________________________________________\n");
+    }
+
+    assert!(success);
+}
+
 #[macro_export]
 macro_rules! test_encoded_insn {
     ($test_name:ident, $insn_macro:expr, $expected:expr) => {
@@ -23,48 +141,7 @@ macro_rules! test_encoded_insn {
 
             $insn_macro(&mut enc);
 
-            let mut success = true;
-            let mut expected_str = String::new();
-            let mut encoded_str = String::new();
-
-            expected_str.push_str("");
-            encoded_str.push_str("");
-
-            for (_, (a, b)) in enc.iter().zip($expected.iter()).enumerate() {
-                if a != b {
-                    success = false;
-
-                    expected_str.push_str(&format!("\x1b[32m{:02x}\x1b[0m ", b));
-                    encoded_str.push_str(&format!("\x1b[31m{:02x}\x1b[0m ", a));
-                } else {
-                    expected_str.push_str(&format!("{:02x} ", b));
-                    encoded_str.push_str(&format!("{:02x} ", a));
-                }
-            }
-
-            for &b in $expected.get(enc.size()..).unwrap_or(&[]) {
-                success = false;
-                expected_str.push_str(&format!("\x1b[32m{:02x}\x1b[0m ", b));
-            }
-
-            for &a in enc.iter().skip($expected.len()) {
-                success = false;
-                encoded_str.push_str(&format!("\x1b[31m{:02x}\x1b[0m ", a));
-            }
-
-            if !success {
-                println!("__________________________________________________________\n");
-                println!(
-                    "Error: Encoding mismatch at \x1b[33m{}\x1b[0m",
-                    &stringify!($insn_macro)[28..].trim().replace(" :: ", "::")
-                );
-
-                println!("Expected -> {}", expected_str.trim_end());
-                println!("Encoded  -> {}", encoded_str.trim_end());
-                println!("__________________________________________________________\n");
-            }
-
-            assert!(success);
+            test_asm_common(&enc, &$expected, stringify!($test_name));
         }
     };
 }
@@ -83,6 +160,10 @@ pub trait BackendCore {
         arg4: usize,
     ) -> HostEncodedInsn;
     fn emit_void_call_with_1_arg(fn_ptr: extern "C" fn(usize), arg1: usize) -> HostEncodedInsn;
+    fn emit_usize_call_with_1_arg(
+        fn_ptr: extern "C" fn(usize) -> usize,
+        arg1: usize,
+    ) -> HostEncodedInsn;
     unsafe fn call_jit_ptr(jit_ptr: PtrT);
 }
 

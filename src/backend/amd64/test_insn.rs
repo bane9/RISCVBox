@@ -1,4 +1,6 @@
 #[allow(unused_imports)]
+use crate::backend::common::test_asm_common;
+#[allow(unused_imports)]
 use crate::backend::target::core::*;
 use crate::*;
 
@@ -310,4 +312,16 @@ test_encoded_insn!(
     test_and_rcx_rax,
     |enc: &mut HostEncodedInsn| emit_and_reg_reg!(enc, amd64_reg::RCX, amd64_reg::RAX),
     [0x48, 0x21, 0xC1]
+);
+
+test_encoded_insn!(
+    test_jmp_rbx,
+    |enc: &mut HostEncodedInsn| emit_jmp_reg!(enc, amd64_reg::RBX),
+    [0xFF, 0xE3]
+);
+
+test_encoded_insn!(
+    test_jmp_r9,
+    |enc: &mut HostEncodedInsn| emit_jmp_reg!(enc, amd64_reg::R9),
+    [0x41, 0xFF, 0xE1]
 );

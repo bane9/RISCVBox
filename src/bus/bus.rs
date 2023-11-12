@@ -1,13 +1,18 @@
 use crate::cpu;
 
+pub type BusType = u32;
+
+#[derive(Debug)]
 pub enum BusError {
     InvalidAddress,
     ReadFault,
     WriteFault,
     PageFault,
-}
 
-pub type BusType = u32;
+    ForwardJumpFault(BusType),
+
+    None,
+}
 
 pub trait BusDevice {
     fn read(&mut self, addr: BusType, size: BusType) -> Result<BusType, BusError>;
@@ -30,6 +35,10 @@ impl Bus {
 
     pub fn add_device(&mut self, device: Box<dyn BusDevice>) {
         self.devices.push(device);
+    }
+
+    pub fn translate(&self, addr: BusType) -> Result<BusType, BusError> {
+        return Ok(addr);
     }
 
     pub fn read(&mut self, addr: BusType, size: BusType) -> Result<BusType, BusError> {

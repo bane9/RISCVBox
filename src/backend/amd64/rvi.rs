@@ -1,9 +1,10 @@
 use crate::backend::common;
+use crate::backend::returnable::{ReturnableHandler, ReturnableImpl};
 use crate::backend::target::core::{amd64_reg, BackendCore, BackendCoreImpl};
 use crate::bus::bus::*;
 use crate::cpu::{self, Exception, PrivMode};
 use crate::*;
-use common::{DecodeRet, HostEncodedInsn};
+use common::{DecodeRet, HostEncodedInsn, JumpCond, JumpVars};
 
 pub struct RviImpl;
 
@@ -20,6 +21,137 @@ macro_rules! emit_bus_access {
             cpu::get_cpu().pc as usize,
         )
     }};
+}
+
+extern "C" fn jump_resolver_cb(jmp_cond: usize) -> usize {
+    let cpu = cpu::get_cpu();
+    let jmp_cond = JumpVars::from_usize(jmp_cond);
+
+    let (jmp_addr, should_jmp) = match jmp_cond.cond {
+        JumpCond::Always => {
+            let pc = jmp_cond.pc as i64;
+            let pc = pc.wrapping_add(jmp_cond.imm as i64);
+
+            (pc as u32, true)
+        }
+        JumpCond::AlwaysAbsolute => {
+            let pc = cpu.regs[jmp_cond.reg2 as usize] as i64;
+            let pc = pc.wrapping_add(jmp_cond.imm as i64);
+
+            (pc as u32, true)
+        }
+        JumpCond::Equal => {
+            if cpu.regs[jmp_cond.reg1 as usize] as i32 == cpu.regs[jmp_cond.reg2 as usize] as i32 {
+                let pc = jmp_cond.pc as i64;
+                let pc = pc.wrapping_add(jmp_cond.imm as i64);
+
+                (pc as u32, true)
+            } else {
+                (0, false)
+            }
+        }
+        JumpCond::NotEqual => {
+            if cpu.regs[jmp_cond.reg1 as usize] as i32 != cpu.regs[jmp_cond.reg2 as usize] as i32 {
+                let pc = jmp_cond.pc as i64;
+                let pc = pc.wrapping_add(jmp_cond.imm as i64);
+
+                (pc as u32, true)
+            } else {
+                (0, false)
+            }
+        }
+        JumpCond::LessThan => {
+            if (cpu.regs[jmp_cond.reg1 as usize] as i32) < (cpu.regs[jmp_cond.reg2 as usize] as i32)
+            {
+                let pc = jmp_cond.pc as i64;
+                let pc = pc.wrapping_add(jmp_cond.imm as i64);
+
+                (pc as u32, true)
+            } else {
+                (0, false)
+            }
+        }
+        JumpCond::GreaterThanEqual => {
+            if (cpu.regs[jmp_cond.reg1 as usize] as i32) < (cpu.regs[jmp_cond.reg2 as usize] as i32)
+            {
+                let pc = jmp_cond.pc as i64;
+                let pc = pc.wrapping_add(jmp_cond.imm as i64);
+
+                (pc as u32, true)
+            } else {
+                (0, false)
+            }
+        }
+        JumpCond::LessThanUnsigned => {
+            if cpu.regs[jmp_cond.reg1 as usize] < cpu.regs[jmp_cond.reg2 as usize] {
+                let pc = jmp_cond.pc as i64;
+                let pc = pc.wrapping_add(jmp_cond.imm as i64);
+
+                (pc as u32, true)
+            } else {
+                (0, false)
+            }
+        }
+        JumpCond::GreaterThanEqualUnsigned => {
+            if cpu.regs[jmp_cond.reg1 as usize] >= cpu.regs[jmp_cond.reg2 as usize] {
+                let pc = jmp_cond.pc as i64;
+                let pc = pc.wrapping_add(jmp_cond.imm as i64);
+
+                (pc as u32, true)
+            } else {
+                (0, false)
+            }
+        }
+    };
+
+    if !should_jmp {
+        return 0;
+    }
+
+    let bus = bus::get_bus();
+
+    let jmp_addr = bus.translate(jmp_addr as BusType);
+
+    if jmp_addr.is_err() {
+        cpu.bus_error = jmp_addr.err().unwrap();
+
+        ReturnableImpl::throw();
+    }
+
+    let jmp_addr = jmp_addr.unwrap();
+
+    let host_addr = cpu.insn_map.get_by_value(jmp_addr);
+
+    if host_addr.is_none() {
+        cpu.bus_error = BusError::ForwardJumpFault(jmp_cond.pc);
+
+        ReturnableImpl::throw();
+    }
+
+    if jmp_cond.reg1 != 0
+        && (jmp_cond.cond == JumpCond::Always || jmp_cond.cond == JumpCond::AlwaysAbsolute)
+    {
+        cpu.regs[jmp_cond.reg1 as usize] = jmp_cond.pc;
+    }
+
+    *host_addr.unwrap()
+}
+
+fn emit_jmp(mut cond: JumpVars) -> HostEncodedInsn {
+    let mut insn = BackendCoreImpl::emit_usize_call_with_1_arg(jump_resolver_cb, cond.to_usize());
+
+    let cpu = cpu::get_cpu();
+    cond.pc = cpu.pc;
+
+    emit_cmp_reg_imm!(insn, amd64_reg::RAX, 0);
+
+    let mut jmp_insn = HostEncodedInsn::new();
+    emit_jmp_reg!(jmp_insn, amd64_reg::RAX);
+
+    emit_jz_imm!(insn, jmp_insn.size() as u8 + 1);
+    insn.push_slice(jmp_insn.iter().as_slice());
+
+    insn
 }
 
 impl common::Rvi for RviImpl {
@@ -216,36 +348,76 @@ impl common::Rvi for RviImpl {
         Ok(insn)
     }
 
-    fn emit_jal(_rd: u8, _imm: i32) -> DecodeRet {
-        todo!()
+    fn emit_jal(rd: u8, imm: i32) -> DecodeRet {
+        Ok(emit_jmp(JumpVars::new(
+            JumpCond::Always,
+            imm,
+            rd as u32,
+            0x0u32,
+        )))
     }
 
-    fn emit_jalr(_rd: u8, _rs1: u8, _imm: i32) -> DecodeRet {
-        todo!()
+    fn emit_jalr(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
+        Ok(emit_jmp(JumpVars::new(
+            JumpCond::AlwaysAbsolute,
+            imm,
+            rd as u32,
+            rs1 as u32,
+        )))
     }
 
-    fn emit_beq(_rs1: u8, _rs2: u8, _imm: i32) -> DecodeRet {
-        todo!()
+    fn emit_beq(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
+        Ok(emit_jmp(JumpVars::new(
+            JumpCond::Equal,
+            imm,
+            rs1 as u32,
+            rs2 as u32,
+        )))
     }
 
-    fn emit_bne(_rs1: u8, _rs2: u8, _imm: i32) -> DecodeRet {
-        todo!()
+    fn emit_bne(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
+        Ok(emit_jmp(JumpVars::new(
+            JumpCond::NotEqual,
+            imm,
+            rs1 as u32,
+            rs2 as u32,
+        )))
     }
 
-    fn emit_blt(_rs1: u8, _rs2: u8, _imm: i32) -> DecodeRet {
-        todo!()
+    fn emit_blt(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
+        Ok(emit_jmp(JumpVars::new(
+            JumpCond::LessThan,
+            imm,
+            rs1 as u32,
+            rs2 as u32,
+        )))
     }
 
-    fn emit_bge(_rs1: u8, _rs2: u8, _imm: i32) -> DecodeRet {
-        todo!()
+    fn emit_bge(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
+        Ok(emit_jmp(JumpVars::new(
+            JumpCond::GreaterThanEqual,
+            imm,
+            rs1 as u32,
+            rs2 as u32,
+        )))
     }
 
-    fn emit_bltu(_rs1: u8, _rs2: u8, _imm: i32) -> DecodeRet {
-        todo!()
+    fn emit_bltu(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
+        Ok(emit_jmp(JumpVars::new(
+            JumpCond::LessThanUnsigned,
+            imm,
+            rs1 as u32,
+            rs2 as u32,
+        )))
     }
 
-    fn emit_bgeu(_rs1: u8, _rs2: u8, _imm: i32) -> DecodeRet {
-        todo!()
+    fn emit_bgeu(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
+        Ok(emit_jmp(JumpVars::new(
+            JumpCond::GreaterThanEqualUnsigned,
+            imm,
+            rs1 as u32,
+            rs2 as u32,
+        )))
     }
 
     fn emit_lb(rd: u8, rs1: u8, imm: i32) -> DecodeRet {

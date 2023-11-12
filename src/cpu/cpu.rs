@@ -1,5 +1,6 @@
 use crate::backend::PtrT;
 use crate::bus::bus::BusType;
+use crate::bus::BusError;
 use crate::util::BiMap;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -116,11 +117,12 @@ pub struct Cpu {
     pub regs: [CpuReg; 32],
     pub csr: [CpuReg; 4096],
     pub mode: PrivMode,
-    pub insn_map: BiMap<PtrT, CpuReg>,
+    pub insn_map: BiMap<usize, CpuReg>,
     pub missing_insn_map: HashMap<CpuReg, PtrT>,
     pub run_state: RunState,
     pub ret_status: usize,
     pub exception: usize,
+    pub bus_error: BusError,
 }
 
 impl Cpu {
@@ -135,6 +137,7 @@ impl Cpu {
             run_state: RunState::None,
             ret_status: 0,
             exception: Exception::None as usize,
+            bus_error: BusError::None,
         }
     }
 }
