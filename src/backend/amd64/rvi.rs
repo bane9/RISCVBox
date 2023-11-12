@@ -348,8 +348,8 @@ impl common::Rvi for RviImpl {
         Ok(emit_bus_access!(BusAccessVars::new(
             backend::BusAccessCond::StoreByte,
             imm,
+            rs2 as u32, // Intentionally flipped
             rs1 as u32,
-            rs2 as u32,
         )))
     }
 
@@ -357,8 +357,8 @@ impl common::Rvi for RviImpl {
         Ok(emit_bus_access!(BusAccessVars::new(
             backend::BusAccessCond::StoreHalf,
             imm,
-            rs1 as u32,
             rs2 as u32,
+            rs1 as u32,
         )))
     }
 
@@ -366,8 +366,8 @@ impl common::Rvi for RviImpl {
         Ok(emit_bus_access!(BusAccessVars::new(
             backend::BusAccessCond::StoreWord,
             imm,
-            rs1 as u32,
             rs2 as u32,
+            rs1 as u32,
         )))
     }
 

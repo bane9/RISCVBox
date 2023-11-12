@@ -62,6 +62,16 @@ impl ParseCore {
 
         let end = std::cmp::min(start + CODE_PAGE_SIZE * CODE_PAGE_READAHEAD, self.rom.len());
 
+        self.parse_until(end)
+    }
+
+    pub fn parse_until(&mut self, end: usize) -> Result<(), JitCommon::JitError> {
+        let start = self.offset;
+
+        if start >= self.rom.len() {
+            return Ok(());
+        }
+
         self.parse(end)?;
 
         self.offset = end;

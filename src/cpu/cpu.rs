@@ -21,6 +21,8 @@ pub enum OpType {
     JAL = 0x6f,
 
     CSR = 0x73,
+
+    Unknown = 0x100,
 }
 
 impl OpType {
@@ -37,7 +39,7 @@ impl OpType {
             0x67 => OpType::JALR,
             0x6f => OpType::JAL,
             0x73 => OpType::CSR,
-            _ => panic!("Invalid instruction type: {:#x}", val),
+            _ => OpType::Unknown,
         }
     }
 }

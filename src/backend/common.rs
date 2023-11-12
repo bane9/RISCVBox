@@ -368,7 +368,7 @@ pub extern "C" fn c_bus_resolver_cb(bus_vars: usize) {
     } else {
         let data = cpu.regs[bus_vars.reg1 as usize];
 
-        let res = bus.write(addres, size, data);
+        let res = bus.write(addres, data, size);
 
         if res.is_err() {
             cpu.bus_error = res.err().unwrap();
