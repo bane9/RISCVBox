@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use crate::bus::bus::*;
 
 const UART_BASE_ADDRESS: u64 = 0x10000000;
@@ -93,6 +95,7 @@ impl BusDevice for Ns16550 {
             THR => {
                 let c = data as u8 as char;
                 print!("{}", c);
+                let _ = std::io::stdout().flush();
                 Ok(())
             }
             IER => {

@@ -5,6 +5,7 @@ use crate::cpu::{cpu, CpuReg, RunState};
 use crate::util::EncodedInsn;
 
 use crate::backend::{ReturnableHandler, ReturnableImpl};
+use crate::util::util::sign_extend;
 
 #[derive(Debug)]
 pub enum JitError {
@@ -137,12 +138,11 @@ where
     fn to_usize(&self) -> usize {
         let mut ret = 0;
 
-        // TODO: check if this is correct
-        ret |= (self.cond.to_usize()) << 0;
-        ret |= (self.reg1 as usize) << 3;
-        ret |= (self.reg2 as usize) << 8;
-        ret |= (self.imm as usize) << 13;
-        ret |= (self.pc as usize) << 25;
+        ret |= (self.cond.to_usize() & 0x7) << 0;
+        ret |= (self.reg1 as usize & 0x1f) << 3;
+        ret |= (self.reg2 as usize & 0x1f) << 8;
+        ret |= (self.imm as usize & 0x7fff) << 13;
+        ret |= (self.pc as usize & 0x7fffffff) << 32;
 
         ret
     }
@@ -153,7 +153,8 @@ where
         let reg1 = ((val >> 3) & 0x1f) as CpuReg;
         let reg2 = ((val >> 8) & 0x1f) as CpuReg;
         let imm = ((val >> 13) & 0x7fff) as i32;
-        let pc = ((val >> 25) & 0x7fffffff) as BusType;
+        let imm = sign_extend(imm, 12) as i32;
+        let pc = ((val >> 32) & 0x7fffffff) as BusType;
 
         Self {
             cond,
@@ -303,49 +304,49 @@ pub extern "C" fn c_bus_resolver_cb(bus_vars: usize) {
             let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
             let addr = addr.wrapping_add(bus_vars.imm as i64);
 
-            (addr as u32, 1, true, false)
+            (addr as u32, 8, true, false)
         }
         BusAccessCond::LoadHalf => {
             let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
             let addr = addr.wrapping_add(bus_vars.imm as i64);
 
-            (addr as u32, 2, true, false)
+            (addr as u32, 6, true, false)
         }
         BusAccessCond::LoadWord => {
             let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
             let addr = addr.wrapping_add(bus_vars.imm as i64);
 
-            (addr as u32, 4, true, false)
+            (addr as u32, 32, true, false)
         }
         BusAccessCond::LoadByteUnsigned => {
             let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
             let addr = addr.wrapping_add(bus_vars.imm as i64);
 
-            (addr as u32, 1, true, true)
+            (addr as u32, 8, true, true)
         }
         BusAccessCond::LoadHalfUnsigned => {
             let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
             let addr = addr.wrapping_add(bus_vars.imm as i64);
 
-            (addr as u32, 2, true, true)
+            (addr as u32, 16, true, true)
         }
         BusAccessCond::StoreByte => {
             let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
             let addr = addr.wrapping_add(bus_vars.imm as i64);
 
-            (addr as u32, 1, false, false)
+            (addr as u32, 8, false, false)
         }
         BusAccessCond::StoreHalf => {
             let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
             let addr = addr.wrapping_add(bus_vars.imm as i64);
 
-            (addr as u32, 2, false, false)
+            (addr as u32, 16, false, false)
         }
         BusAccessCond::StoreWord => {
             let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
             let addr = addr.wrapping_add(bus_vars.imm as i64);
 
-            (addr as u32, 4, false, false)
+            (addr as u32, 32, false, false)
         }
     };
 
@@ -360,10 +361,10 @@ pub extern "C" fn c_bus_resolver_cb(bus_vars: usize) {
             ReturnableImpl::throw();
         }
 
-        let data = data.unwrap();
+        let data_val = data.unwrap();
 
         if bus_vars.reg1 != 0 {
-            cpu.regs[bus_vars.reg1 as usize] = data;
+            cpu.regs[bus_vars.reg1 as usize] = data_val;
         }
     } else {
         let data = cpu.regs[bus_vars.reg1 as usize];

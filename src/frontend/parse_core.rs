@@ -3,6 +3,7 @@ use crate::backend::common::BackendCore;
 use crate::backend::common::HostEncodedInsn;
 
 use crate::backend::target::core::BackendCoreImpl;
+use crate::bus::bus;
 use crate::cpu;
 use crate::frontend::code_pages;
 use crate::xmem::page_container;
@@ -65,6 +66,12 @@ impl ParseCore {
         self.parse_until(end)
     }
 
+    pub fn parse_range(&mut self, start: usize, end: usize) -> Result<(), JitCommon::JitError> {
+        cpu::get_cpu().pc = start as u32;
+
+        self.parse_until(end)
+    }
+
     pub fn parse_until(&mut self, end: usize) -> Result<(), JitCommon::JitError> {
         let start = self.offset;
 
@@ -80,23 +87,24 @@ impl ParseCore {
     }
 
     pub fn parse(&mut self, end: usize) -> Result<(), JitCommon::JitError> {
-        let end = std::cmp::min(end, self.rom.len());
         let mut insn: u32 = 0;
 
         let ptr = self.code_pages.as_ptr().wrapping_add(self.offset);
+        let cpu = cpu::get_cpu();
+        let _bus = bus::get_bus();
 
         while (cpu::get_cpu().pc as usize) < end {
-            let pc = cpu::get_cpu().pc as usize;
-
             unsafe {
                 std::ptr::copy_nonoverlapping(
-                    self.rom.as_ptr().add(pc),
+                    self.rom.as_ptr().add(cpu.pc as usize),
                     &mut insn as *mut u32 as *mut u8,
                     INSN_SIZE,
                 );
             }
 
             let result = self.decode_single(ptr.wrapping_add(self.offset), insn);
+
+            cpu.pc += INSN_SIZE as u32;
 
             if let Err(JitCommon::JitError::ReachedBlockBoundary) = result {
                 break;
@@ -157,8 +165,6 @@ impl ParseCore {
         let cpu = cpu::get_cpu();
 
         cpu.insn_map.insert(ptr as usize, cpu.pc);
-
-        cpu.pc += INSN_SIZE as u32;
 
         self.offset += insn_res.size();
 

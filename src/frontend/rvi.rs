@@ -1,6 +1,21 @@
 use crate::backend::*;
 use crate::cpu::*;
 
+macro_rules! imm_j {
+    ($insn:expr) => {{
+        let mut imm: u32 = ((($insn & 0x80000000) >> 11)
+            | (($insn & 0x7fe00000) >> 20)
+            | (($insn & 0x00100000) >> 9)
+            | ($insn & 0x000ff000));
+
+        if (imm & 0x00100000) != 0 {
+            imm |= 0xffe00000;
+        }
+
+        imm
+    }};
+}
+
 pub fn decode_rvi(insn: u32) -> DecodeRet {
     let opcode = insn & 0x7f;
 
@@ -104,7 +119,7 @@ pub fn decode_rvi(insn: u32) -> DecodeRet {
         }
         OpType::JAL => {
             let rd = ((insn >> 7) & 0b11111) as u8;
-            let imm = ((insn >> 12) & 0b11111111111111111111) as i32;
+            let imm = imm_j!(insn) as i32;
 
             RviImpl::emit_jal(rd, imm)
         }

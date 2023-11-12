@@ -6,28 +6,40 @@ Disassembly of section .text:
 
 00000000 <_start>:
    0:	10000537          	lui	a0,0x10000
-   4:	06800593          	addi	a1,zero,104
-   8:	0005c603          	lbu	a2,0(a1)
-   c:	00c50023          	sb	a2,0(a0) # 10000000 <hello+0xfffff98>
-  10:	0015c603          	lbu	a2,1(a1)
-  14:	00c50023          	sb	a2,0(a0)
-  18:	0025c603          	lbu	a2,2(a1)
-  1c:	00c50023          	sb	a2,0(a0)
-  20:	0035c603          	lbu	a2,3(a1)
-  24:	00c50023          	sb	a2,0(a0)
-  28:	0045c603          	lbu	a2,4(a1)
-  2c:	00c50023          	sb	a2,0(a0)
-  30:	0055c603          	lbu	a2,5(a1)
-  34:	00c50023          	sb	a2,0(a0)
-  38:	0065c603          	lbu	a2,6(a1)
-  3c:	00c50023          	sb	a2,0(a0)
-  40:	0075c603          	lbu	a2,7(a1)
-  44:	00c50023          	sb	a2,0(a0)
-  48:	0085c603          	lbu	a2,8(a1)
-  4c:	00c50023          	sb	a2,0(a0)
-  50:	0095c603          	lbu	a2,9(a1)
-  54:	00c50023          	sb	a2,0(a0)
-  58:	00a5c603          	lbu	a2,10(a1)
-  5c:	00c50023          	sb	a2,0(a0)
-  60:	00b5c603          	lbu	a2,11(a1)
-  64:	00c50023          	sb	a2,0(a0)
+   4:	02400593          	addi	a1,zero,36
+   8:	0040006f          	jal	zero,c <print_str>
+
+0000000c <print_str>:
+   c:	0005c283          	lbu	t0,0(a1)
+  10:	00028863          	beq	t0,zero,20 <end>
+  14:	00550023          	sb	t0,0(a0) # 10000000 <hello+0xfffffdc>
+  18:	00158593          	addi	a1,a1,1
+  1c:	ff1ff06f          	jal	zero,c <print_str>
+
+00000020 <end>:
+  20:	00000013          	addi	zero,zero,0
+
+Disassembly of section .data:
+
+00000024 <hello>:
+  24:	6568                	.2byte	0x6568
+  26:	6c6c                	.2byte	0x6c6c
+  28:	6f77206f          	jal	zero,72f1e <hello+0x72efa>
+  2c:	6c72                	.2byte	0x6c72
+  2e:	0a64                	.2byte	0xa64
+	...
+
+Disassembly of section .riscv.attributes:
+
+00000000 <.riscv.attributes>:
+   0:	1941                	.2byte	0x1941
+   2:	0000                	.2byte	0x0
+   4:	7200                	.2byte	0x7200
+   6:	7369                	.2byte	0x7369
+   8:	01007663          	bgeu	zero,a6,14 <print_str+0x8>
+   c:	0000000f          	fence	unknown,unknown
+  10:	7205                	.2byte	0x7205
+  12:	3376                	.2byte	0x3376
+  14:	6932                	.2byte	0x6932
+  16:	7032                	.2byte	0x7032
+  18:	0031                	.2byte	0x31

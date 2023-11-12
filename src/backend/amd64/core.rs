@@ -181,11 +181,27 @@ macro_rules! emit_mov_dword_ptr_reg {
 }
 
 #[macro_export]
+macro_rules! emit_mov_ptr_reg_dword_ptr {
+    ($enc:expr, $dst_reg:expr, $src_reg:expr) => {{
+        assert!($dst_reg < amd64_reg::R8 && $src_reg < amd64_reg::R8);
+        emit_insn!(
+            $enc,
+            [
+                0x8B,
+                (0x00 as u8)
+                    .wrapping_add($src_reg << 3)
+                    .wrapping_add($dst_reg)
+            ]
+        );
+    }};
+}
+
+#[macro_export]
 macro_rules! emit_mov_reg_guest_to_host {
     ($enc:expr, $cpu:expr, $dst_reg:expr, $src_reg:expr) => {{
         if $src_reg != 0 {
             emit_move_reg_imm!($enc, $dst_reg, &$cpu.regs[$src_reg as usize] as *const _);
-            emit_mov_dword_ptr_reg!($enc, $dst_reg, $dst_reg);
+            emit_mov_ptr_reg_dword_ptr!($enc, $dst_reg, $dst_reg);
         } else {
             emit_move_reg_imm!($enc, $dst_reg, 0);
         }

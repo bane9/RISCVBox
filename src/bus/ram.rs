@@ -11,10 +11,20 @@ impl Ram {
 }
 
 impl BusDevice for Ram {
-    fn read(&mut self, addr: BusType, _size: BusType) -> Result<BusType, BusError> {
+    fn read(&mut self, addr: BusType, size: BusType) -> Result<BusType, BusError> {
         let adj_addr = (addr as usize) - (self.get_begin_addr() as usize);
 
-        Ok(self.mem[adj_addr] as BusType)
+        match size {
+            8 => Ok(self.mem[adj_addr] as BusType),
+            16 => Ok(u16::from_le_bytes([self.mem[adj_addr], self.mem[adj_addr + 1]]) as BusType),
+            32 => Ok(u32::from_le_bytes([
+                self.mem[adj_addr],
+                self.mem[adj_addr + 1],
+                self.mem[adj_addr + 2],
+                self.mem[adj_addr + 3],
+            ]) as BusType),
+            _ => Err(BusError::InvalidSize),
+        }
     }
 
     fn write(&mut self, addr: BusType, data: BusType, size: BusType) -> Result<(), BusError> {

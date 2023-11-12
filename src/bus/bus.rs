@@ -9,6 +9,7 @@ pub enum BusError {
 
     ForwardJumpFault(BusType),
 
+    InvalidSize,
     None,
 }
 

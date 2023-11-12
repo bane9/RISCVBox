@@ -8,10 +8,16 @@ pub fn read_file(path: &str) -> io::Result<Vec<u8>> {
     Ok(buffer)
 }
 
-pub fn sign_extend<T>(value: T, size: usize) -> usize
+pub fn sign_extend<T>(value: T, size: usize) -> i64
 where
-    T: Into<usize> + std::ops::Shl<usize, Output = T> + std::ops::Shr<usize, Output = T> + Copy,
+    T: Into<i64>,
 {
-    let shift = std::mem::size_of::<T>() * 8 - size;
-    (((value << shift) >> shift).into()) as usize
+    let value = value.into();
+    let sign_bit = 1 << (size - 1);
+    let sign_extend_mask = (u64::max_value() & !((1 << size) - 1)) as i64;
+    if (value & sign_bit) != 0 {
+        return value | sign_extend_mask;
+    } else {
+        return value;
+    };
 }

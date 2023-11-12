@@ -19,7 +19,7 @@ fn emit_jmp(mut cond: JumpVars) -> HostEncodedInsn {
     let mut jmp_insn = HostEncodedInsn::new();
     emit_jmp_reg!(jmp_insn, amd64_reg::RAX);
 
-    emit_jz_imm!(insn, jmp_insn.size() as u8 + 1);
+    emit_jz_imm!(insn, jmp_insn.size() as u8);
     insn.push_slice(jmp_insn.iter().as_slice());
 
     insn
