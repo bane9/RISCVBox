@@ -113,6 +113,7 @@ pub mod bits {
     pub const MEIP: usize = 1 << MEIP_BIT;
 }
 
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub enum MppMode {
     Machine = 3,
     Supervisor = 1,

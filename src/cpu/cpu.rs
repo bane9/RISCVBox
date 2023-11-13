@@ -67,6 +67,21 @@ impl RunState {
     }
 }
 
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum Interrupt {
+    UserSoftware = 0,
+    SupervisorSoftware = 1,
+    MachineSoftware = 3,
+    UserTimer = 4,
+    SupervisorTimer = 5,
+    MachineTimer = 7,
+    UserExternal = 8,
+    SupervisorExternal = 9,
+    MachineExternal = 11,
+    None = 0xff,
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Exception {
     InstructionAddressMisaligned = 0,
     InstructionAccessFault = 1,
@@ -118,6 +133,7 @@ pub struct Cpu {
     pub ret_status: usize,
     pub exception: usize,
     pub bus_error: BusError,
+    pub mode: csr::MppMode,
     pub csr: &'static mut csr::Csr,
 }
 
@@ -132,6 +148,7 @@ impl Cpu {
             ret_status: 0,
             exception: Exception::None as usize,
             bus_error: BusError::None,
+            mode: csr::MppMode::Machine,
             csr: csr::get_csr(),
         }
     }

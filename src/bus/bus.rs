@@ -1,6 +1,6 @@
 pub type BusType = u32;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum BusError {
     InvalidAddress,
     ReadFault,
