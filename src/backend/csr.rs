@@ -3,7 +3,7 @@ use common::DecodeRet;
 use crate::backend::common;
 use crate::backend::target::core::{BackendCore, BackendCoreImpl};
 use crate::cpu::csr::{self, MppMode};
-use crate::cpu::{self, Exception};
+use crate::cpu::{self, CpuReg, Exception};
 
 use super::{ReturnableHandler, ReturnableImpl};
 
@@ -59,11 +59,11 @@ extern "C" fn csr_handler_cb(csr_reg: usize, rd: usize, rhs: usize, op: usize) {
 }
 
 // Nothing is more permanent than a temporary solution
-extern "C" fn mret_handler_cb() {
+extern "C" fn mret_handler_cb(pc: usize) {
     let cpu = cpu::get_cpu();
 
     if cpu.mode != MppMode::Machine {
-        cpu.exception = Exception::IllegalInstruction(cpu.pc);
+        cpu.set_exception(Exception::IllegalInstruction(cpu.pc), pc as CpuReg);
 
         ReturnableImpl::throw();
     }
@@ -82,11 +82,11 @@ extern "C" fn mret_handler_cb() {
     cpu.csr.write_mpp_mode(MppMode::User);
 }
 
-extern "C" fn sret_handler_cb() {
+extern "C" fn sret_handler_cb(pc: usize) {
     let cpu = cpu::get_cpu();
 
     if cpu.csr.read_bit_mstatus(csr::bits::TSR) || cpu.mode == MppMode::Machine {
-        cpu.exception = Exception::IllegalInstruction(cpu.pc);
+        cpu.set_exception(Exception::IllegalInstruction(cpu.pc), pc as CpuReg);
 
         ReturnableImpl::throw();
     }
@@ -204,7 +204,8 @@ impl common::Csr for CsrImpl {
     }
 
     fn emit_sret() -> DecodeRet {
-        let mut insn = BackendCoreImpl::emit_void_call(sret_handler_cb);
+        let mut insn =
+            BackendCoreImpl::emit_void_call_with_1_arg(sret_handler_cb, cpu::get_cpu().pc as usize);
         let ret = BackendCoreImpl::emit_ret();
 
         insn.push_slice(ret.iter().as_slice());
@@ -213,7 +214,8 @@ impl common::Csr for CsrImpl {
     }
 
     fn emit_mret() -> DecodeRet {
-        let mut insn = BackendCoreImpl::emit_void_call(mret_handler_cb);
+        let mut insn =
+            BackendCoreImpl::emit_void_call_with_1_arg(mret_handler_cb, cpu::get_cpu().pc as usize);
         let ret = BackendCoreImpl::emit_ret();
 
         insn.push_slice(ret.iter().as_slice());

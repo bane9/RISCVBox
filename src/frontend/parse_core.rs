@@ -11,7 +11,6 @@ use crate::xmem::page_container;
 use crate::xmem::page_container::Xmem;
 
 use crate::frontend::csr;
-use crate::frontend::privledged;
 use crate::frontend::rva;
 use crate::frontend::rvi;
 use crate::frontend::rvm;
@@ -131,12 +130,11 @@ impl ParseCore {
     }
 
     fn decode_single(&mut self, ptr: *mut u8, insn: u32) -> Result<(), JitCommon::JitError> {
-        static DECODERS: [DecoderFn; 5] = [
+        static DECODERS: [DecoderFn; 4] = [
             rvi::decode_rvi,
             rvm::decode_rvm,
             rva::decode_rva,
             csr::decode_csr,
-            privledged::decode_privledged,
         ];
 
         let mut out_res: JitCommon::DecodeRet = Err(JitCommon::JitError::InvalidInstruction(insn));

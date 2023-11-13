@@ -272,7 +272,7 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize) -> usize {
     let jmp_addr = bus.translate(jmp_addr as BusType);
 
     if jmp_addr.is_err() {
-        cpu.exception = jmp_addr.err().unwrap();
+        cpu.set_exception(jmp_addr.err().unwrap(), jmp_cond.pc);
 
         ReturnableImpl::throw();
     }
@@ -282,7 +282,7 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize) -> usize {
     let host_addr = cpu.insn_map.get_by_value(jmp_addr);
 
     if host_addr.is_none() {
-        cpu.exception = Exception::ForwardJumpFault(jmp_cond.pc);
+        cpu.set_exception(Exception::ForwardJumpFault(jmp_cond.pc), jmp_cond.pc);
 
         ReturnableImpl::throw();
     }

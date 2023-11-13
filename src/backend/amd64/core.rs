@@ -233,7 +233,7 @@ macro_rules! emit_check_rd {
 
 #[macro_export]
 macro_rules! emit_set_exception {
-    ($enc:expr, $cpu:expr, $exception:expr, $data:expr) => {{
+    ($enc:expr, $cpu:expr, $exception:expr, $data:expr, $pc:expr) => {{
         let exception_addr = &$cpu.c_exception as *const _ as usize;
         emit_move_reg_imm!($enc, amd64_reg::RAX, exception_addr);
         emit_mov_dword_ptr_imm!($enc, amd64_reg::RAX, $exception as usize);
@@ -241,6 +241,10 @@ macro_rules! emit_set_exception {
         let exception_data_addr = &$cpu.c_exception_data as *const _ as usize;
         emit_move_reg_imm!($enc, amd64_reg::RAX, exception_data_addr);
         emit_mov_dword_ptr_imm!($enc, amd64_reg::RAX, $data as usize);
+
+        let exception_pc = &$cpu.c_exception_pc as *const _ as usize;
+        emit_move_reg_imm!($enc, amd64_reg::RAX, exception_pc);
+        emit_mov_dword_ptr_imm!($enc, amd64_reg::RAX, $pc as usize);
 
         emit_ret!($enc);
     }};
@@ -628,7 +632,9 @@ impl BackendCore for BackendCoreImpl {
         let exc_int = exception.to_cpu_reg() as usize;
         let exc_data = exception.get_data() as usize;
 
-        emit_set_exception!(insn, cpu::get_cpu(), exc_int, exc_data);
+        let cpu = cpu::get_cpu();
+
+        emit_set_exception!(insn, cpu, exc_int, exc_data, cpu.pc);
 
         insn
     }

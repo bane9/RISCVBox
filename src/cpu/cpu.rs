@@ -156,6 +156,7 @@ pub struct Cpu {
     pub exception: Exception,
     pub c_exception: usize,
     pub c_exception_data: usize,
+    pub c_exception_pc: usize,
     pub mode: csr::MppMode,
     pub csr: &'static mut csr::Csr,
 }
@@ -169,9 +170,17 @@ impl Cpu {
             exception: Exception::None,
             c_exception: Exception::None.to_cpu_reg() as usize,
             c_exception_data: 0,
+            c_exception_pc: 0,
             mode: csr::MppMode::Machine,
             csr: csr::get_csr(),
         }
+    }
+
+    pub fn set_exception(&mut self, exception: Exception, pc: CpuReg) {
+        let cpu = get_cpu();
+
+        cpu.exception = exception;
+        cpu.c_exception_pc = pc as usize;
     }
 }
 

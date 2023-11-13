@@ -122,7 +122,7 @@ pub fn handle_exception() {
         _ => {}
     }
 
-    let pc = cpu.exception.get_data() + 4; // TODO: Fix this
+    let pc = (cpu.c_exception_pc + 4) as u32;
     let mode = cpu.mode;
 
     let exc_val = cpu.exception.to_cpu_reg() as usize;
