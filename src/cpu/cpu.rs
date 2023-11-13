@@ -1,6 +1,7 @@
 use crate::backend::PtrT;
 use crate::bus::bus::BusType;
 use crate::bus::BusError;
+use crate::cpu::csr;
 use crate::util::BiMap;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -42,12 +43,6 @@ impl OpType {
             _ => OpType::Unknown,
         }
     }
-}
-
-pub enum PrivMode {
-    User = 0,
-    Supervisor = 1,
-    Machine = 3,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -117,14 +112,13 @@ pub type CpuReg = BusType;
 pub struct Cpu {
     pub pc: CpuReg,
     pub regs: [CpuReg; 32],
-    pub csr: [CpuReg; 4096],
-    pub mode: PrivMode,
     pub insn_map: BiMap<usize, CpuReg>,
     pub missing_insn_map: HashMap<CpuReg, PtrT>,
     pub run_state: RunState,
     pub ret_status: usize,
     pub exception: usize,
     pub bus_error: BusError,
+    pub csr: &'static mut csr::Csr,
 }
 
 impl Cpu {
@@ -132,14 +126,13 @@ impl Cpu {
         Cpu {
             pc: 0,
             regs: [0; 32],
-            csr: [0; 4096],
-            mode: PrivMode::Machine,
             insn_map: BiMap::new(),
             missing_insn_map: HashMap::new(),
             run_state: RunState::None,
             ret_status: 0,
             exception: Exception::None as usize,
             bus_error: BusError::None,
+            csr: csr::get_csr(),
         }
     }
 }

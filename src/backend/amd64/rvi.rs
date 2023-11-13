@@ -1,6 +1,7 @@
 use crate::backend::common;
 use crate::backend::target::core::{amd64_reg, BackendCore, BackendCoreImpl};
-use crate::cpu::{self, Exception, PrivMode};
+use crate::cpu::csr;
+use crate::cpu::{self, Exception};
 use crate::*;
 use common::{
     BusAccessVars, DecodeRet, HostEncodedInsn, JumpCond, JumpVars, PCAccess, UsizeConversions,
@@ -391,14 +392,14 @@ impl common::Rvi for RviImpl {
         let mut insn = HostEncodedInsn::new();
         let cpu = cpu::get_cpu();
 
-        match cpu.mode {
-            PrivMode::User => {
+        match cpu.csr.read_mpp_mode() {
+            csr::MppMode::User => {
                 emit_set_exception!(insn, cpu, Exception::EnvironmentCallFromUMode);
             }
-            PrivMode::Supervisor => {
+            csr::MppMode::Supervisor => {
                 emit_set_exception!(insn, cpu, Exception::EnvironmentCallFromSMode);
             }
-            PrivMode::Machine => {
+            csr::MppMode::Machine => {
                 emit_set_exception!(insn, cpu, Exception::EnvironmentCallFromMMode);
             }
         }
