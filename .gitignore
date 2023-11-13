@@ -14,3 +14,9 @@ Cargo.lock
 # Added by cargo
 
 /target
+
+# Other
+
+testbins/
+
+logs/
