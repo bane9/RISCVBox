@@ -1,6 +1,6 @@
 use crate::backend::common;
 use crate::backend::target::core::{amd64_reg, BackendCore, BackendCoreImpl};
-use crate::cpu::{csr, Exception};
+use crate::util::util::sign_extend;
 use crate::*;
 use common::{
     BusAccessVars, DecodeRet, HostEncodedInsn, JumpCond, JumpVars, PCAccess, UsizeConversions,
@@ -220,9 +220,10 @@ impl common::Rvi for RviImpl {
         let cpu = cpu::get_cpu();
 
         let rd_addr = &cpu.regs[rd as usize] as *const _ as usize;
+        let imm = sign_extend(imm, 12); // TODO: this is wrong
 
         emit_move_reg_imm!(insn, amd64_reg::RBX, rd_addr);
-        emit_mov_dword_ptr_imm!(insn, amd64_reg::RBX, cpu.pc + imm as u32);
+        emit_mov_dword_ptr_imm!(insn, amd64_reg::RBX, (cpu.pc as i64).wrapping_add(imm));
 
         Ok(insn)
     }
@@ -383,49 +384,6 @@ impl common::Rvi for RviImpl {
         let mut insn = HostEncodedInsn::new();
 
         emit_nop!(insn);
-
-        Ok(insn)
-    }
-
-    fn emit_ecall() -> DecodeRet {
-        let mut insn = HostEncodedInsn::new();
-        let cpu = cpu::get_cpu();
-
-        match cpu.csr.read_mpp_mode() {
-            csr::MppMode::User => {
-                emit_set_exception!(
-                    insn,
-                    cpu,
-                    Exception::EnvironmentCallFromUMode(0).to_cpu_reg(),
-                    cpu.pc
-                );
-            }
-            csr::MppMode::Supervisor => {
-                emit_set_exception!(
-                    insn,
-                    cpu,
-                    Exception::EnvironmentCallFromSMode(0).to_cpu_reg(),
-                    cpu.pc
-                );
-            }
-            csr::MppMode::Machine => {
-                emit_set_exception!(
-                    insn,
-                    cpu,
-                    Exception::EnvironmentCallFromMMode(0).to_cpu_reg(),
-                    cpu.pc
-                );
-            }
-        }
-
-        Ok(insn)
-    }
-
-    fn emit_ebreak() -> DecodeRet {
-        let mut insn = HostEncodedInsn::new();
-        let cpu = cpu::get_cpu();
-
-        emit_set_exception!(insn, cpu, Exception::Breakpoint.to_cpu_reg(), 0);
 
         Ok(insn)
     }

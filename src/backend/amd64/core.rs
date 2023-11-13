@@ -633,7 +633,6 @@ impl BackendCore for BackendCoreImpl {
         insn
     }
 
-    #[rustfmt::skip]
     fn emit_void_call(fn_ptr: extern "C" fn()) -> HostEncodedInsn {
         let mut insn = HostEncodedInsn::new();
 

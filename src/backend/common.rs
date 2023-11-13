@@ -2,6 +2,7 @@ use cpu::Exception;
 
 use crate::bus::{bus, BusType};
 use crate::cpu::{cpu, CpuReg};
+use crate::frontend::exec_core::INSN_SIZE;
 use crate::util::EncodedInsn;
 
 use crate::backend::{ReturnableHandler, ReturnableImpl};
@@ -289,7 +290,7 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize) -> usize {
     if jmp_cond.reg1 != 0
         && (jmp_cond.cond == JumpCond::Always || jmp_cond.cond == JumpCond::AlwaysAbsolute)
     {
-        cpu.regs[jmp_cond.reg1 as usize] = jmp_cond.pc;
+        cpu.regs[jmp_cond.reg1 as usize] = jmp_cond.pc + INSN_SIZE as u32;
     }
 
     *host_addr.unwrap()
@@ -511,9 +512,6 @@ pub trait Rvi {
 
     fn emit_fence(pred: u8, succ: u8) -> DecodeRet;
     fn emit_fence_i() -> DecodeRet;
-
-    fn emit_ecall() -> DecodeRet;
-    fn emit_ebreak() -> DecodeRet;
 }
 
 pub trait Rvm {
@@ -559,4 +557,11 @@ pub trait Csr {
     fn emit_csrrwi(rd: u8, zimm: u8, csr: u16) -> DecodeRet;
     fn emit_csrrsi(rd: u8, zimm: u8, csr: u16) -> DecodeRet;
     fn emit_csrrci(rd: u8, zimm: u8, csr: u16) -> DecodeRet;
+
+    fn emit_ecall() -> DecodeRet;
+    fn emit_ebreak() -> DecodeRet;
+    fn emit_sret() -> DecodeRet;
+    fn emit_mret() -> DecodeRet;
+
+    fn emit_wfi() -> DecodeRet;
 }

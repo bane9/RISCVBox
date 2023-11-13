@@ -20,6 +20,8 @@ pub enum OpType {
     JALR = 0x67,
     JAL = 0x6f,
 
+    AUIPC = 0x17,
+
     CSR = 0x73,
 
     Unknown = 0x100,
@@ -39,6 +41,7 @@ impl OpType {
             0x67 => OpType::JALR,
             0x6f => OpType::JAL,
             0x73 => OpType::CSR,
+            0x17 => OpType::AUIPC,
             _ => OpType::Unknown,
         }
     }

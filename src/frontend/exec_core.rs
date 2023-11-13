@@ -1,5 +1,6 @@
 use crate::backend::target::core::BackendCoreImpl;
 use crate::backend::BackendCore;
+use crate::cpu::trap;
 use crate::cpu::{self, CpuReg};
 pub use crate::frontend::parse_core::*;
 
@@ -15,7 +16,7 @@ impl ExecCore {
     }
 
     pub fn exec_loop(&mut self) {
-        let ptr = self.parse_core.get_exec_ptr();
+        let mut ptr = self.parse_core.get_exec_ptr();
         let cpu = cpu::get_cpu();
         loop {
             // let result = ReturnableImpl::handle(|| unsafe { BackendCoreImpl::call_jit_ptr(ptr) });
@@ -36,7 +37,16 @@ impl ExecCore {
             }
 
             println!("ret_status: {:#x?}", cpu.exception);
-            break;
+
+            match cpu.exception {
+                cpu::Exception::IllegalInstruction(_) => {
+                    std::process::exit(0);
+                }
+                _ => {
+                    trap::handle_exception();
+                    ptr = *cpu.insn_map.get_by_value(cpu.pc).unwrap() as *mut u8;
+                }
+            }
         }
     }
 }

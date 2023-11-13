@@ -6,40 +6,75 @@ Disassembly of section .text:
 
 00000000 <_start>:
    0:	10000537          	lui	a0,0x10000
-   4:	02400593          	addi	a1,zero,36
-   8:	0040006f          	jal	zero,c <print_str>
+   4:	05800593          	addi	a1,zero,88
+   8:	034000ef          	jal	ra,3c <print_str>
+   c:	00000317          	auipc	t1,0x0
+  10:	01430313          	addi	t1,t1,20 # 20 <trap>
+  14:	30531073          	csrrw	zero,mtvec,t1
+  18:	00000073          	ecall
+  1c:	0380006f          	jal	zero,54 <end>
 
-0000000c <print_str>:
-   c:	0005c283          	lbu	t0,0(a1)
-  10:	00028863          	beq	t0,zero,20 <end>
-  14:	00550023          	sb	t0,0(a0) # 10000000 <hello+0xfffffdc>
-  18:	00158593          	addi	a1,a1,1
-  1c:	ff1ff06f          	jal	zero,c <print_str>
+00000020 <trap>:
+  20:	10000537          	lui	a0,0x10000
+  24:	06500593          	addi	a1,zero,101
+  28:	014000ef          	jal	ra,3c <print_str>
+  2c:	34102373          	csrrs	t1,mepc,zero
+  30:	00430313          	addi	t1,t1,4
+  34:	34131073          	csrrw	zero,mepc,t1
+  38:	30200073          	mret
 
-00000020 <end>:
-  20:	00000013          	addi	zero,zero,0
+0000003c <print_str>:
+  3c:	0005c283          	lbu	t0,0(a1)
+  40:	00028863          	beq	t0,zero,50 <print_str_ret>
+  44:	00550023          	sb	t0,0(a0) # 10000000 <hello_exc+0xfffff9b>
+  48:	00158593          	addi	a1,a1,1
+  4c:	ff1ff06f          	jal	zero,3c <print_str>
+
+00000050 <print_str_ret>:
+  50:	00008067          	jalr	zero,0(ra)
+
+00000054 <end>:
+  54:	00000013          	addi	zero,zero,0
 
 Disassembly of section .data:
 
-00000024 <hello>:
-  24:	6568                	.2byte	0x6568
-  26:	6c6c                	.2byte	0x6c6c
-  28:	6f77206f          	jal	zero,72f1e <hello+0x72efa>
-  2c:	6c72                	.2byte	0x6c72
-  2e:	0a64                	.2byte	0xa64
+00000058 <hello>:
+  58:	6568                	.2byte	0x6568
+  5a:	6c6c                	.2byte	0x6c6c
+  5c:	6f77206f          	jal	zero,72f52 <hello_exc+0x72eed>
+  60:	6c72                	.2byte	0x6c72
+  62:	0a64                	.2byte	0xa64
 	...
+
+00000065 <hello_exc>:
+  65:	6568                	.2byte	0x6568
+  67:	6c6c                	.2byte	0x6c6c
+  69:	7266206f          	jal	zero,6278f <hello_exc+0x6272a>
+  6d:	65206d6f          	jal	s10,66bf <hello_exc+0x665a>
+  71:	6378                	.2byte	0x6378
+  73:	7065                	.2byte	0x7065
+  75:	6974                	.2byte	0x6974
+  77:	000a6e6f          	jal	t3,a6077 <hello_exc+0xa6012>
 
 Disassembly of section .riscv.attributes:
 
 00000000 <.riscv.attributes>:
-   0:	1941                	.2byte	0x1941
+   0:	2641                	.2byte	0x2641
    2:	0000                	.2byte	0x0
    4:	7200                	.2byte	0x7200
    6:	7369                	.2byte	0x7369
-   8:	01007663          	bgeu	zero,a6,14 <print_str+0x8>
-   c:	0000000f          	fence	unknown,unknown
+   8:	01007663          	bgeu	zero,a6,14 <_start+0x14>
+   c:	001c                	.2byte	0x1c
+   e:	0000                	.2byte	0x0
   10:	7205                	.2byte	0x7205
   12:	3376                	.2byte	0x3376
   14:	6932                	.2byte	0x6932
   16:	7032                	.2byte	0x7032
-  18:	0031                	.2byte	0x31
+  18:	5f31                	.2byte	0x5f31
+  1a:	697a                	.2byte	0x697a
+  1c:	32727363          	bgeu	tp,t2,342 <hello_exc+0x2dd>
+  20:	3070                	.2byte	0x3070
+  22:	0800                	.2byte	0x800
+  24:	0a01                	.2byte	0xa01
+  26:	0b              	Address 0x26 is out of bounds.
+

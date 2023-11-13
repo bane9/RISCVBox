@@ -64,12 +64,11 @@ pub fn has_pending_interrupt() -> Option<Interrupt> {
     None
 }
 
-pub fn handle_interrupt(int_val: Interrupt) {
+pub fn handle_interrupt(int_val: Interrupt, pc: CpuReg) {
     assert!(int_val != Interrupt::None);
 
     let cpu = cpu::get_cpu();
 
-    let pc = cpu.pc;
     let mode = cpu.mode;
 
     let mideleg_flag = if int_val != Interrupt::MachineTimer {
@@ -118,9 +117,12 @@ pub fn handle_interrupt(int_val: Interrupt) {
 pub fn handle_exception() {
     let cpu = cpu::get_cpu();
 
-    assert!(cpu.exception != Exception::None);
+    match cpu.exception {
+        Exception::None | Exception::ForwardJumpFault(_) => return,
+        _ => {}
+    }
 
-    let pc = cpu.pc;
+    let pc = cpu.exception.get_data() + 4; // TODO: Fix this
     let mode = cpu.mode;
 
     let exc_val = cpu.exception.to_cpu_reg() as usize;

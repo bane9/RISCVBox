@@ -106,13 +106,18 @@ pub fn decode_rvi(insn: u32) -> DecodeRet {
                 _ => Err(JitError::InvalidInstruction(insn)),
             }
         }
+        OpType::AUIPC => {
+            let rd = ((insn >> 7) & 0b11111) as u8;
+            let imm = ((insn >> 12) & 0b11111111111111111111) as i32;
+
+            RviImpl::emit_auipc(rd, imm)
+        }
         OpType::U => {
             let rd = ((insn >> 7) & 0b11111) as u8;
             let imm = ((insn >> 12) & 0b11111111111111111111) as i32;
             let op: u32 = (insn >> 25) & 0b1111111;
 
             match op {
-                0b0010111 => RviImpl::emit_auipc(rd, imm),
                 0b1000 => RviImpl::emit_lui(rd, imm),
                 _ => Err(JitError::InvalidInstruction(insn)),
             }
@@ -126,7 +131,7 @@ pub fn decode_rvi(insn: u32) -> DecodeRet {
         OpType::JALR => {
             let rd = ((insn >> 7) & 0b11111) as u8;
             let rs1 = ((insn >> 15) & 0b11111) as u8;
-            let imm = ((insn >> 20) & 0b111111111111) as i32;
+            let imm = imm_j!(insn) as i32;
 
             RviImpl::emit_jalr(rd, rs1, imm)
         }
