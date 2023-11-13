@@ -451,6 +451,13 @@ pub trait BackendCore {
         arg3: usize,
         arg4: usize,
     ) -> HostEncodedInsn;
+    fn emit_void_call_with_4_args(
+        fn_ptr: extern "C" fn(usize, usize, usize, usize),
+        arg1: usize,
+        arg2: usize,
+        arg3: usize,
+        arg4: usize,
+    ) -> HostEncodedInsn;
     fn emit_void_call_with_1_arg(fn_ptr: extern "C" fn(usize), arg1: usize) -> HostEncodedInsn;
     fn emit_usize_call_with_1_arg(
         fn_ptr: extern "C" fn(usize) -> usize,
@@ -542,4 +549,13 @@ pub trait Rva {
     fn emit_amominu_w(rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
 
     fn emit_amomaxu_w(rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet;
+}
+
+pub trait Csr {
+    fn emit_csrrw(rd: u8, rs1: u8, csr: u16) -> DecodeRet;
+    fn emit_csrrs(rd: u8, rs1: u8, csr: u16) -> DecodeRet;
+    fn emit_csrrc(rd: u8, rs1: u8, csr: u16) -> DecodeRet;
+    fn emit_csrrwi(rd: u8, zimm: u8, csr: u16) -> DecodeRet;
+    fn emit_csrrsi(rd: u8, zimm: u8, csr: u16) -> DecodeRet;
+    fn emit_csrrci(rd: u8, zimm: u8, csr: u16) -> DecodeRet;
 }

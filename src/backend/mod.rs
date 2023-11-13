@@ -29,3 +29,6 @@ pub use returnable_win32::ReturnableImpl;
 
 pub mod common;
 pub use common::*;
+
+pub mod csr;
+pub use csr::CsrImpl;

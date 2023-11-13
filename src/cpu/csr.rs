@@ -2,7 +2,7 @@ use crate::bus::bus::BusType;
 use crate::util::util;
 use std::cell::RefCell;
 
-pub const CSR_SIZE: usize = 4096;
+pub const CSR_COUNT: usize = 4096;
 pub type CsrType = BusType;
 
 // Constants
@@ -122,12 +122,12 @@ pub enum MppMode {
 // Implementation
 
 pub struct Csr {
-    pub regs: [CsrType; CSR_SIZE],
+    pub regs: [CsrType; CSR_COUNT],
 }
 
 impl Csr {
     pub fn new() -> Self {
-        let mut regs = [0u32; CSR_SIZE];
+        let mut regs = [0u32; CSR_COUNT];
 
         regs[register::MISA] =
             (XLEN_32 | RV32I_64I_128I | A_EXT | M_EXT | SUPERVISOR | USER) as u32;

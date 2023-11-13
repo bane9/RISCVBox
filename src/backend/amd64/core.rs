@@ -671,6 +671,20 @@ impl BackendCore for BackendCoreImpl {
         insn
     }
 
+    fn emit_void_call_with_4_args(
+        fn_ptr: extern "C" fn(usize, usize, usize, usize),
+        arg1: usize,
+        arg2: usize,
+        arg3: usize,
+        arg4: usize,
+    ) -> HostEncodedInsn {
+        let fn_ptr = unsafe {
+            std::mem::transmute::<_, extern "C" fn(usize, usize, usize, usize) -> usize>(fn_ptr)
+        };
+
+        Self::emit_usize_call_with_4_args(fn_ptr, arg1, arg2, arg3, arg4)
+    }
+
     fn emit_void_call_with_1_arg(fn_ptr: extern "C" fn(usize), arg1: usize) -> HostEncodedInsn {
         let mut insn = HostEncodedInsn::new();
 
