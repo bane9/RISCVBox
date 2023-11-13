@@ -1,21 +1,10 @@
+use crate::cpu::Exception;
+
 pub type BusType = u32;
 
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum BusError {
-    InvalidAddress,
-    ReadFault,
-    WriteFault,
-    PageFault,
-
-    ForwardJumpFault(BusType),
-
-    InvalidSize,
-    None,
-}
-
 pub trait BusDevice {
-    fn read(&mut self, addr: BusType, size: BusType) -> Result<BusType, BusError>;
-    fn write(&mut self, addr: BusType, data: BusType, size: BusType) -> Result<(), BusError>;
+    fn read(&mut self, addr: BusType, size: BusType) -> Result<BusType, Exception>;
+    fn write(&mut self, addr: BusType, data: BusType, size: BusType) -> Result<(), Exception>;
     fn get_begin_addr(&self) -> BusType;
     fn get_end_addr(&self) -> BusType;
     fn tick(&mut self);
@@ -36,32 +25,32 @@ impl Bus {
         self.devices.push(device);
     }
 
-    pub fn translate(&self, addr: BusType) -> Result<BusType, BusError> {
+    pub fn translate(&self, addr: BusType) -> Result<BusType, Exception> {
         return Ok(addr);
     }
 
-    pub fn read(&mut self, addr: BusType, size: BusType) -> Result<BusType, BusError> {
+    pub fn read(&mut self, addr: BusType, size: BusType) -> Result<BusType, Exception> {
         for device in &mut self.devices {
             if addr >= device.get_begin_addr() && addr < device.get_end_addr() {
                 return device.read(addr, size);
             }
         }
 
-        Err(BusError::InvalidAddress)
+        Err(Exception::LoadAccessFault(addr))
     }
 
-    pub fn fetch(&mut self, addr: BusType, size: BusType) -> Result<BusType, BusError> {
+    pub fn fetch(&mut self, addr: BusType, size: BusType) -> Result<BusType, Exception> {
         self.read(addr, size)
     }
 
-    pub fn write(&mut self, addr: BusType, data: BusType, size: BusType) -> Result<(), BusError> {
+    pub fn write(&mut self, addr: BusType, data: BusType, size: BusType) -> Result<(), Exception> {
         for device in &mut self.devices {
             if addr >= device.get_begin_addr() && addr < device.get_end_addr() {
                 return device.write(addr, data, size);
             }
         }
 
-        Err(BusError::InvalidAddress)
+        Err(Exception::StoreAccessFault(addr))
     }
 
     pub fn tick(&mut self) {

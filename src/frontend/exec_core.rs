@@ -1,6 +1,6 @@
 use crate::backend::target::core::BackendCoreImpl;
 use crate::backend::BackendCore;
-use crate::cpu;
+use crate::cpu::{self, CpuReg};
 pub use crate::frontend::parse_core::*;
 
 pub struct ExecCore {
@@ -17,20 +17,25 @@ impl ExecCore {
     pub fn exec_loop(&mut self) {
         let ptr = self.parse_core.get_exec_ptr();
         let cpu = cpu::get_cpu();
-        cpu.ret_status = cpu::RunState::Running as usize;
         loop {
-            //let callable: extern "C" fn() = unsafe { std::mem::transmute(ptr) };
-            //callable();
-            //let result = ReturnableImpl::handle(|| callable());
+            // let result = ReturnableImpl::handle(|| unsafe { BackendCoreImpl::call_jit_ptr(ptr) });
+
+            cpu.exception = cpu::Exception::None;
+            cpu.c_exception = cpu::Exception::None.to_cpu_reg() as usize;
+            cpu.c_exception_data = 0;
 
             unsafe {
                 BackendCoreImpl::call_jit_ptr(ptr);
             }
-            //println!("result: {:?}", result);
-            println!(
-                "ret_status: {:?}",
-                cpu::RunState::from_usize(cpu.ret_status)
-            );
+
+            if cpu.c_exception != cpu::Exception::None.to_cpu_reg() as usize {
+                cpu.exception = cpu::Exception::from_cpu_reg(
+                    cpu.c_exception as CpuReg,
+                    cpu.c_exception_data as CpuReg,
+                );
+            }
+
+            println!("ret_status: {:#x?}", cpu.exception);
             break;
         }
     }

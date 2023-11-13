@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use crate::bus::bus::*;
+use crate::{bus::bus::*, cpu::Exception};
 
 const UART_BASE_ADDRESS: u64 = 0x10000000;
 const UART_IRQN: u64 = 10;
@@ -67,7 +67,7 @@ impl Ns16550 {
 }
 
 impl BusDevice for Ns16550 {
-    fn read(&mut self, addr: BusType, _size: BusType) -> Result<BusType, BusError> {
+    fn read(&mut self, addr: BusType, _size: BusType) -> Result<BusType, Exception> {
         let adj_addr = (addr as usize) - (self.get_begin_addr() as usize);
 
         match adj_addr as u64 {
@@ -84,11 +84,11 @@ impl BusDevice for Ns16550 {
             LSR => return Ok(self.lsr as BusType),
             MSR => return Ok(self.msr as BusType),
             SCR => return Ok(self.scr as BusType),
-            _ => Err(BusError::InvalidAddress),
+            _ => Err(Exception::LoadAccessFault(addr)),
         }
     }
 
-    fn write(&mut self, addr: BusType, data: BusType, _size: BusType) -> Result<(), BusError> {
+    fn write(&mut self, addr: BusType, data: BusType, _size: BusType) -> Result<(), Exception> {
         let adj_addr = (addr as usize) - (self.get_begin_addr() as usize);
 
         match adj_addr as u64 {
@@ -118,7 +118,7 @@ impl BusDevice for Ns16550 {
                 self.scr = data as u8;
                 Ok(())
             }
-            _ => Err(BusError::InvalidAddress),
+            _ => Err(Exception::StoreAccessFault(addr)),
         }
     }
 

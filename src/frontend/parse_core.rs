@@ -5,6 +5,7 @@ use crate::backend::common::HostEncodedInsn;
 use crate::backend::target::core::BackendCoreImpl;
 use crate::bus::bus;
 use crate::cpu;
+use crate::cpu::Exception;
 use crate::frontend::code_pages;
 use crate::xmem::page_container;
 use crate::xmem::page_container::Xmem;
@@ -40,7 +41,7 @@ impl ParseCore {
 
         BackendCoreImpl::fill_with_target_nop(code_pages.as_ptr(), pages * Xmem::page_size());
 
-        let ok_jump = BackendCoreImpl::emit_ret_with_status(cpu::RunState::BlockExit);
+        let ok_jump = BackendCoreImpl::emit_ret();
 
         code_pages.apply_reserved_insn_all(ok_jump);
 
@@ -157,7 +158,8 @@ impl ParseCore {
                 insn_res = out_res.unwrap();
             }
             Err(JitCommon::JitError::InvalidInstruction(_)) => {
-                insn_res = BackendCoreImpl::emit_ret_with_status(cpu::RunState::InvalidInstruction);
+                insn_res =
+                    BackendCoreImpl::emit_ret_with_exception(Exception::IllegalInstruction(insn));
             }
             _ => {
                 return Err(out_res.err().unwrap());

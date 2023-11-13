@@ -1,8 +1,5 @@
-use crate::{
-    bus::BusError,
-    cpu::{cpu, csr},
-};
-use cpu::Interrupt;
+use crate::cpu::{cpu, csr};
+use cpu::{Exception, Interrupt};
 
 use super::{csr::MppMode, CpuReg};
 
@@ -121,13 +118,12 @@ pub fn handle_interrupt(int_val: Interrupt) {
 pub fn handle_exception() {
     let cpu = cpu::get_cpu();
 
-    // TODO: unify exception types
-    assert!(cpu.bus_error != BusError::None);
+    assert!(cpu.exception != Exception::None);
 
     let pc = cpu.pc;
     let mode = cpu.mode;
 
-    let exc_val = cpu.exception as usize;
+    let exc_val = cpu.exception.to_cpu_reg() as usize;
 
     let mideleg_flag = ((cpu.csr.read(csr::register::MIDELEG) >> exc_val as usize) & 1) != 0;
 

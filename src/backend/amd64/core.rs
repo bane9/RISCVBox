@@ -233,10 +233,14 @@ macro_rules! emit_check_rd {
 
 #[macro_export]
 macro_rules! emit_set_exception {
-    ($enc:expr, $cpu:expr, $exception:expr) => {{
-        let rd_addr = &$cpu.exception as *const _ as usize;
-        emit_move_reg_imm!($enc, amd64_reg::RAX, $exception as usize);
-        emit_mov_dword_ptr_imm!($enc, amd64_reg::RAX, rd_addr);
+    ($enc:expr, $cpu:expr, $exception:expr, $data:expr) => {{
+        let exception_addr = &$cpu.c_exception as *const _ as usize;
+        emit_move_reg_imm!($enc, amd64_reg::RAX, exception_addr);
+        emit_mov_dword_ptr_imm!($enc, amd64_reg::RAX, $exception as usize);
+
+        let exception_data_addr = &$cpu.c_exception_data as *const _ as usize;
+        emit_move_reg_imm!($enc, amd64_reg::RAX, exception_data_addr);
+        emit_mov_dword_ptr_imm!($enc, amd64_reg::RAX, $data as usize);
 
         emit_ret!($enc);
     }};
@@ -610,14 +614,21 @@ impl BackendCore for BackendCoreImpl {
         }
     }
 
-    fn emit_ret_with_status(state: RunState) -> HostEncodedInsn {
+    fn emit_ret() -> HostEncodedInsn {
         let mut insn = HostEncodedInsn::new();
 
-        let cpu = cpu::get_cpu();
-
-        emit_move_reg_imm!(insn, amd64_reg::R11, &cpu.ret_status as *const _);
-        emit_mov_qword_ptr!(insn, amd64_reg::R11, state as u32);
         emit_ret!(insn);
+
+        insn
+    }
+
+    fn emit_ret_with_exception(exception: Exception) -> HostEncodedInsn {
+        let mut insn = HostEncodedInsn::new();
+
+        let exc_int = exception.to_cpu_reg() as usize;
+        let exc_data = exception.get_data() as usize;
+
+        emit_set_exception!(insn, cpu::get_cpu(), exc_int, exc_data);
 
         insn
     }

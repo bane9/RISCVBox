@@ -1,7 +1,7 @@
-use bus::BusError;
+use cpu::Exception;
 
 use crate::bus::{bus, BusType};
-use crate::cpu::{cpu, CpuReg, RunState};
+use crate::cpu::{cpu, CpuReg};
 use crate::util::EncodedInsn;
 
 use crate::backend::{ReturnableHandler, ReturnableImpl};
@@ -271,7 +271,7 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize) -> usize {
     let jmp_addr = bus.translate(jmp_addr as BusType);
 
     if jmp_addr.is_err() {
-        cpu.bus_error = jmp_addr.err().unwrap();
+        cpu.exception = jmp_addr.err().unwrap();
 
         ReturnableImpl::throw();
     }
@@ -281,7 +281,7 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize) -> usize {
     let host_addr = cpu.insn_map.get_by_value(jmp_addr);
 
     if host_addr.is_none() {
-        cpu.bus_error = BusError::ForwardJumpFault(jmp_cond.pc);
+        cpu.exception = Exception::ForwardJumpFault(jmp_cond.pc);
 
         ReturnableImpl::throw();
     }
@@ -356,7 +356,7 @@ pub extern "C" fn c_bus_resolver_cb(bus_vars: usize) {
         let data = bus.read(addres, size);
 
         if data.is_err() {
-            cpu.bus_error = data.err().unwrap();
+            cpu.exception = data.err().unwrap();
 
             ReturnableImpl::throw();
         }
@@ -372,7 +372,7 @@ pub extern "C" fn c_bus_resolver_cb(bus_vars: usize) {
         let res = bus.write(addres, data, size);
 
         if res.is_err() {
-            cpu.bus_error = res.err().unwrap();
+            cpu.exception = res.err().unwrap();
 
             ReturnableImpl::throw();
         }
@@ -441,7 +441,8 @@ macro_rules! test_encoded_insn {
 pub trait BackendCore {
     fn fill_with_target_nop(ptr: PtrT, size: usize);
     fn fill_with_target_ret(ptr: PtrT, size: usize);
-    fn emit_ret_with_status(state: RunState) -> HostEncodedInsn;
+    fn emit_ret() -> HostEncodedInsn;
+    fn emit_ret_with_exception(exception: Exception) -> HostEncodedInsn;
     fn emit_void_call(fn_ptr: extern "C" fn()) -> HostEncodedInsn;
     fn find_guest_pc_from_host_stack_frame(caller_ret_addr: *mut u8) -> Option<u32>;
     fn emit_usize_call_with_4_args(

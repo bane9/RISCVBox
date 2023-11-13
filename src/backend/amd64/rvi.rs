@@ -1,7 +1,6 @@
 use crate::backend::common;
 use crate::backend::target::core::{amd64_reg, BackendCore, BackendCoreImpl};
-use crate::cpu::csr;
-use crate::cpu::{self, Exception};
+use crate::cpu::{csr, Exception};
 use crate::*;
 use common::{
     BusAccessVars, DecodeRet, HostEncodedInsn, JumpCond, JumpVars, PCAccess, UsizeConversions,
@@ -394,13 +393,28 @@ impl common::Rvi for RviImpl {
 
         match cpu.csr.read_mpp_mode() {
             csr::MppMode::User => {
-                emit_set_exception!(insn, cpu, Exception::EnvironmentCallFromUMode);
+                emit_set_exception!(
+                    insn,
+                    cpu,
+                    Exception::EnvironmentCallFromUMode(0).to_cpu_reg(),
+                    cpu.pc
+                );
             }
             csr::MppMode::Supervisor => {
-                emit_set_exception!(insn, cpu, Exception::EnvironmentCallFromSMode);
+                emit_set_exception!(
+                    insn,
+                    cpu,
+                    Exception::EnvironmentCallFromSMode(0).to_cpu_reg(),
+                    cpu.pc
+                );
             }
             csr::MppMode::Machine => {
-                emit_set_exception!(insn, cpu, Exception::EnvironmentCallFromMMode);
+                emit_set_exception!(
+                    insn,
+                    cpu,
+                    Exception::EnvironmentCallFromMMode(0).to_cpu_reg(),
+                    cpu.pc
+                );
             }
         }
 
@@ -411,7 +425,7 @@ impl common::Rvi for RviImpl {
         let mut insn = HostEncodedInsn::new();
         let cpu = cpu::get_cpu();
 
-        emit_set_exception!(insn, cpu, Exception::Breakpoint);
+        emit_set_exception!(insn, cpu, Exception::Breakpoint.to_cpu_reg(), 0);
 
         Ok(insn)
     }

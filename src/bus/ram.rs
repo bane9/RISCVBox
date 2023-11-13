@@ -1,4 +1,4 @@
-use crate::bus::bus::*;
+use crate::{bus::bus::*, cpu::Exception};
 
 pub struct Ram {
     pub mem: Vec<u8>,
@@ -11,7 +11,7 @@ impl Ram {
 }
 
 impl BusDevice for Ram {
-    fn read(&mut self, addr: BusType, size: BusType) -> Result<BusType, BusError> {
+    fn read(&mut self, addr: BusType, size: BusType) -> Result<BusType, Exception> {
         let adj_addr = (addr as usize) - (self.get_begin_addr() as usize);
 
         match size {
@@ -23,11 +23,11 @@ impl BusDevice for Ram {
                 self.mem[adj_addr + 2],
                 self.mem[adj_addr + 3],
             ]) as BusType),
-            _ => Err(BusError::InvalidSize),
+            _ => Err(Exception::LoadAccessFault(addr)),
         }
     }
 
-    fn write(&mut self, addr: BusType, data: BusType, size: BusType) -> Result<(), BusError> {
+    fn write(&mut self, addr: BusType, data: BusType, size: BusType) -> Result<(), Exception> {
         let adj_addr = (addr as usize) - (self.get_begin_addr() as usize);
 
         unsafe {

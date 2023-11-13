@@ -1,10 +1,9 @@
-use crate::backend::PtrT;
 use crate::bus::bus::BusType;
-use crate::bus::BusError;
 use crate::cpu::csr;
 use crate::util::BiMap;
 use std::cell::RefCell;
-use std::collections::HashMap;
+
+pub type CpuReg = BusType;
 
 pub enum OpType {
     L = 0x03,
@@ -46,28 +45,6 @@ impl OpType {
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub enum RunState {
-    None = 0,
-    Running = 1,
-    Exception = 2,
-    BlockExit = 3,
-    InvalidInstruction = 4,
-    Unknown = 0xff,
-}
-
-impl RunState {
-    pub fn from_usize(val: usize) -> RunState {
-        match val {
-            0 => RunState::None,
-            1 => RunState::Running,
-            2 => RunState::Exception,
-            3 => RunState::BlockExit,
-            _ => RunState::Unknown,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Interrupt {
     UserSoftware = 0,
     SupervisorSoftware = 1,
@@ -82,57 +59,100 @@ pub enum Interrupt {
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
+#[repr(u32)]
 pub enum Exception {
-    InstructionAddressMisaligned = 0,
-    InstructionAccessFault = 1,
-    IllegalInstruction = 2,
+    InstructionAddressMisaligned(CpuReg) = 0,
+    InstructionAccessFault(CpuReg) = 1,
+    IllegalInstruction(CpuReg) = 2,
     Breakpoint = 3,
-    LoadAddressMisaligned = 4,
-    LoadAccessFault = 5,
-    StoreAddressMisaligned = 6,
-    StoreAccessFault = 7,
-    EnvironmentCallFromUMode = 8,
-    EnvironmentCallFromSMode = 9,
-    EnvironmentCallFromMMode = 11,
-    InstructionPageFault = 12,
-    LoadPageFault = 13,
-    StorePageFault = 15,
+    LoadAddressMisaligned(CpuReg) = 4,
+    LoadAccessFault(CpuReg) = 5,
+    StoreAddressMisaligned(CpuReg) = 6,
+    StoreAccessFault(CpuReg) = 7,
+    EnvironmentCallFromUMode(CpuReg) = 8,
+    EnvironmentCallFromSMode(CpuReg) = 9,
+    EnvironmentCallFromMMode(CpuReg) = 11,
+    InstructionPageFault(CpuReg) = 12,
+    LoadPageFault(CpuReg) = 13,
+    StorePageFault(CpuReg) = 15,
     None = 0xff,
+
+    ForwardJumpFault(CpuReg) = 0x100,
 }
 
 impl Exception {
-    pub fn from_usize(val: usize) -> Exception {
+    pub fn from_cpu_reg(val: CpuReg, data: CpuReg) -> Exception {
         match val {
-            0 => Exception::InstructionAddressMisaligned,
-            1 => Exception::InstructionAccessFault,
-            2 => Exception::IllegalInstruction,
+            0 => Exception::InstructionAddressMisaligned(data),
+            1 => Exception::InstructionAccessFault(data),
+            2 => Exception::IllegalInstruction(data),
             3 => Exception::Breakpoint,
-            4 => Exception::LoadAddressMisaligned,
-            5 => Exception::LoadAccessFault,
-            6 => Exception::StoreAddressMisaligned,
-            7 => Exception::StoreAccessFault,
-            8 => Exception::EnvironmentCallFromUMode,
-            9 => Exception::EnvironmentCallFromSMode,
-            11 => Exception::EnvironmentCallFromMMode,
-            12 => Exception::InstructionPageFault,
-            13 => Exception::LoadPageFault,
-            15 => Exception::StorePageFault,
+            4 => Exception::LoadAddressMisaligned(data),
+            5 => Exception::LoadAccessFault(data),
+            6 => Exception::StoreAddressMisaligned(data),
+            7 => Exception::StoreAccessFault(data),
+            8 => Exception::EnvironmentCallFromUMode(data),
+            9 => Exception::EnvironmentCallFromSMode(data),
+            11 => Exception::EnvironmentCallFromMMode(data),
+            12 => Exception::InstructionPageFault(data),
+            13 => Exception::LoadPageFault(data),
+            15 => Exception::StorePageFault(data),
             _ => Exception::None,
         }
     }
-}
 
-pub type CpuReg = BusType;
+    pub fn to_cpu_reg(&self) -> CpuReg {
+        match self {
+            Exception::InstructionAddressMisaligned(_) => 0,
+            Exception::InstructionAccessFault(_) => 1,
+            Exception::IllegalInstruction(_) => 2,
+            Exception::Breakpoint => 3,
+            Exception::LoadAddressMisaligned(_) => 4,
+            Exception::LoadAccessFault(_) => 5,
+            Exception::StoreAddressMisaligned(_) => 6,
+            Exception::StoreAccessFault(_) => 7,
+            Exception::EnvironmentCallFromUMode(_) => 8,
+            Exception::EnvironmentCallFromSMode(_) => 9,
+            Exception::EnvironmentCallFromMMode(_) => 11,
+            Exception::InstructionPageFault(_) => 12,
+            Exception::LoadPageFault(_) => 13,
+            Exception::StorePageFault(_) => 15,
+            Exception::None => 0xff,
+            Exception::ForwardJumpFault(_) => 0x100,
+        }
+    }
+
+    pub fn get_data(&self) -> CpuReg {
+        let data = match self {
+            Exception::InstructionAddressMisaligned(data) => data,
+            Exception::InstructionAccessFault(data) => data,
+            Exception::IllegalInstruction(data) => data,
+            Exception::Breakpoint => &0,
+            Exception::LoadAddressMisaligned(data) => data,
+            Exception::LoadAccessFault(data) => data,
+            Exception::StoreAddressMisaligned(data) => data,
+            Exception::StoreAccessFault(data) => data,
+            Exception::EnvironmentCallFromUMode(data) => data,
+            Exception::EnvironmentCallFromSMode(data) => data,
+            Exception::EnvironmentCallFromMMode(data) => data,
+            Exception::InstructionPageFault(data) => data,
+            Exception::LoadPageFault(data) => data,
+            Exception::StorePageFault(data) => data,
+            Exception::None => &0,
+            Exception::ForwardJumpFault(data) => data,
+        };
+
+        *data
+    }
+}
 
 pub struct Cpu {
     pub pc: CpuReg,
     pub regs: [CpuReg; 32],
     pub insn_map: BiMap<usize, CpuReg>,
-    pub missing_insn_map: HashMap<CpuReg, PtrT>,
-    pub run_state: RunState,
-    pub ret_status: usize,
-    pub exception: usize,
-    pub bus_error: BusError,
+    pub exception: Exception,
+    pub c_exception: usize,
+    pub c_exception_data: usize,
     pub mode: csr::MppMode,
     pub csr: &'static mut csr::Csr,
 }
@@ -143,11 +163,9 @@ impl Cpu {
             pc: 0,
             regs: [0; 32],
             insn_map: BiMap::new(),
-            missing_insn_map: HashMap::new(),
-            run_state: RunState::None,
-            ret_status: 0,
-            exception: Exception::None as usize,
-            bus_error: BusError::None,
+            exception: Exception::None,
+            c_exception: Exception::None.to_cpu_reg() as usize,
+            c_exception_data: 0,
             mode: csr::MppMode::Machine,
             csr: csr::get_csr(),
         }
