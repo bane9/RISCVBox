@@ -5,96 +5,62 @@ use crate::backend::common::HostEncodedInsn;
 use crate::backend::target::core::BackendCoreImpl;
 use crate::bus::bus;
 use crate::cpu;
+use crate::cpu::CpuReg;
 use crate::cpu::Exception;
-use crate::frontend::code_pages;
-use crate::xmem::page_container;
-use crate::xmem::page_container::Xmem;
+use crate::xmem::CodePage;
 
 use crate::frontend::csr;
 use crate::frontend::rva;
 use crate::frontend::rvi;
 use crate::frontend::rvm;
+use crate::xmem::CodePageImpl;
+use crate::xmem::PageState;
 
 use super::code_pages::CodePages;
 
-pub const CODE_PAGE_SIZE: usize = 4096;
-pub const CODE_PAGE_READAHEAD: usize = 1;
-
 pub const INSN_SIZE: usize = 4; // Unlikely for rvc to be supported
 pub const INSN_SIZE_BITS: usize = INSN_SIZE * 8;
+
+pub const INSN_PAGE_SIZE: usize = 4096 / INSN_SIZE;
+pub const INSN_PAGE_READAHEAD: usize = 1;
 
 pub type DecoderFn = fn(u32) -> JitCommon::DecodeRet;
 
 pub struct ParseCore {
     code_pages: CodePages,
-    rom_size: usize,
-    offset: usize,
 }
 
 impl ParseCore {
-    pub fn new(rom_size: usize) -> ParseCore {
-        let pages = rom_size / Xmem::page_size();
-        let pages = pages + pages / 2;
-        let pages = std::cmp::max(pages, 1);
-        let mut code_pages = code_pages::CodePages::new(pages, CODE_PAGE_READAHEAD);
-
-        BackendCoreImpl::fill_with_target_nop(code_pages.as_ptr(), pages * Xmem::page_size());
-
-        let ok_jump = BackendCoreImpl::emit_ret();
-
-        code_pages.apply_reserved_insn_all(ok_jump);
-
-        code_pages.mark_all_pages(page_container::PageState::ReadExecute);
-
-        let core = ParseCore {
-            code_pages,
-            rom_size,
-            offset: 0,
-        };
-
-        core
-    }
-
-    pub fn parse_ahead(&mut self) -> Result<(), JitCommon::JitError> {
-        let start = self.offset;
-
-        if start >= self.rom_size {
-            return Ok(());
+    pub fn new() -> ParseCore {
+        ParseCore {
+            code_pages: CodePages::new(),
         }
-
-        let end = std::cmp::min(start + CODE_PAGE_SIZE * CODE_PAGE_READAHEAD, self.rom_size);
-
-        self.parse_until(end)
     }
 
-    pub fn parse_range(&mut self, start: usize, end: usize) -> Result<(), JitCommon::JitError> {
-        cpu::get_cpu().pc = start as u32;
-
-        self.parse_until(end)
-    }
-
-    pub fn parse_until(&mut self, end: usize) -> Result<(), JitCommon::JitError> {
-        let start = self.offset;
-
-        if start >= self.rom_size {
-            return Ok(());
-        }
-
-        self.parse(end)?;
-
-        self.offset = end;
-
-        Ok(())
-    }
-
-    pub fn parse(&mut self, end: usize) -> Result<(), JitCommon::JitError> {
+    pub fn parse(
+        &mut self,
+        guest_start: usize,
+        guest_end: usize,
+    ) -> Result<(), JitCommon::JitError> {
         let mut insn: u32 = 0;
 
-        let ptr = self.code_pages.as_ptr().wrapping_add(self.offset);
         let cpu = cpu::get_cpu();
         let bus = bus::get_bus();
 
-        while (cpu::get_cpu().pc as usize) < end {
+        let code_page: &mut CodePageImpl;
+        let code_page_idx: usize;
+
+        // lol
+        unsafe {
+            let self_mut = self as *mut Self;
+            let (code_page_, code_page_idx_) = (*self_mut).code_pages.alloc_code_page();
+            code_page = code_page_;
+            code_page_idx = code_page_idx_;
+        }
+
+        cpu.pc = guest_start as CpuReg;
+
+        while (cpu::get_cpu().pc as usize) < guest_end {
             let loaded_insn = bus.fetch(cpu.pc, INSN_SIZE_BITS as u32);
 
             // if loaded_insn.is_err() {
@@ -110,26 +76,37 @@ impl ParseCore {
                 );
             }
 
-            let result = self.decode_single(ptr.wrapping_add(self.offset), insn);
+            let result: Result<(), JitCommon::JitError>;
+
+            unsafe {
+                let self_mut = self as *mut Self;
+                result = (*self_mut).decode_single(code_page_idx, insn);
+            }
 
             cpu.pc += INSN_SIZE as u32;
 
             if let Err(JitCommon::JitError::ReachedBlockBoundary) = result {
                 break;
             } else if result.is_err() {
-                self.code_pages
-                    .mark_all_pages(page_container::PageState::ReadExecute);
+                self.code_pages.mark_all_pages(PageState::ReadExecute);
                 return result;
             }
         }
 
-        self.code_pages
-            .mark_all_pages(page_container::PageState::ReadExecute);
+        code_page
+            .push(BackendCoreImpl::emit_ret_with_exception(Exception::BlockExit).as_slice())
+            .expect("Out of memory");
+
+        code_page.mark_rx().unwrap();
 
         Ok(())
     }
 
-    fn decode_single(&mut self, ptr: *mut u8, insn: u32) -> Result<(), JitCommon::JitError> {
+    fn decode_single(
+        &mut self,
+        code_page_idx: usize,
+        insn: u32,
+    ) -> Result<(), JitCommon::JitError> {
         static DECODERS: [DecoderFn; 4] = [
             rvi::decode_rvi,
             rvm::decode_rvm,
@@ -152,8 +129,8 @@ impl ParseCore {
         let insn_res: HostEncodedInsn;
 
         match out_res {
-            Ok(_insn) => {
-                insn_res = out_res.unwrap();
+            Ok(insn_res_unwrapped) => {
+                insn_res = insn_res_unwrapped;
             }
             Err(JitCommon::JitError::InvalidInstruction(_)) => {
                 insn_res =
@@ -164,22 +141,20 @@ impl ParseCore {
             }
         }
 
-        let result = self.code_pages.apply_insn(ptr, insn_res);
+        let code_page = self.code_pages.get_code_page(code_page_idx);
 
-        if result.is_none() {
-            return Err(JitCommon::JitError::ReachedBlockBoundary);
-        }
+        let host_insn_ptr = code_page.as_end_ptr();
+        code_page.push(insn_res.as_slice()).expect("Out of memory");
 
         let cpu = cpu::get_cpu();
 
-        cpu.insn_map.insert(ptr as usize, cpu.pc);
-
-        self.offset += insn_res.size();
+        cpu.insn_map
+            .add_mapping(cpu.pc, host_insn_ptr, code_page_idx);
 
         Ok(())
     }
 
-    pub fn get_exec_ptr(&self) -> *mut u8 {
-        self.code_pages.as_ptr()
+    pub fn get_exec_ptr(&mut self, idx: usize) -> *mut u8 {
+        self.code_pages.get_code_page(idx).as_ptr()
     }
 }

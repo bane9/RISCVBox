@@ -1,5 +1,6 @@
 use crate::backend::target::core::BackendCoreImpl;
 use crate::backend::BackendCore;
+use crate::bus::BusType;
 use crate::cpu::trap;
 use crate::cpu::{self, CpuReg};
 pub use crate::frontend::parse_core::*;
@@ -9,24 +10,39 @@ pub struct ExecCore {
 }
 
 impl ExecCore {
-    pub fn new(rom: Vec<u8>) -> Self {
-        let mut parse_core = ParseCore::new(rom.len());
-        parse_core.parse_ahead().unwrap();
-        Self { parse_core }
+    pub fn new() -> ExecCore {
+        ExecCore {
+            parse_core: ParseCore::new(),
+        }
     }
 
-    pub fn exec_loop(&mut self) {
-        let mut ptr = self.parse_core.get_exec_ptr();
+    pub fn exec_loop(&mut self, initial_pc: CpuReg) {
         let cpu = cpu::get_cpu();
+        cpu.pc = initial_pc;
+
         loop {
             // let result = ReturnableImpl::handle(|| unsafe { BackendCoreImpl::call_jit_ptr(ptr) });
+
+            let mut insn_data = cpu.insn_map.get_by_guest_idx(cpu.pc);
+            if insn_data.is_none() {
+                let pc = cpu.pc;
+
+                self.parse_core
+                    .parse(cpu.pc as usize, cpu.pc as usize + INSN_PAGE_SIZE as usize)
+                    .unwrap();
+
+                cpu.pc = pc;
+
+                insn_data = cpu.insn_map.get_by_guest_idx(cpu.pc);
+            }
 
             cpu.exception = cpu::Exception::None;
             cpu.c_exception = cpu::Exception::None.to_cpu_reg() as usize;
             cpu.c_exception_data = 0;
+            cpu.c_exception_pc = 0;
 
             unsafe {
-                BackendCoreImpl::call_jit_ptr(ptr);
+                BackendCoreImpl::call_jit_ptr(insn_data.unwrap().host_ptr);
             }
 
             if cpu.c_exception != cpu::Exception::None.to_cpu_reg() as usize {
@@ -42,19 +58,21 @@ impl ExecCore {
                 cpu::Exception::IllegalInstruction(_) => {
                     std::process::exit(0);
                 }
+                cpu::Exception::BlockExit => {
+                    cpu.pc = cpu.c_exception_pc as CpuReg + INSN_SIZE as CpuReg;
+                }
                 _ => {
                     trap::handle_exception();
-                    ptr = *cpu.insn_map.get_by_value(cpu.pc).unwrap() as *mut u8;
                 }
             }
         }
     }
 }
 
-pub fn exec_core_thread(rom: Vec<u8>) {
-    let mut exec_core = ExecCore::new(rom);
+pub fn exec_core_thread(initial_pc: CpuReg) {
+    let mut exec_core = ExecCore::new();
 
-    exec_core.exec_loop();
+    exec_core.exec_loop(initial_pc);
 }
 
 pub struct ExecCoreThreadPool {
@@ -62,12 +80,11 @@ pub struct ExecCoreThreadPool {
 }
 
 impl ExecCoreThreadPool {
-    pub fn new(rom: Vec<u8>, thread_count: usize) -> Self {
+    pub fn new(ram_begin_addr: BusType, thread_count: usize) -> Self {
         let mut threads = Vec::new();
 
         for _ in 0..thread_count {
-            let rom_local = rom.clone();
-            threads.push(std::thread::spawn(move || exec_core_thread(rom_local)));
+            threads.push(std::thread::spawn(move || exec_core_thread(ram_begin_addr)));
         }
 
         Self { threads }

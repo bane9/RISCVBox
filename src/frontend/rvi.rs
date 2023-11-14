@@ -108,7 +108,7 @@ pub fn decode_rvi(insn: u32) -> DecodeRet {
         }
         OpType::AUIPC => {
             let rd = ((insn >> 7) & 0b11111) as u8;
-            let imm = ((insn >> 12) & 0b11111111111111111111) as i32;
+            let imm = (insn & 0xfffff000) as i32;
 
             RviImpl::emit_auipc(rd, imm)
         }

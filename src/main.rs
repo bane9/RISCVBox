@@ -7,6 +7,7 @@ mod frontend;
 mod util;
 mod xmem;
 
+use bus::ram::RAM_BEGIN_ADDR;
 use frontend::exec_core::ExecCoreThreadPool;
 
 fn init_bus(mut rom: Vec<u8>, ram_size: usize) {
@@ -24,12 +25,12 @@ fn init_bus(mut rom: Vec<u8>, ram_size: usize) {
 }
 
 fn main() {
-    let ram_size = util::size_kib(64);
+    let ram_size = util::size_mib(64);
     let rom = util::read_file("test.bin").unwrap();
 
     init_bus(rom.clone(), ram_size);
 
-    let exec_thread_pool = ExecCoreThreadPool::new(rom, 1);
+    let exec_thread_pool = ExecCoreThreadPool::new(RAM_BEGIN_ADDR, 1);
 
     exec_thread_pool.join();
 }

@@ -1,5 +1,7 @@
 use crate::{bus::bus::*, cpu::Exception};
 
+pub const RAM_BEGIN_ADDR: BusType = 0;
+
 pub struct Ram {
     pub mem: Vec<u8>,
 }
@@ -42,7 +44,7 @@ impl BusDevice for Ram {
     }
 
     fn get_begin_addr(&self) -> BusType {
-        return 0;
+        return RAM_BEGIN_ADDR;
     }
 
     fn get_end_addr(&self) -> BusType {

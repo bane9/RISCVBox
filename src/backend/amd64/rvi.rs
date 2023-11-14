@@ -1,6 +1,5 @@
 use crate::backend::common;
 use crate::backend::target::core::{amd64_reg, BackendCore, BackendCoreImpl};
-use crate::util::util::sign_extend;
 use crate::*;
 use common::{
     BusAccessVars, DecodeRet, HostEncodedInsn, JumpCond, JumpVars, PCAccess, UsizeConversions,
@@ -220,10 +219,13 @@ impl common::Rvi for RviImpl {
         let cpu = cpu::get_cpu();
 
         let rd_addr = &cpu.regs[rd as usize] as *const _ as usize;
-        let imm = sign_extend(imm, 12); // TODO: this is wrong
 
         emit_move_reg_imm!(insn, amd64_reg::RBX, rd_addr);
-        emit_mov_dword_ptr_imm!(insn, amd64_reg::RBX, (cpu.pc as i64).wrapping_add(imm));
+        emit_mov_dword_ptr_imm!(
+            insn,
+            amd64_reg::RBX,
+            (cpu.pc as i64).wrapping_add(imm as i64)
+        );
 
         Ok(insn)
     }

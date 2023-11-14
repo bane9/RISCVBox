@@ -64,6 +64,10 @@ impl<T, const N: usize> EncodedInsn<T, N> {
         self.insn.as_mut_ptr()
     }
 
+    pub fn as_slice(&self) -> &[T] {
+        &self.insn[..self.size]
+    }
+
     pub fn size(&self) -> usize {
         self.size
     }

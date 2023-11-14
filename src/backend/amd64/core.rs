@@ -651,20 +651,6 @@ impl BackendCore for BackendCoreImpl {
         insn
     }
 
-    fn find_guest_pc_from_host_stack_frame(caller_ret_addr: *mut u8) -> Option<u32> {
-        let cpu = cpu::get_cpu();
-
-        for i in 0..MAX_WALK_BACK {
-            let addr = caller_ret_addr.wrapping_sub(i);
-
-            if let Some(guest_pc) = cpu.insn_map.get_by_key(addr as usize) {
-                return Some(*guest_pc);
-            }
-        }
-
-        None
-    }
-
     fn emit_usize_call_with_4_args(
         fn_ptr: extern "C" fn(usize, usize, usize, usize) -> usize,
         arg1: usize,

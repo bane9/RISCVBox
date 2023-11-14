@@ -117,9 +117,7 @@ pub fn handle_interrupt(int_val: Interrupt, pc: CpuReg) {
 pub fn handle_exception() {
     let cpu = cpu::get_cpu();
 
-    if cpu.exception == Exception::None
-        || (cpu.exception.to_cpu_reg() > Exception::None.to_cpu_reg())
-    {
+    if cpu.exception == Exception::None || (cpu.exception >= Exception::None) {
         return;
     }
 

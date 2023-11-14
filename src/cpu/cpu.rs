@@ -1,6 +1,6 @@
 use crate::bus::bus::BusType;
 use crate::cpu::csr;
-use crate::util::BiMap;
+use crate::frontend::insn_lookup::InsnData;
 use std::cell::RefCell;
 
 pub type CpuReg = BusType;
@@ -61,7 +61,7 @@ pub enum Interrupt {
     None = 0xff,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Eq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum Exception {
     InstructionAddressMisaligned(CpuReg) = 0,
@@ -81,7 +81,7 @@ pub enum Exception {
     None = 0xff,
 
     ForwardJumpFault(CpuReg) = 0x100,
-    BlockExit(CpuReg) = 0x101, // data holds jit cache block index
+    BlockExit = 0x101,
 }
 
 impl Exception {
@@ -103,7 +103,7 @@ impl Exception {
             15 => Exception::StorePageFault(data),
             0xff => Exception::None,
             0x100 => Exception::ForwardJumpFault(data),
-            0x101 => Exception::BlockExit(data),
+            0x101 => Exception::BlockExit,
             _ => Exception::None,
         }
     }
@@ -126,7 +126,7 @@ impl Exception {
             Exception::StorePageFault(_) => 15,
             Exception::None => 0xff,
             Exception::ForwardJumpFault(_) => 0x100,
-            Exception::BlockExit(_) => 0x101,
+            Exception::BlockExit => 0x101,
         }
     }
 
@@ -148,7 +148,7 @@ impl Exception {
             Exception::StorePageFault(data) => data,
             Exception::None => &0,
             Exception::ForwardJumpFault(data) => data,
-            Exception::BlockExit(data) => data,
+            Exception::BlockExit => &0,
         };
 
         *data
@@ -158,7 +158,7 @@ impl Exception {
 pub struct Cpu {
     pub pc: CpuReg,
     pub regs: [CpuReg; 32],
-    pub insn_map: BiMap<usize, CpuReg>,
+    pub insn_map: InsnData,
     pub exception: Exception,
     pub c_exception: usize,
     pub c_exception_data: usize,
@@ -172,7 +172,7 @@ impl Cpu {
         Cpu {
             pc: 0,
             regs: [0; 32],
-            insn_map: BiMap::new(),
+            insn_map: InsnData::new(),
             exception: Exception::None,
             c_exception: Exception::None.to_cpu_reg() as usize,
             c_exception_data: 0,

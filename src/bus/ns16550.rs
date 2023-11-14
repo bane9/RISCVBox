@@ -95,6 +95,7 @@ impl BusDevice for Ns16550 {
             THR => {
                 let c = data as u8 as char;
                 print!("{}", c);
+                // println!("printing u8: {} as char: {}", data as u8, c);
                 let _ = std::io::stdout().flush();
                 Ok(())
             }

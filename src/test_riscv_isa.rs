@@ -9,7 +9,7 @@ mod xmem;
 
 use std::process::Output;
 
-use bus::BusType;
+use bus::{ram::RAM_BEGIN_ADDR, BusType};
 use cpu::Exception;
 use frontend::exec_core::ExecCoreThreadPool;
 
@@ -63,7 +63,7 @@ fn main() {
 
     init_bus(rom.clone(), ram_size);
 
-    let exec_thread_pool = ExecCoreThreadPool::new(rom, 1);
+    let exec_thread_pool = ExecCoreThreadPool::new(RAM_BEGIN_ADDR, 1);
 
     exec_thread_pool.join();
 }

@@ -7,7 +7,7 @@ Disassembly of section .text:
 00000000 <_start>:
        0:	10000537          	lui	a0,0x10000
        4:	00001597          	auipc	a1,0x1
-       8:	05858593          	addi	a1,a1,88 # 105c <hello>
+       8:	06058593          	addi	a1,a1,96 # 1064 <hello>
        c:	038000ef          	jal	ra,44 <print_str>
       10:	00000317          	auipc	t1,0x0
       14:	01430313          	addi	t1,t1,20 # 24 <trap>
@@ -18,7 +18,7 @@ Disassembly of section .text:
 00000024 <trap>:
       24:	10000537          	lui	a0,0x10000
       28:	00001597          	auipc	a1,0x1
-      2c:	04158593          	addi	a1,a1,65 # 1069 <hello_exc>
+      2c:	04958593          	addi	a1,a1,73 # 1071 <hello_exc>
       30:	014000ef          	jal	ra,44 <print_str>
       34:	34102373          	csrrs	t1,mepc,zero
       38:	00430313          	addi	t1,t1,4
@@ -28,7 +28,7 @@ Disassembly of section .text:
 00000044 <print_str>:
       44:	0005c283          	lbu	t0,0(a1)
       48:	00028863          	beq	t0,zero,58 <print_str_ret>
-      4c:	00550023          	sb	t0,0(a0) # 10000000 <hello_exc+0xfffef97>
+      4c:	00550023          	sb	t0,0(a0) # 10000000 <hello_exc+0xfffef8f>
       50:	00158593          	addi	a1,a1,1
       54:	ff1ff06f          	jal	zero,44 <print_str>
 
@@ -1060,26 +1060,28 @@ Disassembly of section .text:
     1050:	00000013          	addi	zero,zero,0
     1054:	00000013          	addi	zero,zero,0
     1058:	00000013          	addi	zero,zero,0
+    105c:	00000013          	addi	zero,zero,0
+    1060:	fa1fe06f          	jal	zero,0 <_start>
 
 Disassembly of section .data:
 
-0000105c <hello>:
-    105c:	6568                	.2byte	0x6568
-    105e:	6c6c                	.2byte	0x6c6c
-    1060:	6f77206f          	jal	zero,73f56 <hello_exc+0x72eed>
-    1064:	6c72                	.2byte	0x6c72
-    1066:	0a64                	.2byte	0xa64
+00001064 <hello>:
+    1064:	6568                	.2byte	0x6568
+    1066:	6c6c                	.2byte	0x6c6c
+    1068:	6f77206f          	jal	zero,73f5e <hello_exc+0x72eed>
+    106c:	6c72                	.2byte	0x6c72
+    106e:	0a64                	.2byte	0xa64
 	...
 
-00001069 <hello_exc>:
-    1069:	6568                	.2byte	0x6568
-    106b:	6c6c                	.2byte	0x6c6c
-    106d:	7266206f          	jal	zero,63793 <hello_exc+0x6272a>
-    1071:	65206d6f          	jal	s10,76c3 <hello_exc+0x665a>
-    1075:	6378                	.2byte	0x6378
-    1077:	7065                	.2byte	0x7065
-    1079:	6974                	.2byte	0x6974
-    107b:	000a6e6f          	jal	t3,a707b <hello_exc+0xa6012>
+00001071 <hello_exc>:
+    1071:	6568                	.2byte	0x6568
+    1073:	6c6c                	.2byte	0x6c6c
+    1075:	7266206f          	jal	zero,6379b <hello_exc+0x6272a>
+    1079:	65206d6f          	jal	s10,76cb <hello_exc+0x665a>
+    107d:	6378                	.2byte	0x6378
+    107f:	7065                	.2byte	0x7065
+    1081:	6974                	.2byte	0x6974
+    1083:	000a6e6f          	jal	t3,a7083 <hello_exc+0xa6012>
 
 Disassembly of section .riscv.attributes:
 

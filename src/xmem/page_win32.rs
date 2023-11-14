@@ -1,7 +1,8 @@
-use crate::xmem::page_common::{AllocationError, PageAllocator};
+use crate::xmem::page_common::*;
 
 extern crate winapi;
 
+use crate::util;
 use std::ptr;
 use winapi::um::memoryapi::{VirtualAlloc, VirtualFree, VirtualProtect};
 use winapi::um::winnt::{
@@ -10,7 +11,12 @@ use winapi::um::winnt::{
 
 const PAGE_SIZE: usize = 4096;
 
-pub struct Win32Allocator;
+pub struct Win32Allocator {
+    ptr: *mut u8,
+    npages: usize,
+    offset: usize,
+    state: PageState,
+}
 
 fn win32_mark_page(ptr: *mut u8, npages: usize, protect: u32) -> Result<(), AllocationError> {
     let size = npages * PAGE_SIZE;
@@ -24,65 +30,116 @@ fn win32_mark_page(ptr: *mut u8, npages: usize, protect: u32) -> Result<(), Allo
     }
 }
 
-impl PageAllocator for Win32Allocator {
-    fn alloc(npages: usize) -> Result<*mut u8, AllocationError> {
-        let size = npages * PAGE_SIZE;
-        let addr = unsafe { VirtualAlloc(ptr::null_mut(), size, MEM_COMMIT, PAGE_READWRITE) };
+impl CodePage for Win32Allocator {
+    fn new() -> Self {
+        let ptr = unsafe {
+            VirtualAlloc(ptr::null_mut(), 32 * PAGE_SIZE, MEM_COMMIT, PAGE_READWRITE) as *mut u8
+        };
 
-        if addr.is_null() {
-            Err(AllocationError::OutOfMemory)
-        } else {
-            Ok(addr as *mut u8)
+        assert!(ptr != ptr::null_mut());
+
+        Win32Allocator {
+            ptr,
+            npages: 32,
+            offset: 0,
+            state: PageState::ReadWrite,
         }
     }
 
-    fn realloc(
-        old_ptr: *mut u8,
-        old_npages: usize,
-        new_npages: usize,
-    ) -> Result<*mut u8, AllocationError> {
-        if old_ptr.is_null() {
-            return Self::alloc(new_npages);
+    fn push(&mut self, data: &[u8]) -> Result<(), AllocationError> {
+        if self.offset + data.len() > self.npages * PAGE_SIZE {
+            unsafe {
+                let npages = std::cmp::max(
+                    util::align_up(self.offset + data.len(), PAGE_SIZE) / PAGE_SIZE,
+                    self.npages * 2, // A logarithmic growth strategy may be better
+                );
+
+                let ptr = VirtualAlloc(
+                    ptr::null_mut(),
+                    npages * PAGE_SIZE,
+                    MEM_COMMIT,
+                    PAGE_READWRITE,
+                ) as *mut u8;
+
+                if self.ptr == ptr::null_mut() {
+                    return Err(AllocationError::OutOfMemory);
+                }
+
+                ptr::copy_nonoverlapping(self.ptr, ptr, self.npages * PAGE_SIZE);
+
+                VirtualFree(self.ptr as *mut _, 0, MEM_RELEASE);
+
+                self.ptr = ptr;
+                self.npages = npages;
+            }
         }
 
-        let new_ptr = Self::alloc(new_npages)?;
-
-        if new_ptr.is_null() {
-            return Err(AllocationError::OutOfMemory);
-        }
-
-        let old_size = old_npages * PAGE_SIZE;
-        let new_size = new_npages * PAGE_SIZE;
-        let bytes_to_copy = std::cmp::min(old_size, new_size);
+        self.mark_rw()?;
 
         unsafe {
-            ptr::copy_nonoverlapping(old_ptr, new_ptr, bytes_to_copy);
+            ptr::copy_nonoverlapping(data.as_ptr(), self.ptr.add(self.offset), data.len());
         }
 
-        Self::dealloc(old_ptr, old_size / PAGE_SIZE);
+        self.offset += data.len();
 
-        Ok(new_ptr)
+        Ok(())
     }
 
-    fn mark_rw(ptr: *mut u8, npages: usize) -> Result<(), AllocationError> {
-        win32_mark_page(ptr, npages, PAGE_READWRITE)
+    fn mark_rw(&mut self) -> Result<(), AllocationError> {
+        if self.state == PageState::ReadWrite {
+            return Ok(());
+        }
+
+        win32_mark_page(self.ptr, self.npages, PAGE_READWRITE)?;
+
+        self.state = PageState::ReadWrite;
+
+        Ok(())
     }
 
-    fn mark_rx(ptr: *mut u8, npages: usize) -> Result<(), AllocationError> {
-        win32_mark_page(ptr, npages, PAGE_EXECUTE_READ)
+    fn mark_rx(&mut self) -> Result<(), AllocationError> {
+        if self.state == PageState::ReadExecute {
+            return Ok(());
+        }
+
+        win32_mark_page(self.ptr, self.npages, PAGE_EXECUTE_READ)?;
+
+        self.state = PageState::ReadExecute;
+
+        Ok(())
     }
 
-    fn mark_invalid(ptr: *mut u8, npages: usize) -> Result<(), AllocationError> {
-        win32_mark_page(ptr, npages, PAGE_NOACCESS)
+    fn mark_invalid(&mut self) -> Result<(), AllocationError> {
+        if self.state == PageState::Invalid {
+            return Ok(());
+        }
+
+        win32_mark_page(self.ptr, self.npages, PAGE_NOACCESS)?;
+
+        self.state = PageState::Invalid;
+
+        Ok(())
     }
 
-    fn dealloc(ptr: *mut u8, _npages: usize) {
+    fn dealloc(&mut self) {
         unsafe {
-            VirtualFree(ptr as *mut _, 0, MEM_RELEASE);
+            VirtualFree(self.ptr as *mut _, 0, MEM_RELEASE);
         }
     }
 
-    fn page_size() -> usize {
-        PAGE_SIZE
+    fn as_ptr(&self) -> *mut u8 {
+        self.ptr
+    }
+
+    fn size(&self) -> usize {
+        self.offset
+    }
+
+    fn npages(&self) -> usize {
+        self.npages
+    }
+
+    fn state(&self) -> PageState {
+        self.state
     }
 }

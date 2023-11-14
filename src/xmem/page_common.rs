@@ -1,25 +1,36 @@
-pub trait PageAllocator {
-    fn alloc(npages: usize) -> Result<*mut u8, AllocationError>;
+pub trait CodePage {
+    fn new() -> Self;
 
-    fn realloc(
-        ptr: *mut u8,
-        old_npages: usize,
-        new_npages: usize,
-    ) -> Result<*mut u8, AllocationError>;
+    fn push(&mut self, data: &[u8]) -> Result<(), AllocationError>;
 
-    fn mark_rw(ptr: *mut u8, npages: usize) -> Result<(), AllocationError>;
+    fn mark_rw(&mut self) -> Result<(), AllocationError>;
 
-    fn mark_rx(ptr: *mut u8, npages: usize) -> Result<(), AllocationError>;
+    fn mark_rx(&mut self) -> Result<(), AllocationError>;
 
-    fn mark_invalid(ptr: *mut u8, npages: usize) -> Result<(), AllocationError>;
+    fn mark_invalid(&mut self) -> Result<(), AllocationError>;
 
-    fn dealloc(ptr: *mut u8, npages: usize);
+    fn dealloc(&mut self);
 
-    fn page_size() -> usize;
+    fn as_ptr(&self) -> *mut u8;
+    fn as_end_ptr(&self) -> *mut u8 {
+        unsafe { self.as_ptr().add(self.size()) }
+    }
+
+    fn size(&self) -> usize;
+    fn npages(&self) -> usize;
+
+    fn state(&self) -> PageState;
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum AllocationError {
     UnknownError,
     OutOfMemory,
+}
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub enum PageState {
+    ReadWrite,
+    ReadExecute,
+    Invalid,
 }

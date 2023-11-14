@@ -154,7 +154,7 @@ where
         let reg1 = ((val >> 3) & 0x1f) as CpuReg;
         let reg2 = ((val >> 8) & 0x1f) as CpuReg;
         let imm = ((val >> 13) & 0x7fff) as i32;
-        let imm = sign_extend(imm, 12) as i32;
+        let imm = sign_extend(imm, 15) as i32;
         let pc = ((val >> 32) & 0x7fffffff) as BusType;
 
         Self {
@@ -267,6 +267,10 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize) -> usize {
         return 0;
     }
 
+    if jmp_addr == 0 {
+        print!("");
+    }
+
     let bus = bus::get_bus();
 
     let jmp_addr = bus.translate(jmp_addr as BusType);
@@ -279,7 +283,7 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize) -> usize {
 
     let jmp_addr = jmp_addr.unwrap();
 
-    let host_addr = cpu.insn_map.get_by_value(jmp_addr);
+    let host_addr = cpu.insn_map.get_by_guest_idx(jmp_addr);
 
     if host_addr.is_none() {
         cpu.set_exception(Exception::ForwardJumpFault(jmp_cond.pc), jmp_cond.pc);
@@ -293,7 +297,7 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize) -> usize {
         cpu.regs[jmp_cond.reg1 as usize] = jmp_cond.pc + INSN_SIZE as u32;
     }
 
-    *host_addr.unwrap()
+    host_addr.unwrap().host_ptr as usize
 }
 
 pub extern "C" fn c_bus_resolver_cb(bus_vars: usize) {
@@ -445,7 +449,6 @@ pub trait BackendCore {
     fn emit_ret() -> HostEncodedInsn;
     fn emit_ret_with_exception(exception: Exception) -> HostEncodedInsn;
     fn emit_void_call(fn_ptr: extern "C" fn()) -> HostEncodedInsn;
-    fn find_guest_pc_from_host_stack_frame(caller_ret_addr: *mut u8) -> Option<u32>;
     fn emit_usize_call_with_4_args(
         fn_ptr: extern "C" fn(usize, usize, usize, usize) -> usize,
         arg1: usize,
