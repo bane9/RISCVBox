@@ -36,6 +36,6 @@ print_str_ret:
 end:
     nop
     .rept 4096 / 4
-         nop
+        nop
     .endr
     j _start

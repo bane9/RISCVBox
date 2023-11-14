@@ -55,9 +55,6 @@ impl ExecCore {
             println!("ret_status: {:#x?}", cpu.exception);
 
             match cpu.exception {
-                cpu::Exception::IllegalInstruction(_) => {
-                    std::process::exit(0);
-                }
                 cpu::Exception::BlockExit => {
                     cpu.pc = cpu.c_exception_pc as CpuReg + INSN_SIZE as CpuReg;
                 }

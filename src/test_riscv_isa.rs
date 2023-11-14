@@ -23,12 +23,12 @@ impl bus::BusDevice for ToHost {
     }
 
     fn write(&mut self, _addr: BusType, data: BusType, _size: BusType) -> Result<(), Exception> {
-        eprintln!("tohost: {:#x}", data);
+        println!("tohost: {:#x}", data);
 
         if data == 1 {
             std::process::exit(0);
         } else {
-            std::process::exit(1);
+            std::process::exit(2);
         }
     }
 
@@ -56,7 +56,7 @@ fn init_bus(mut rom: Vec<u8>, ram_size: usize) {
 }
 
 fn main() {
-    let ram_size = 16 * 4096;
+    let ram_size = util::size_mib(64);
 
     let argv = std::env::args().collect::<Vec<String>>();
     let rom = util::read_file(&argv[1]).unwrap();
@@ -66,13 +66,15 @@ fn main() {
     let exec_thread_pool = ExecCoreThreadPool::new(RAM_BEGIN_ADDR, 1);
 
     exec_thread_pool.join();
+
+    std::process::exit(1); // It's only valid to exit from the tohost device
 }
 
 fn run_bin_as_subproccess(bin: &str) -> Output {
     let child = std::process::Command::new("target/debug/deps/test_riscv_isa")
         .arg(bin)
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::inherit())
         .output()
         .unwrap();
 
@@ -106,10 +108,10 @@ fn run_tests_from_directory(dir: &str) {
 
         if !output.status.success() {
             println!(
-                "\x1b[31mtest failed:\x1b[0m {} with status {} and stderr: \"{}\"",
+                "\x1b[31mtest failed:\x1b[0m {} with status {} and stdout: \"{}\"",
                 file,
                 output.status,
-                String::from_utf8(output.stderr).unwrap()
+                String::from_utf8(output.stdout).unwrap()
             );
             failed = true;
         }
