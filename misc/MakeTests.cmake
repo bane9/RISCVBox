@@ -4,6 +4,7 @@ set(ABI ilp32)
 set(RVTEST_FOLDER riscv-tests)
 set(TESTBINS_FOLDER testbins)
 set(MISC_FOLDER misc)
+set(CURRENT_EXECUTABLE "${CMAKE_CURRENT_LIST_DIR}/MakeTests.cmake")
 
 function (build_asm asm_path out_path)
     file(MAKE_DIRECTORY "${out_path}/bin")
@@ -21,19 +22,31 @@ function (build_asm asm_path out_path)
     endforeach()
 endfunction()
 
-if(WIN32)
-    exec_program("rmdir /s /q ${TESTBINS_FOLDER}")
+get_filename_component(CURRENT_DIR ${CMAKE_CURRENT_SOURCE_DIR} ABSOLUTE)
+
+string(REGEX MATCH ".*${MISC_FOLDER}$" IS_MISC_DIR ${CURRENT_DIR})
+
+if(IS_MISC_DIR)
+    message("Current directory ends with 'misc'. Changing to parent directory.")
+    execute_process(
+        COMMAND ${CMAKE_COMMAND} -P ${CURRENT_EXECUTABLE}
+        WORKING_DIRECTORY ${CURRENT_DIR}/..
+    )
 else()
-    exec_program("rm -rf ${TESTBINS_FOLDER}")
+    if(WIN32)
+        exec_program("rmdir /s /q ${TESTBINS_FOLDER}")
+    else()
+        exec_program("rm -rf ${TESTBINS_FOLDER}")
+    endif()
+
+    file(MAKE_DIRECTORY ${TESTBINS_FOLDER})
+
+    build_asm("${RVTEST_FOLDER}/isa/rv${BITS}ui/*.S" "${TESTBINS_FOLDER}/rv${BITS}ui")
+    build_asm("${RVTEST_FOLDER}/isa/rv${BITS}um/*.S" "${TESTBINS_FOLDER}/rv${BITS}um")
+    build_asm("${RVTEST_FOLDER}/isa/rv${BITS}ua/*.S" "${TESTBINS_FOLDER}/rv${BITS}ua")
+
+    build_asm("${RVTEST_FOLDER}/isa/rv${BITS}mi/*.S" "${TESTBINS_FOLDER}/rv${BITS}mi")
+    build_asm("${RVTEST_FOLDER}/isa/rv${BITS}si/*.S" "${TESTBINS_FOLDER}/rv${BITS}si")
+
+    file(REMOVE temp)
 endif()
-
-file(MAKE_DIRECTORY ${TESTBINS_FOLDER})
-
-build_asm("${RVTEST_FOLDER}/isa/rv${BITS}ui/*.S" "${TESTBINS_FOLDER}/rv${BITS}ui")
-build_asm("${RVTEST_FOLDER}/isa/rv${BITS}um/*.S" "${TESTBINS_FOLDER}/rv${BITS}um")
-build_asm("${RVTEST_FOLDER}/isa/rv${BITS}ua/*.S" "${TESTBINS_FOLDER}/rv${BITS}ua")
-
-build_asm("${RVTEST_FOLDER}/isa/rv${BITS}mi/*.S" "${TESTBINS_FOLDER}/rv${BITS}mi")
-build_asm("${RVTEST_FOLDER}/isa/rv${BITS}si/*.S" "${TESTBINS_FOLDER}/rv${BITS}si")
-
-file(REMOVE temp)

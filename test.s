@@ -34,4 +34,7 @@ print_str_ret:
     ret
 
 end:
-    nop
+    .rept 4096 / 4
+        nop
+    .endr
+    #j _start

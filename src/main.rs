@@ -24,7 +24,7 @@ fn init_bus(mut rom: Vec<u8>, ram_size: usize) {
 }
 
 fn main() {
-    let ram_size = 4096;
+    let ram_size = util::size_kib(64);
     let rom = util::read_file("test.bin").unwrap();
 
     init_bus(rom.clone(), ram_size);

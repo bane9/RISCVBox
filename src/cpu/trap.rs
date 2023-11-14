@@ -117,9 +117,10 @@ pub fn handle_interrupt(int_val: Interrupt, pc: CpuReg) {
 pub fn handle_exception() {
     let cpu = cpu::get_cpu();
 
-    match cpu.exception {
-        Exception::None | Exception::ForwardJumpFault(_) => return,
-        _ => {}
+    if cpu.exception == Exception::None
+        || (cpu.exception.to_cpu_reg() > Exception::None.to_cpu_reg())
+    {
+        return;
     }
 
     let pc = (cpu.c_exception_pc + 4) as u32;

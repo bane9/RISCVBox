@@ -81,6 +81,7 @@ pub enum Exception {
     None = 0xff,
 
     ForwardJumpFault(CpuReg) = 0x100,
+    BlockExit(CpuReg) = 0x101, // data holds jit cache block index
 }
 
 impl Exception {
@@ -100,6 +101,9 @@ impl Exception {
             12 => Exception::InstructionPageFault(data),
             13 => Exception::LoadPageFault(data),
             15 => Exception::StorePageFault(data),
+            0xff => Exception::None,
+            0x100 => Exception::ForwardJumpFault(data),
+            0x101 => Exception::BlockExit(data),
             _ => Exception::None,
         }
     }
@@ -122,6 +126,7 @@ impl Exception {
             Exception::StorePageFault(_) => 15,
             Exception::None => 0xff,
             Exception::ForwardJumpFault(_) => 0x100,
+            Exception::BlockExit(_) => 0x101,
         }
     }
 
@@ -143,6 +148,7 @@ impl Exception {
             Exception::StorePageFault(data) => data,
             Exception::None => &0,
             Exception::ForwardJumpFault(data) => data,
+            Exception::BlockExit(data) => data,
         };
 
         *data
