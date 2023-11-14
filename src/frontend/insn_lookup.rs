@@ -5,7 +5,6 @@ use crate::bus::BusType;
 pub struct InsnMappingData {
     pub host_ptr: *mut u8,
     pub guest_idx: BusType,
-    pub codepage_idx: usize,
 }
 
 pub struct InsnData {
@@ -19,13 +18,12 @@ impl InsnData {
         }
     }
 
-    pub fn add_mapping(&mut self, guest_idx: BusType, host_ptr: *mut u8, codepage_idx: usize) {
+    pub fn add_mapping(&mut self, guest_idx: BusType, host_ptr: *mut u8) {
         self.mapping.insert(
             guest_idx,
             InsnMappingData {
                 host_ptr,
                 guest_idx,
-                codepage_idx,
             },
         );
     }

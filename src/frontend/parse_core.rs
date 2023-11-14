@@ -48,14 +48,12 @@ impl ParseCore {
         let bus = bus::get_bus();
 
         let code_page: &mut CodePageImpl;
-        let code_page_idx: usize;
 
         // lol
         unsafe {
             let self_mut = self as *mut Self;
-            let (code_page_, code_page_idx_) = (*self_mut).code_pages.alloc_code_page();
+            let (code_page_, _) = (*self_mut).code_pages.alloc_code_page();
             code_page = code_page_;
-            code_page_idx = code_page_idx_;
         }
 
         cpu.pc = guest_start as CpuReg;
@@ -79,8 +77,8 @@ impl ParseCore {
             let result: Result<(), JitCommon::JitError>;
 
             unsafe {
-                let self_mut = self as *mut Self;
-                result = (*self_mut).decode_single(code_page_idx, insn);
+                let code_page_mut = code_page as *mut CodePageImpl;
+                result = self.decode_single(&mut *code_page_mut, insn);
             }
 
             cpu.pc += INSN_SIZE as u32;
@@ -104,7 +102,7 @@ impl ParseCore {
 
     fn decode_single(
         &mut self,
-        code_page_idx: usize,
+        code_page: &mut CodePageImpl,
         insn: u32,
     ) -> Result<(), JitCommon::JitError> {
         static DECODERS: [DecoderFn; 4] = [
@@ -141,15 +139,12 @@ impl ParseCore {
             }
         }
 
-        let code_page = self.code_pages.get_code_page(code_page_idx);
-
         let host_insn_ptr = code_page.as_end_ptr();
         code_page.push(insn_res.as_slice()).expect("Out of memory");
 
         let cpu = cpu::get_cpu();
 
-        cpu.insn_map
-            .add_mapping(cpu.pc, host_insn_ptr, code_page_idx);
+        cpu.insn_map.add_mapping(cpu.pc, host_insn_ptr);
 
         Ok(())
     }
