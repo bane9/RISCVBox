@@ -17,8 +17,7 @@ impl ReturnableHandler for ReturnableImpl {
 
         match res.err().unwrap().code() {
             microseh::ExceptionCode::Breakpoint => ReturnStatus::ReturnOk,
-            microseh::ExceptionCode::IntDivideByZero => ReturnStatus::ReturnNotify,
-            _ => panic!("unknown return status"),
+            _ => ReturnStatus::ReturnNotOk,
         }
     }
 

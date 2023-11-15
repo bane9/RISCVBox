@@ -58,7 +58,7 @@ impl ParseCore {
 
         cpu.pc = guest_start as CpuReg;
 
-        while (cpu::get_cpu().pc as usize) < guest_end {
+        while (cpu.pc as usize) < guest_end {
             let loaded_insn = bus.fetch(cpu.pc, INSN_SIZE_BITS as u32);
 
             // if loaded_insn.is_err() {

@@ -114,13 +114,9 @@ pub fn decode_rvi(insn: u32) -> DecodeRet {
         }
         OpType::U => {
             let rd = ((insn >> 7) & 0b11111) as u8;
-            let imm = ((insn >> 12) & 0b11111111111111111111) as i32;
-            let op: u32 = (insn >> 25) & 0b1111111;
+            let imm = (insn & 0xfffff000) as i32;
 
-            match op {
-                0b1000 => RviImpl::emit_lui(rd, imm),
-                _ => Err(JitError::InvalidInstruction(insn)),
-            }
+            RviImpl::emit_lui(rd, imm)
         }
         OpType::JAL => {
             let rd = ((insn >> 7) & 0b11111) as u8;

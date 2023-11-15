@@ -1,5 +1,5 @@
 use crate::backend::target::core::BackendCoreImpl;
-use crate::backend::BackendCore;
+use crate::backend::{BackendCore, ReturnStatus, ReturnableHandler, ReturnableImpl};
 use crate::bus::BusType;
 use crate::cpu::trap;
 use crate::cpu::{self, CpuReg};
@@ -21,8 +21,6 @@ impl ExecCore {
         cpu.pc = initial_pc;
 
         loop {
-            // let result = ReturnableImpl::handle(|| unsafe { BackendCoreImpl::call_jit_ptr(ptr) });
-
             let mut insn_data = cpu.insn_map.get_by_guest_idx(cpu.pc);
             if insn_data.is_none() {
                 let pc = cpu.pc;
@@ -41,9 +39,16 @@ impl ExecCore {
             cpu.c_exception_data = 0;
             cpu.c_exception_pc = 0;
 
-            unsafe {
-                BackendCoreImpl::call_jit_ptr(insn_data.unwrap().host_ptr);
-            }
+            // unsafe {
+            //     BackendCoreImpl::call_jit_ptr(insn_data.unwrap().host_ptr);
+            // }
+
+            let ret = ReturnableImpl::handle(|| unsafe {
+                let host_ptr = insn_data.unwrap().host_ptr;
+                BackendCoreImpl::call_jit_ptr(host_ptr);
+            });
+
+            assert!(ret == ReturnStatus::ReturnOk);
 
             if cpu.c_exception != cpu::Exception::None.to_cpu_reg() as usize {
                 cpu.exception = cpu::Exception::from_cpu_reg(
@@ -52,12 +57,27 @@ impl ExecCore {
                 );
             }
 
-            println!("ret_status: {:#x?}", cpu.exception);
+            println!(
+                "ret_status: {:#x?} with pc 0x{:x}",
+                cpu.exception, cpu.c_exception_pc
+            );
 
             match cpu.exception {
                 cpu::Exception::BlockExit => {
                     cpu.pc = cpu.c_exception_pc as CpuReg + INSN_SIZE as CpuReg;
                 }
+                cpu::Exception::None => {
+                    unreachable!("Exiting jit block without exception is invalid");
+                }
+                cpu::Exception::ForwardJumpFault(pc) => {
+                    println!("ForwardJumpFault: pc = {:#x}", pc);
+                    std::process::exit(1);
+                }
+                cpu::Exception::IllegalInstruction(pc) => {
+                    println!("IllegalInstruction: pc = {:#x}", pc);
+                    std::process::exit(1);
+                }
+                cpu::Exception::Mret | cpu::Exception::Sret => {}
                 _ => {
                     trap::handle_exception();
                 }

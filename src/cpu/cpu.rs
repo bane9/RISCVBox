@@ -82,6 +82,8 @@ pub enum Exception {
 
     ForwardJumpFault(CpuReg) = 0x100,
     BlockExit = 0x101,
+    Mret = 0x102,
+    Sret = 0x103,
 }
 
 impl Exception {
@@ -104,6 +106,8 @@ impl Exception {
             0xff => Exception::None,
             0x100 => Exception::ForwardJumpFault(data),
             0x101 => Exception::BlockExit,
+            0x102 => Exception::Mret,
+            0x103 => Exception::Sret,
             _ => Exception::None,
         }
     }
@@ -127,6 +131,8 @@ impl Exception {
             Exception::None => 0xff,
             Exception::ForwardJumpFault(_) => 0x100,
             Exception::BlockExit => 0x101,
+            Exception::Mret => 0x102,
+            Exception::Sret => 0x103,
         }
     }
 
@@ -149,6 +155,8 @@ impl Exception {
             Exception::None => &0,
             Exception::ForwardJumpFault(data) => data,
             Exception::BlockExit => &0,
+            Exception::Mret => &0,
+            Exception::Sret => &0,
         };
 
         *data

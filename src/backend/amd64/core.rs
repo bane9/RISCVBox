@@ -713,9 +713,8 @@ impl BackendCore for BackendCoreImpl {
     #[cfg(windows)]
     unsafe fn call_jit_ptr(jit_ptr: *mut u8) {
         asm!(
-            "sub rsp, 8 * 8",
-            "push rbx",
             "push rbp",
+            "push rbx",
             "push rdi",
             "push rsi",
             "push r12",
@@ -729,9 +728,8 @@ impl BackendCore for BackendCoreImpl {
             "pop r12",
             "pop rsi",
             "pop rdi",
-            "pop rbp",
             "pop rbx",
-            "add rsp, 8 * 8",
+            "pop rbp",
 
             in(reg) jit_ptr,
         );

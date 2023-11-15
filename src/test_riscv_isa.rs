@@ -58,8 +58,11 @@ fn init_bus(mut rom: Vec<u8>, ram_size: usize) {
 fn main() {
     let ram_size = util::size_mib(64);
 
-    let argv = std::env::args().collect::<Vec<String>>();
-    let rom = util::read_file(&argv[1]).unwrap();
+    // let argv = std::env::args().collect::<Vec<String>>();
+    // let rom = util::read_file(&argv[1]).unwrap();
+
+    let arg = "testbins/rv32ui/bin/addi.bin";
+    let rom = util::read_file(arg).unwrap();
 
     init_bus(rom.clone(), ram_size);
 

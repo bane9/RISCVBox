@@ -18,7 +18,7 @@ function (build_asm asm_path out_path)
 
         exec_program("riscv${BITS}-unknown-elf-gcc -T${MISC_FOLDER}/link.ld -I${RVTEST_FOLDER}/env/p -I${RVTEST_FOLDER}/isa/macros/scalar -nostdlib -ffreestanding -march=${ARCH} -mabi=${ABI} -nostartfiles -O0 -o temp ${file}")
         exec_program("riscv${BITS}-unknown-elf-objcopy -O binary temp ${out_path}/bin/${filename_bin}")
-        exec_program("riscv${BITS}-unknown-elf-objdump --disassemble-all temp > ${out_path}/dumped/${filename_dump}")
+        exec_program("riscv${BITS}-unknown-elf-objdump --disassemble-all -Mno-aliases temp > ${out_path}/dumped/${filename_dump}")
     endforeach()
 endfunction()
 

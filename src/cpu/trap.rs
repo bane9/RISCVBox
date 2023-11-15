@@ -1,4 +1,7 @@
-use crate::cpu::{cpu, csr};
+use crate::{
+    cpu::{cpu, csr},
+    frontend::exec_core::INSN_SIZE,
+};
 use cpu::{Exception, Interrupt};
 
 use super::{csr::MppMode, CpuReg};
@@ -117,11 +120,9 @@ pub fn handle_interrupt(int_val: Interrupt, pc: CpuReg) {
 pub fn handle_exception() {
     let cpu = cpu::get_cpu();
 
-    if cpu.exception == Exception::None || (cpu.exception >= Exception::None) {
-        return;
-    }
+    assert!(cpu.exception < Exception::None);
 
-    let pc = (cpu.c_exception_pc + 4) as u32;
+    let pc = (cpu.c_exception_pc + INSN_SIZE) as CpuReg;
     let mode = cpu.mode;
 
     let exc_val = cpu.exception.to_cpu_reg() as usize;
