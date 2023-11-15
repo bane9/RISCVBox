@@ -52,5 +52,5 @@ SECTIONS
   .tohost :
   { 
     *(.tohost)
-  } >TOHOST at >RAM
+  } >TOHOST AT >RAM
 }

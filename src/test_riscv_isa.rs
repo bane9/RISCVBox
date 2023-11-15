@@ -112,7 +112,7 @@ fn run_tests_from_directory(dir: &str) {
 
         if !output.status.success() {
             println!(
-                "\x1b[31mtest failed:\x1b[0m {} with status {} and stdout: \"{}\"",
+                "\x1b[31mtest failed:\x1b[0m {} with status {} and stdout: \n\"\n{}\"",
                 file,
                 output.status,
                 String::from_utf8(output.stdout).unwrap()
