@@ -209,7 +209,7 @@ impl common::Rvi for RviImpl {
         let rd_addr = &cpu.regs[rd as usize] as *const _ as usize;
 
         emit_move_reg_imm!(insn, amd64_reg::RBX, rd_addr);
-        emit_mov_dword_ptr_imm!(insn, amd64_reg::RBX, imm << 12 as u32);
+        emit_mov_dword_ptr_imm!(insn, amd64_reg::RBX, imm as u32);
 
         Ok(insn)
     }
@@ -217,6 +217,8 @@ impl common::Rvi for RviImpl {
     fn emit_auipc(rd: u8, imm: i32) -> DecodeRet {
         let mut insn = HostEncodedInsn::new();
         let cpu = cpu::get_cpu();
+
+        emit_check_rd!(insn, rd);
 
         let rd_addr = &cpu.regs[rd as usize] as *const _ as usize;
 

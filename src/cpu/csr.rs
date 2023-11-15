@@ -128,14 +128,12 @@ pub struct Csr {
 
 impl Csr {
     pub fn new() -> Self {
-        let mut regs = [0u32; CSR_COUNT];
+        let mut regs = [0 as CsrType; CSR_COUNT];
 
         regs[register::MISA] =
             (XLEN_32 | RV32I_64I_128I | A_EXT | M_EXT | SUPERVISOR | USER) as u32;
 
-        let mut csr = Self { regs };
-
-        csr.write_mpp_mode(MppMode::Machine);
+        let csr = Self { regs };
 
         csr
     }

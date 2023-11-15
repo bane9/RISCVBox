@@ -21,7 +21,7 @@ use super::code_pages::CodePages;
 pub const INSN_SIZE: usize = 4; // Unlikely for rvc to be supported
 pub const INSN_SIZE_BITS: usize = INSN_SIZE * 8;
 
-pub const INSN_PAGE_SIZE: usize = 4096 / INSN_SIZE;
+pub const INSN_PAGE_SIZE: usize = 4096;
 pub const INSN_PAGE_READAHEAD: usize = 1;
 
 pub type DecoderFn = fn(u32) -> JitCommon::DecodeRet;

@@ -58,8 +58,8 @@ impl ExecCore {
             }
 
             println!(
-                "ret_status: {:#x?} with pc 0x{:x}",
-                cpu.exception, cpu.c_exception_pc
+                "ret_status: {:#x?} with pc 0x{:x} cpu.pc {:x}",
+                cpu.exception, cpu.c_exception_pc, cpu.pc
             );
 
             match cpu.exception {

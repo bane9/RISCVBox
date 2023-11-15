@@ -1,5 +1,6 @@
 use crate::backend::*;
 use crate::cpu::*;
+use crate::util::sign_extend;
 
 macro_rules! imm_j {
     ($insn:expr) => {{
@@ -25,6 +26,7 @@ pub fn decode_rvi(insn: u32) -> DecodeRet {
             let funct3 = ((insn >> 12) & 0b111) as u8;
             let rs1 = ((insn >> 15) & 0b11111) as u8;
             let imm = ((insn >> 20) & 0b111111111111) as i32;
+            let imm = sign_extend(imm, 12) as i32;
 
             match funct3 {
                 0b000 => RviImpl::emit_addi(rd, rs1, imm),
@@ -49,7 +51,18 @@ pub fn decode_rvi(insn: u32) -> DecodeRet {
             let funct3 = ((insn >> 12) & 0b111) as u8;
             let rs1 = ((insn >> 15) & 0b11111) as u8;
             let rs2 = ((insn >> 20) & 0b11111) as u8;
-            let imm = ((insn >> 7) & 0b11111) as i32;
+            let imm = ((insn & 0xf00) >> 7)
+                | ((insn & 0x7e000000) >> 20)
+                | ((insn & 0x80) << 4)
+                | ((insn >> 31) << 12);
+
+            let imm = if imm & 0x1000 != 0 {
+                imm | 0xffffe000
+            } else {
+                imm
+            };
+
+            let imm = imm as i32;
 
             match funct3 {
                 0b000 => RviImpl::emit_beq(rs1, rs2, imm),

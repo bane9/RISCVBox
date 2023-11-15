@@ -143,7 +143,7 @@ where
         ret |= (self.reg1 as usize & 0x1f) << 3;
         ret |= (self.reg2 as usize & 0x1f) << 8;
         ret |= (self.imm as usize & 0x7fff) << 13;
-        ret |= (self.pc as usize & 0x7fffffff) << 32;
+        ret |= (self.pc as usize & 0xffffffff) << 32;
 
         ret
     }
@@ -155,7 +155,7 @@ where
         let reg2 = ((val >> 8) & 0x1f) as CpuReg;
         let imm = ((val >> 13) & 0x7fff) as i32;
         let imm = sign_extend(imm, 15) as i32;
-        let pc = ((val >> 32) & 0x7fffffff) as BusType;
+        let pc = ((val >> 32) & 0xffffffff) as BusType;
 
         Self {
             cond,
@@ -267,10 +267,6 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize) -> usize {
         return 0;
     }
 
-    if jmp_addr == 0 {
-        print!("");
-    }
-
     let bus = bus::get_bus();
 
     let jmp_addr = bus.translate(jmp_addr as BusType);
@@ -302,7 +298,9 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize) -> usize {
 
 pub extern "C" fn c_bus_resolver_cb(bus_vars: usize) {
     let cpu = cpu::get_cpu();
-    let bus_vars = BusAccessVars::from_usize(bus_vars);
+    let mut bus_vars = BusAccessVars::from_usize(bus_vars);
+
+    bus_vars.imm = sign_extend(bus_vars.imm, 12) as i32;
 
     let (addres, size, is_load, _is_unsigned) = match bus_vars.cond {
         BusAccessCond::LoadByte => {

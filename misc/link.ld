@@ -1,17 +1,56 @@
 OUTPUT_ARCH( "riscv" )
 ENTRY(_start)
 
+MEMORY
+{
+  RAM (rwx)  : ORIGIN = 0x00000000, LENGTH = 64K
+  TOHOST (rw) : ORIGIN = 0x01000000, LENGTH = 1k
+}
+
+
 SECTIONS
 {
-  . = 0x00000000;
-  .text.init : { *(.text.init) }
-  . = ALIGN(0x1000);
-  .text : { *(.text) }
-  . = ALIGN(0x1000);
-  .data : { *(.data) }
-  .bss : { *(.bss) }
-  _end = .;
+   .text :
+  {
+    . = ALIGN(8);
+    *(.text.init*)
+    *(.text)
+    *(.text*)
+    . = ALIGN(8);
+    _etext = .;
+  } >RAM
 
-  . = 0x01000000;
-  .tohost : { *(.tohost) }
+  .rodata : {
+      *(.rdata)
+      *(.rodata .rodata.*)
+  } >RAM
+
+  .bss :
+  {
+    _sbss = .;
+    *(.bss)
+    *(.bss*)
+    . = ALIGN(8);
+    _ebss = .;
+  } >RAM
+
+  _sidata = LOADADDR(.data);
+
+  .data :
+  {
+    . = ALIGN(8);
+    _sdata = .;
+    *(.data)
+    *(.data*)
+    . = ALIGN(8);
+    _edata = .;
+    PROVIDE(__global_pointer$ = . + 0x800);
+    *(.sdata .sdata.* .sdata2.*)
+    PROVIDE(_end = .);
+  } >RAM
+
+  .tohost :
+  { 
+    *(.tohost)
+  } >TOHOST at >RAM
 }

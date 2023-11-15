@@ -1,7 +1,4 @@
-use crate::{
-    cpu::{cpu, csr},
-    frontend::exec_core::INSN_SIZE,
-};
+use crate::cpu::{cpu, csr};
 use cpu::{Exception, Interrupt};
 
 use super::{csr::MppMode, CpuReg};
@@ -122,14 +119,14 @@ pub fn handle_exception() {
 
     assert!(cpu.exception < Exception::None);
 
-    let pc = (cpu.c_exception_pc + INSN_SIZE) as CpuReg;
+    let pc = (cpu.c_exception_pc) as CpuReg;
     let mode = cpu.mode;
 
     let exc_val = cpu.exception.to_cpu_reg() as usize;
 
-    let mideleg_flag = ((cpu.csr.read(csr::register::MIDELEG) >> exc_val as usize) & 1) != 0;
+    let medeleg_flag = ((cpu.csr.read(csr::register::MEDELEG) >> exc_val as usize) & 1) != 0;
 
-    if mideleg_flag & (mode == MppMode::Supervisor || mode == MppMode::User) {
+    if medeleg_flag & (mode == MppMode::Supervisor || mode == MppMode::User) {
         cpu.mode = MppMode::Supervisor;
 
         let stvec_val = cpu.csr.read(csr::register::STVEC);
@@ -149,6 +146,10 @@ pub fn handle_exception() {
         cpu.pc = mtvec_val & !1;
 
         cpu.csr.write(csr::register::MEPC, pc & !1);
+        cpu.csr
+            .write(csr::register::MCAUSE, cpu.exception.to_cpu_reg() as CpuReg);
+        cpu.csr
+            .write(csr::register::MTVAL, cpu.c_exception_data as CpuReg);
         cpu.csr
             .write_bit_mstatus(csr::bits::MPIE, cpu.csr.read_bit_mstatus(csr::bits::MIE));
         cpu.csr.write_bit_mstatus(csr::bits::MIE, false);

@@ -75,7 +75,7 @@ extern "C" fn mret_handler_cb(pc: usize) {
         ReturnableImpl::throw();
     }
 
-    cpu.pc = cpu.csr.read(csr::register::MEPC) - 4;
+    cpu.pc = cpu.csr.read(csr::register::MEPC);
     cpu.mode = cpu.csr.read_mpp_mode();
 
     if cpu.mode != MppMode::Machine {
@@ -103,7 +103,7 @@ extern "C" fn sret_handler_cb(pc: usize) {
         ReturnableImpl::throw();
     }
 
-    cpu.pc = cpu.csr.read(csr::register::SEPC) - 4;
+    cpu.pc = cpu.csr.read(csr::register::SEPC);
     cpu.mode = cpu.csr.read_mpp_mode();
 
     if cpu.mode == MppMode::User {
@@ -186,6 +186,7 @@ impl common::Csr for CsrImpl {
     fn emit_ecall() -> DecodeRet {
         let cpu = cpu::get_cpu();
 
+        // TODO: check at runtime
         match cpu.mode {
             MppMode::Machine => {
                 let insn = BackendCoreImpl::emit_ret_with_exception(

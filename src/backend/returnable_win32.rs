@@ -16,14 +16,14 @@ impl ReturnableHandler for ReturnableImpl {
         }
 
         match res.err().unwrap().code() {
-            microseh::ExceptionCode::Breakpoint => ReturnStatus::ReturnOk,
+            microseh::ExceptionCode::IllegalInstruction => ReturnStatus::ReturnOk,
             _ => ReturnStatus::ReturnNotOk,
         }
     }
 
     #[cfg(target_arch = "x86_64")]
     fn throw() -> ! {
-        unsafe { asm!("int3") };
+        unsafe { asm!("ud2") };
 
         unreachable!();
     }
