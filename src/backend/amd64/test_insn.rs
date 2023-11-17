@@ -30,13 +30,13 @@ test_encoded_insn!(
 
 test_encoded_insn!(
     test_mov_rax_64b,
-    |enc: &mut HostEncodedInsn| emit_move_reg_imm!(enc, amd64_reg::RAX, 10000000000000000000),
+    |enc: &mut HostEncodedInsn| emit_mov_reg_imm!(enc, amd64_reg::RAX, 10000000000000000000),
     [0x48, 0xb8, 0x00, 0x00, 0xe8, 0x89, 0x04, 0x23, 0xc7, 0x8a]
 );
 
 test_encoded_insn!(
     test_mov_r8_64b,
-    |enc: &mut HostEncodedInsn| emit_move_reg_imm!(enc, amd64_reg::R8, 10000000000000000000),
+    |enc: &mut HostEncodedInsn| emit_mov_reg_imm!(enc, amd64_reg::R8, 10000000000000000000),
     [0x49, 0xb8, 0x00, 0x00, 0xe8, 0x89, 0x04, 0x23, 0xc7, 0x8a]
 );
 
@@ -347,4 +347,40 @@ test_encoded_insn!(
     test_mul_rbx,
     |enc: &mut HostEncodedInsn| emit_mul_reg!(enc, amd64_reg::RBX),
     [0x48, 0xF7, 0xE3]
+);
+
+test_encoded_insn!(
+    test_idiv_rax_rbx,
+    |enc: &mut HostEncodedInsn| emit_idiv_reg_reg!(enc, amd64_reg::RAX, amd64_reg::RBX),
+    [0x48, 0xF7, 0xFB]
+);
+
+test_encoded_insn!(
+    test_div_rax_rbx,
+    |enc: &mut HostEncodedInsn| emit_div_reg_reg!(enc, amd64_reg::RAX, amd64_reg::RBX),
+    [0x48, 0xF7, 0xF3]
+);
+
+test_encoded_insn!(
+    test_cqo,
+    |enc: &mut HostEncodedInsn| emit_cqo!(enc),
+    [0x48, 0x99]
+);
+
+test_encoded_insn!(
+    test_div_rbx,
+    |enc: &mut HostEncodedInsn| emit_mul_reg!(enc, amd64_reg::RBX),
+    [0x48, 0xF7, 0xF3]
+);
+
+test_encoded_insn!(
+    test_jmp_rip_relative_0,
+    |enc: &mut HostEncodedInsn| emit_jmp_rip_relative_imm32!(enc, 0),
+    [0xFF, 0x25, 0x00, 0x00, 0x00, 0x00]
+);
+
+test_encoded_insn!(
+    test_jmp_rip_relative_1000,
+    |enc: &mut HostEncodedInsn| emit_jmp_rip_relative_imm32!(enc, 1000),
+    [0xFF, 0x25, 0xE8, 0x03, 0x00, 0x000]
 );

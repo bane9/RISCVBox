@@ -17,7 +17,10 @@ impl ReturnableHandler for ReturnableImpl {
 
         match res.err().unwrap().code() {
             microseh::ExceptionCode::IllegalInstruction => ReturnStatus::ReturnOk,
-            _ => ReturnStatus::ReturnNotOk,
+            code => {
+                println!("code: {:?}", code);
+                ReturnStatus::ReturnNotOk
+            }
         }
     }
 

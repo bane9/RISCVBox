@@ -103,7 +103,7 @@ macro_rules! emit_pop_reg {
 }
 
 #[macro_export]
-macro_rules! emit_move_reg_imm {
+macro_rules! emit_mov_reg_imm {
     ($enc:expr, $reg:expr, $imm:expr) => {{
         if $reg < amd64_reg::R8 {
             emit_insn!($enc, [0x48, 0xB8 + $reg as u8]);
@@ -200,10 +200,10 @@ macro_rules! emit_mov_ptr_reg_dword_ptr {
 macro_rules! emit_mov_reg_guest_to_host {
     ($enc:expr, $cpu:expr, $dst_reg:expr, $src_reg:expr) => {{
         if $src_reg != 0 {
-            emit_move_reg_imm!($enc, $dst_reg, &$cpu.regs[$src_reg as usize] as *const _);
+            emit_mov_reg_imm!($enc, $dst_reg, &$cpu.regs[$src_reg as usize] as *const _);
             emit_mov_ptr_reg_dword_ptr!($enc, $dst_reg, $dst_reg);
         } else {
-            emit_move_reg_imm!($enc, $dst_reg, 0);
+            emit_mov_reg_imm!($enc, $dst_reg, 0);
         }
     }};
 }
@@ -211,7 +211,7 @@ macro_rules! emit_mov_reg_guest_to_host {
 #[macro_export]
 macro_rules! emit_mov_reg_host_to_guest {
     ($enc:expr, $cpu:expr, $dst_addr_reg:expr, $dst_val_reg:expr, $src_reg:expr) => {{
-        emit_move_reg_imm!(
+        emit_mov_reg_imm!(
             $enc,
             $dst_addr_reg,
             &$cpu.regs[$src_reg as usize] as *const _ as usize
@@ -235,15 +235,15 @@ macro_rules! emit_check_rd {
 macro_rules! emit_set_exception {
     ($enc:expr, $cpu:expr, $exception:expr, $data:expr, $pc:expr) => {{
         let exception_addr = &$cpu.c_exception as *const _ as usize;
-        emit_move_reg_imm!($enc, amd64_reg::RAX, exception_addr);
+        emit_mov_reg_imm!($enc, amd64_reg::RAX, exception_addr);
         emit_mov_dword_ptr_imm!($enc, amd64_reg::RAX, $exception as usize);
 
         let exception_data_addr = &$cpu.c_exception_data as *const _ as usize;
-        emit_move_reg_imm!($enc, amd64_reg::RAX, exception_data_addr);
+        emit_mov_reg_imm!($enc, amd64_reg::RAX, exception_data_addr);
         emit_mov_dword_ptr_imm!($enc, amd64_reg::RAX, $data as usize);
 
         let exception_pc = &$cpu.c_exception_pc as *const _ as usize;
-        emit_move_reg_imm!($enc, amd64_reg::RAX, exception_pc);
+        emit_mov_reg_imm!($enc, amd64_reg::RAX, exception_pc);
         emit_mov_dword_ptr_imm!($enc, amd64_reg::RAX, $pc as usize);
 
         emit_ret!($enc);
@@ -642,6 +642,22 @@ macro_rules! emit_jmp_reg {
     }};
 }
 
+#[macro_export]
+macro_rules! emit_jmp_rip_relative_imm32 {
+    ($enc:expr, $reg:expr) => {{
+        emit_insn!($enc, [0xFF, 0x25]);
+        emit_insn!($enc, ($reg as u32).to_le_bytes());
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_jmp_imm32 {
+    ($enc:expr, $reg:expr) => {{
+        emit_insn!($enc, [0xE9]);
+        emit_insn!($enc, ($reg as u32).to_le_bytes());
+    }};
+}
+
 /////////// RVM
 
 #[macro_export]
@@ -657,7 +673,7 @@ macro_rules! emit_mul_reg_imm {
 macro_rules! emit_mul_reg {
     ($enc:expr, $reg1:expr) => {{
         assert!($reg1 < amd64_reg::R8);
-        emit_insn!($enc, [0x48, 0xF7, (0xE0 as u8).wrapping_add($reg1)]);
+        emit_insn!($enc, [0x48, 0xF7, (0xF0 as u8).wrapping_add($reg1)]);
     }};
 }
 
@@ -677,10 +693,34 @@ macro_rules! emit_div_reg_reg {
         emit_insn!(
             $enc,
             [
+                0x48,
                 0xF7,
-                (0xF0 as u8).wrapping_add($reg2 << 3).wrapping_add($reg1)
+                (0xF0 as u8).wrapping_add($reg1 << 3).wrapping_add($reg2)
             ]
         );
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_div_reg {
+    ($enc:expr, $reg:expr) => {{
+        assert!($reg < amd64_reg::R8);
+        emit_insn!($enc, [0x48, 0xF7, (0xF8 as u8).wrapping_add($reg)]);
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_idiv_reg {
+    ($enc:expr, $reg:expr) => {{
+        assert!($reg < amd64_reg::R8);
+        emit_insn!($enc, [0x48, 0xF7, (0xF8 as u8).wrapping_add($reg)]);
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_cqo {
+    ($enc:expr) => {{
+        emit_insn!($enc, [0x48, 0x99]);
     }};
 }
 
@@ -691,8 +731,9 @@ macro_rules! emit_idiv_reg_reg {
         emit_insn!(
             $enc,
             [
+                0x48,
                 0xF7,
-                (0xF8 as u8).wrapping_add($reg2 << 3).wrapping_add($reg1)
+                (0xF8 as u8).wrapping_add($reg1 << 3).wrapping_add($reg2)
             ]
         );
     }};
@@ -771,7 +812,7 @@ impl BackendCore for BackendCoreImpl {
 
         emit_push_reg!(insn, amd64_reg::RBP);
         emit_mov_reg_reg1!(insn, amd64_reg::RBP, amd64_reg::RSP);
-        emit_move_reg_imm!(insn, amd64_reg::R11, fn_ptr);
+        emit_mov_reg_imm!(insn, amd64_reg::R11, fn_ptr);
         emit_call_reg!(insn, amd64_reg::R11);
         emit_pop_reg!(insn, amd64_reg::RBP);
 
@@ -789,11 +830,11 @@ impl BackendCore for BackendCoreImpl {
 
         emit_push_reg!(insn, amd64_reg::RBP);
         emit_mov_reg_reg1!(insn, amd64_reg::RBP, amd64_reg::RSP);
-        emit_move_reg_imm!(insn, abi_reg::ARG1, arg1);
-        emit_move_reg_imm!(insn, abi_reg::ARG2, arg2);
-        emit_move_reg_imm!(insn, abi_reg::ARG3, arg3);
-        emit_move_reg_imm!(insn, abi_reg::ARG4, arg4);
-        emit_move_reg_imm!(insn, amd64_reg::R11, fn_ptr);
+        emit_mov_reg_imm!(insn, abi_reg::ARG1, arg1);
+        emit_mov_reg_imm!(insn, abi_reg::ARG2, arg2);
+        emit_mov_reg_imm!(insn, abi_reg::ARG3, arg3);
+        emit_mov_reg_imm!(insn, abi_reg::ARG4, arg4);
+        emit_mov_reg_imm!(insn, amd64_reg::R11, fn_ptr);
         emit_call_reg!(insn, amd64_reg::R11);
         emit_pop_reg!(insn, amd64_reg::RBP);
 
@@ -819,8 +860,8 @@ impl BackendCore for BackendCoreImpl {
 
         emit_push_reg!(insn, amd64_reg::RBP);
         emit_mov_reg_reg1!(insn, amd64_reg::RBP, amd64_reg::RSP);
-        emit_move_reg_imm!(insn, abi_reg::ARG1, arg1);
-        emit_move_reg_imm!(insn, amd64_reg::R11, fn_ptr);
+        emit_mov_reg_imm!(insn, abi_reg::ARG1, arg1);
+        emit_mov_reg_imm!(insn, amd64_reg::R11, fn_ptr);
         emit_call_reg!(insn, amd64_reg::R11);
         emit_pop_reg!(insn, amd64_reg::RBP);
 

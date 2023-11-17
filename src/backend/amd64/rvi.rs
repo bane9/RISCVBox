@@ -212,7 +212,7 @@ impl common::Rvi for RviImpl {
 
         let rd_addr = &cpu.regs[rd as usize] as *const _ as usize;
 
-        emit_move_reg_imm!(insn, amd64_reg::RBX, rd_addr);
+        emit_mov_reg_imm!(insn, amd64_reg::RBX, rd_addr);
         emit_mov_dword_ptr_imm!(insn, amd64_reg::RBX, imm as u32);
 
         Ok(insn)
@@ -226,7 +226,7 @@ impl common::Rvi for RviImpl {
 
         let rd_addr = &cpu.regs[rd as usize] as *const _ as usize;
 
-        emit_move_reg_imm!(insn, amd64_reg::RBX, rd_addr);
+        emit_mov_reg_imm!(insn, amd64_reg::RBX, rd_addr);
         emit_mov_dword_ptr_imm!(
             insn,
             amd64_reg::RBX,

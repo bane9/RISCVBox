@@ -17,7 +17,7 @@ pub enum JitError {
 
 pub type PtrT = *mut u8;
 pub type HostInsnT = u8;
-pub const HOST_INSN_MAX_SIZE: usize = 64; // TODO: check worst case later
+pub const HOST_INSN_MAX_SIZE: usize = 96; // TODO: check worst case later
 pub type HostEncodedInsn = EncodedInsn<HostInsnT, HOST_INSN_MAX_SIZE>;
 pub type DecodeRet = Result<HostEncodedInsn, JitError>;
 
