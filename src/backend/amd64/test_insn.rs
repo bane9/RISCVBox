@@ -356,6 +356,12 @@ test_encoded_insn!(
 );
 
 test_encoded_insn!(
+    test_idiv_rbx,
+    |enc: &mut HostEncodedInsn| emit_idiv_reg!(enc, amd64_reg::RBX),
+    [0x48, 0xF7, 0xFB]
+);
+
+test_encoded_insn!(
     test_div_rax_rbx,
     |enc: &mut HostEncodedInsn| emit_div_reg_reg!(enc, amd64_reg::RAX, amd64_reg::RBX),
     [0x48, 0xF7, 0xF3]

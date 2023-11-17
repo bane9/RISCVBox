@@ -673,7 +673,7 @@ macro_rules! emit_mul_reg_imm {
 macro_rules! emit_mul_reg {
     ($enc:expr, $reg1:expr) => {{
         assert!($reg1 < amd64_reg::R8);
-        emit_insn!($enc, [0x48, 0xF7, (0xF0 as u8).wrapping_add($reg1)]);
+        emit_insn!($enc, [0x48, 0xF7, (0xE0 as u8).wrapping_add($reg1)]);
     }};
 }
 
@@ -721,6 +721,13 @@ macro_rules! emit_idiv_reg {
 macro_rules! emit_cqo {
     ($enc:expr) => {{
         emit_insn!($enc, [0x48, 0x99]);
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_cdq {
+    ($enc:expr) => {{
+        emit_insn!($enc, [0x99]);
     }};
 }
 
