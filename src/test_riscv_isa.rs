@@ -7,6 +7,9 @@ mod frontend;
 mod util;
 mod xmem;
 
+use std::thread;
+use std::time::Duration;
+
 use std::process::Output;
 
 use bus::{ram::RAM_BEGIN_ADDR, BusType};
@@ -25,8 +28,12 @@ impl bus::BusDevice for ToHost {
     fn write(&mut self, _addr: BusType, _data: BusType, _size: BusType) -> Result<(), Exception> {
         let cpu = cpu::get_cpu();
 
-        let a0 = cpu.regs[10];
-        let gp = cpu.regs[3];
+        let a0 = if cpu.regs[cpu::RegName::A0 as usize] == 0 {
+            0
+        } else {
+            cpu.regs[cpu::RegName::A0 as usize] >> 1
+        };
+        let gp = cpu.regs[cpu::RegName::Gp as usize];
 
         println!("tohost a0: {}, gp {}", a0, gp);
 
@@ -56,13 +63,35 @@ fn init_bus(mut rom: Vec<u8>, ram_size: usize) {
     bus::bus::get_bus().add_device(Box::new(tohost));
 }
 
+fn timeout_thread() {
+    thread::spawn(|| {
+        let duration = Duration::from_secs(5);
+
+        thread::sleep(duration);
+
+        println!("Test timeout after {:?}", duration);
+
+        std::process::exit(1);
+    });
+}
+
 fn main() {
     let ram_size = util::size_kib(64);
 
     let argv = std::env::args().collect::<Vec<String>>();
+
+    if argv.len() < 2 {
+        println!("Usage: {} <bin> [timeout]", argv[0]);
+        std::process::exit(1);
+    }
+
     let rom = util::read_file(&argv[1]).unwrap();
 
-    // let arg = "testbins/rv32ui/bin/addi.bin";
+    if argv.len() == 3 && argv[2] == "timeout" {
+        timeout_thread();
+    }
+
+    // let arg = "testbins/rv32ui/bin/fence_i.bin";
     // let rom = util::read_file(arg).unwrap();
 
     init_bus(rom.clone(), ram_size);
@@ -77,6 +106,7 @@ fn main() {
 fn run_bin_as_subproccess(bin: &str) -> Output {
     let child = std::process::Command::new("target/debug/deps/test_riscv_isa")
         .arg(bin)
+        .arg("timeout")
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::inherit())
         .output()
@@ -103,7 +133,8 @@ fn list_files_from_directory(dir: &str) -> Vec<String> {
 fn run_tests_from_directory(dir: &str) {
     let files = list_files_from_directory(dir);
 
-    let mut failed = false;
+    let total = files.len();
+    let mut failed: usize = 0;
 
     for file in files {
         println!("\nrunning test: {}", file);
@@ -117,11 +148,19 @@ fn run_tests_from_directory(dir: &str) {
                 output.status,
                 String::from_utf8(output.stdout).unwrap()
             );
-            failed = true;
+
+            failed += 1;
         }
     }
 
-    std::process::exit(if failed { 1 } else { 0 });
+    println!(
+        "\n\ntest result: out for {} tests, {} passed and {} failed.",
+        total,
+        total - failed,
+        failed
+    );
+
+    std::process::exit(if failed > 0 { 1 } else { 0 });
 }
 
 #[test]

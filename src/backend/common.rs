@@ -79,6 +79,21 @@ pub enum BusAccessCond {
     StoreWord,
 }
 
+impl BusAccessCond {
+    fn bit_size(&self) -> usize {
+        match self {
+            BusAccessCond::LoadByte => 8,
+            BusAccessCond::LoadHalf => 16,
+            BusAccessCond::LoadWord => 32,
+            BusAccessCond::LoadByteUnsigned => 8,
+            BusAccessCond::LoadHalfUnsigned => 16,
+            BusAccessCond::StoreByte => 8,
+            BusAccessCond::StoreHalf => 16,
+            BusAccessCond::StoreWord => 32,
+        }
+    }
+}
+
 impl UsizeConversions for BusAccessCond {
     fn to_usize(&self) -> usize {
         match self {
@@ -231,7 +246,8 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize) -> usize {
             }
         }
         JumpCond::GreaterThanEqual => {
-            if (cpu.regs[jmp_cond.reg1 as usize] as i32) < (cpu.regs[jmp_cond.reg2 as usize] as i32)
+            if (cpu.regs[jmp_cond.reg1 as usize] as i32)
+                >= (cpu.regs[jmp_cond.reg2 as usize] as i32)
             {
                 let pc = jmp_cond.pc as i64;
                 let pc = pc.wrapping_add(jmp_cond.imm as i64);
@@ -302,7 +318,7 @@ pub extern "C" fn c_bus_resolver_cb(bus_vars: usize) {
 
     bus_vars.imm = sign_extend(bus_vars.imm, 12) as i32;
 
-    let (addres, size, is_load, _is_unsigned) = match bus_vars.cond {
+    let (addres, size, is_load, is_unsigned) = match bus_vars.cond {
         BusAccessCond::LoadByte => {
             let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
             let addr = addr.wrapping_add(bus_vars.imm as i64);
@@ -313,7 +329,7 @@ pub extern "C" fn c_bus_resolver_cb(bus_vars: usize) {
             let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
             let addr = addr.wrapping_add(bus_vars.imm as i64);
 
-            (addr as u32, 6, true, false)
+            (addr as u32, 16, true, false)
         }
         BusAccessCond::LoadWord => {
             let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
@@ -366,6 +382,12 @@ pub extern "C" fn c_bus_resolver_cb(bus_vars: usize) {
 
         let data_val = data.unwrap();
 
+        let data_val = if !is_unsigned {
+            sign_extend(data_val, size as usize) as u32
+        } else {
+            data_val
+        };
+
         if bus_vars.reg1 != 0 {
             cpu.regs[bus_vars.reg1 as usize] = data_val;
         }
@@ -414,10 +436,7 @@ pub fn test_asm_common(enc: &HostEncodedInsn, expected: &[u8], insn_name: &str) 
 
     if !success {
         println!("__________________________________________________________\n");
-        println!(
-            "Error: Encoding mismatch at \x1b[33m{}\x1b[0m",
-            insn_name[28..].trim().replace(" :: ", "::")
-        );
+        println!("Error: Encoding mismatch at \x1b[33m{}\x1b[0m", insn_name);
 
         println!("Expected -> {}", expected_str.trim_end());
         println!("Encoded  -> {}", encoded_str.trim_end());

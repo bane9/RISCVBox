@@ -27,7 +27,7 @@ get_filename_component(CURRENT_DIR ${CMAKE_CURRENT_SOURCE_DIR} ABSOLUTE)
 string(REGEX MATCH ".*${MISC_FOLDER}$" IS_MISC_DIR ${CURRENT_DIR})
 
 if(IS_MISC_DIR)
-    message("Current directory ends with 'misc'. Changing to parent directory.")
+    message("Current directory is 'misc'. Changing to parent directory.")
     execute_process(
         COMMAND ${CMAKE_COMMAND} -P ${CURRENT_EXECUTABLE}
         WORKING_DIRECTORY ${CURRENT_DIR}/..

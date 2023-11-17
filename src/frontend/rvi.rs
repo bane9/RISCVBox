@@ -38,9 +38,10 @@ pub fn decode_rvi(insn: u32) -> DecodeRet {
                 0b111 => RviImpl::emit_andi(rd, rs1, imm),
                 0b101 => {
                     let funct7 = ((insn >> 25) & 0b1111111) as u8;
+                    let imm = (insn >> 20) & 0x1f;
                     match funct7 {
-                        0b0000000 => RviImpl::emit_srli(rd, rs1, (imm & 0b11111) as u8),
-                        0b0100000 => RviImpl::emit_srai(rd, rs1, (imm & 0b11111) as u8),
+                        0b0000000 => RviImpl::emit_srli(rd, rs1, imm as u8),
+                        0b0100000 => RviImpl::emit_srai(rd, rs1, imm as u8),
                         _ => Err(JitError::InvalidInstruction(insn)),
                     }
                 }
@@ -140,7 +141,8 @@ pub fn decode_rvi(insn: u32) -> DecodeRet {
         OpType::JALR => {
             let rd = ((insn >> 7) & 0b11111) as u8;
             let rs1 = ((insn >> 15) & 0b11111) as u8;
-            let imm = imm_j!(insn) as i32;
+            let imm = ((insn >> 20) & 0xfff) as i32;
+            let imm = sign_extend(imm, 12) as i32;
 
             RviImpl::emit_jalr(rd, rs1, imm)
         }

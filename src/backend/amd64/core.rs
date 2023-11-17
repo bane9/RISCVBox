@@ -285,6 +285,21 @@ macro_rules! emit_mov_cl_imm {
 }
 
 #[macro_export]
+macro_rules! emit_movsxd_reg_reg {
+    ($enc:expr, $reg1:expr, $reg2:expr) => {{
+        assert!($reg1 < amd64_reg::R8 && $reg2 < amd64_reg::R8);
+        emit_insn!(
+            $enc,
+            [
+                0x48,
+                0x63,
+                (0xC0 as u8).wrapping_add($reg2 << 3).wrapping_add($reg1)
+            ]
+        );
+    }};
+}
+
+#[macro_export]
 macro_rules! emit_shr_reg_cl {
     ($enc:expr, $reg1:expr) => {{
         if $reg1 < amd64_reg::R8 {
@@ -292,6 +307,36 @@ macro_rules! emit_shr_reg_cl {
         } else {
             emit_insn!($enc, [0x49, 0xD3, 0xE8 + $reg1 as u8 - amd64_reg::R8]);
         }
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_sar_reg_cl {
+    ($enc:expr, $reg1:expr) => {{
+        if $reg1 < amd64_reg::R8 {
+            emit_insn!($enc, [0x48, 0xD3, 0xF8 + $reg1 as u8]);
+        } else {
+            emit_insn!($enc, [0x49, 0xD3, 0xF8 + $reg1 as u8 - amd64_reg::R8]);
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_sarx_reg_reg {
+    ($enc:expr, $dest_reg:expr, $reg1:expr, $reg2:expr) => {{
+        assert!($dest_reg < amd64_reg::R8 && $reg1 < amd64_reg::R8 && $reg2 < amd64_reg::R8);
+        emit_insn!(
+            $enc,
+            [
+                0xC4,
+                0xE2,
+                0xf2,
+                0xF7,
+                (0xC0 as u8)
+                    .wrapping_add($dest_reg << 3)
+                    .wrapping_add($reg1),
+            ]
+        );
     }};
 }
 
@@ -463,6 +508,13 @@ macro_rules! emit_setl_al {
 }
 
 #[macro_export]
+macro_rules! emit_setb_al {
+    ($enc:expr) => {{
+        emit_insn!($enc, [0x0F, 0x92, 0xC0]);
+    }};
+}
+
+#[macro_export]
 macro_rules! emit_setg_al {
     ($enc:expr) => {{
         emit_insn!($enc, [0x0F, 0x9F, 0xC0]);
@@ -506,12 +558,37 @@ macro_rules! emit_cmp_reg_imm {
     }};
 }
 
+#[macro_export]
+macro_rules! emit_cmp_reg_reg {
+    ($enc:expr, $reg1:expr, $reg2:expr) => {{
+        assert!($reg1 < amd64_reg::R8 && $reg2 < amd64_reg::R8);
+        emit_insn!(
+            $enc,
+            [
+                0x48,
+                0x39,
+                (0xC0 as u8).wrapping_add($reg2 << 3).wrapping_add($reg1)
+            ]
+        );
+    }};
+}
+
 // reg1 is always RAX
 #[macro_export]
 macro_rules! emit_test_less_reg_imm {
     ($enc:expr, $imm:expr) => {{
         emit_cmp_reg_imm!($enc, amd64_reg::RAX, $imm);
         emit_setl_al!($enc);
+        emit_movzx_rax_al!($enc);
+    }};
+}
+
+// reg1 is always RAX
+#[macro_export]
+macro_rules! emit_test_less_reg_uimm {
+    ($enc:expr, $imm:expr) => {{
+        emit_cmp_reg_imm!($enc, amd64_reg::RAX, $imm);
+        emit_setb_al!($enc);
         emit_movzx_rax_al!($enc);
     }};
 }

@@ -5,6 +5,81 @@ use std::cell::RefCell;
 
 pub type CpuReg = BusType;
 
+pub enum RegName {
+    Zero = 0,
+    Ra = 1,
+    Sp = 2,
+    Gp = 3,
+    Tp = 4,
+    T0 = 5,
+    T1 = 6,
+    T2 = 7,
+    S0 = 8,
+    S1 = 9,
+    A0 = 10,
+    A1 = 11,
+    A2 = 12,
+    A3 = 13,
+    A4 = 14,
+    A5 = 15,
+    A6 = 16,
+    A7 = 17,
+    S2 = 18,
+    S3 = 19,
+    S4 = 20,
+    S5 = 21,
+    S6 = 22,
+    S7 = 23,
+    S8 = 24,
+    S9 = 25,
+    S10 = 26,
+    S11 = 27,
+    T3 = 28,
+    T4 = 29,
+    T5 = 30,
+    T6 = 31,
+}
+
+impl RegName {
+    pub fn from_usize(reg: usize) -> RegName {
+        match reg {
+            0 => RegName::Zero,
+            1 => RegName::Ra,
+            2 => RegName::Sp,
+            3 => RegName::Gp,
+            4 => RegName::Tp,
+            5 => RegName::T0,
+            6 => RegName::T1,
+            7 => RegName::T2,
+            8 => RegName::S0,
+            9 => RegName::S1,
+            10 => RegName::A0,
+            11 => RegName::A1,
+            12 => RegName::A2,
+            13 => RegName::A3,
+            14 => RegName::A4,
+            15 => RegName::A5,
+            16 => RegName::A6,
+            17 => RegName::A7,
+            18 => RegName::S2,
+            19 => RegName::S3,
+            20 => RegName::S4,
+            21 => RegName::S5,
+            22 => RegName::S6,
+            23 => RegName::S7,
+            24 => RegName::S8,
+            25 => RegName::S9,
+            26 => RegName::S10,
+            27 => RegName::S11,
+            28 => RegName::T3,
+            29 => RegName::T4,
+            30 => RegName::T5,
+            31 => RegName::T6,
+            _ => panic!("Invalid register {}", reg),
+        }
+    }
+}
+
 pub enum OpType {
     L = 0x03,
 

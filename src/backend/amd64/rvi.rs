@@ -103,6 +103,8 @@ impl common::Rvi for RviImpl {
 
         emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RAX, rs1);
 
+        emit_movsxd_reg_reg!(insn, amd64_reg::RAX, amd64_reg::RAX);
+
         emit_test_less_reg_imm!(insn, imm);
 
         emit_mov_reg_host_to_guest!(insn, cpu, amd64_reg::RCX, amd64_reg::RAX, rd);
@@ -118,7 +120,9 @@ impl common::Rvi for RviImpl {
 
         emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RAX, rs1);
 
-        emit_test_less_reg_imm!(insn, imm);
+        emit_movsxd_reg_reg!(insn, amd64_reg::RAX, amd64_reg::RAX);
+
+        emit_test_less_reg_uimm!(insn, imm);
 
         emit_mov_reg_host_to_guest!(insn, cpu, amd64_reg::RCX, amd64_reg::RAX, rd);
 
@@ -133,7 +137,7 @@ impl common::Rvi for RviImpl {
 
         emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RAX, rs1);
 
-        emit_test_less_reg_imm!(insn, imm);
+        emit_xor_reg_imm!(insn, amd64_reg::RAX, imm);
 
         emit_mov_reg_host_to_guest!(insn, cpu, amd64_reg::RCX, amd64_reg::RAX, rd);
 
@@ -162,6 +166,8 @@ impl common::Rvi for RviImpl {
         emit_check_rd!(insn, rd);
 
         emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RBX, rs1);
+
+        emit_movsxd_reg_reg!(insn, amd64_reg::RBX, amd64_reg::RBX);
 
         emit_shr_reg_imm!(insn, amd64_reg::RBX, shamt);
 
@@ -430,12 +436,14 @@ impl common::Rvi for RviImpl {
 
         emit_check_rd!(insn, rd);
 
-        emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RAX, rs1);
+        emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RBX, rs1);
         emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RCX, rs2);
 
-        emit_test_greater_reg_imm!(insn, amd64_reg::RCX);
+        emit_movsxd_reg_reg!(insn, amd64_reg::RBX, amd64_reg::RBX);
 
-        emit_mov_reg_host_to_guest!(insn, cpu, amd64_reg::RCX, amd64_reg::RAX, rd);
+        emit_sarx_reg_reg!(insn, amd64_reg::RBX, amd64_reg::RBX, amd64_reg::RCX);
+
+        emit_mov_reg_host_to_guest!(insn, cpu, amd64_reg::RCX, amd64_reg::RBX, rd);
 
         Ok(insn)
     }
@@ -497,7 +505,10 @@ impl common::Rvi for RviImpl {
         emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RAX, rs1);
         emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RCX, rs2);
 
-        emit_test_less_reg_imm!(insn, amd64_reg::RCX);
+        emit_movsxd_reg_reg!(insn, amd64_reg::RAX, amd64_reg::RAX);
+        emit_movsxd_reg_reg!(insn, amd64_reg::RCX, amd64_reg::RCX);
+
+        emit_test_less_reg_reg!(insn, amd64_reg::RCX);
 
         emit_mov_reg_host_to_guest!(insn, cpu, amd64_reg::RCX, amd64_reg::RAX, rd);
 
@@ -513,7 +524,7 @@ impl common::Rvi for RviImpl {
         emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RAX, rs1);
         emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RCX, rs2);
 
-        emit_test_less_reg_imm!(insn, amd64_reg::RCX);
+        emit_test_less_reg_reg!(insn, amd64_reg::RCX);
 
         emit_mov_reg_host_to_guest!(insn, cpu, amd64_reg::RCX, amd64_reg::RAX, rd);
 

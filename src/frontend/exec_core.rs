@@ -66,18 +66,14 @@ impl ExecCore {
                 cpu::Exception::BlockExit => {
                     cpu.pc = cpu.c_exception_pc as CpuReg + INSN_SIZE as CpuReg;
                 }
-                cpu::Exception::None => {
-                    unreachable!("Exiting jit block without exception is invalid");
-                }
                 cpu::Exception::ForwardJumpFault(pc) => {
                     println!("ForwardJumpFault: pc = {:#x}", pc);
                     std::process::exit(1);
                 }
-                cpu::Exception::IllegalInstruction(pc) => {
-                    println!("IllegalInstruction: pc = {:#x}", pc);
-                    std::process::exit(1);
-                }
                 cpu::Exception::Mret | cpu::Exception::Sret => {}
+                cpu::Exception::None => {
+                    unreachable!("Exiting jit block without setting an exception is invalid");
+                }
                 _ => {
                     trap::handle_exception();
                 }

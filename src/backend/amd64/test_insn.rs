@@ -325,3 +325,14 @@ test_encoded_insn!(
     |enc: &mut HostEncodedInsn| emit_jmp_reg!(enc, amd64_reg::R9),
     [0x41, 0xFF, 0xE1]
 );
+
+test_encoded_insn!(
+    test_sarx_rbx_rbx_rcx,
+    |enc: &mut HostEncodedInsn| emit_sarx_reg_reg!(
+        enc,
+        amd64_reg::RBX,
+        amd64_reg::RBX,
+        amd64_reg::RCX
+    ),
+    [0xC4, 0xE2, 0xF2, 0xF7, 0xDB]
+);

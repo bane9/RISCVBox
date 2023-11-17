@@ -2,10 +2,8 @@ use common::DecodeRet;
 
 use crate::backend::common;
 use crate::backend::target::core::{BackendCore, BackendCoreImpl};
-use crate::bus::{self, BusType};
 use crate::cpu::csr::{self, MppMode};
 use crate::cpu::{self, CpuReg, Exception};
-use crate::frontend::exec_core::INSN_SIZE;
 
 use super::{ReturnableHandler, ReturnableImpl};
 
@@ -65,12 +63,8 @@ extern "C" fn mret_handler_cb(pc: usize) {
     let cpu = cpu::get_cpu();
 
     if cpu.mode != MppMode::Machine {
-        // Not sure if this or the altrenative methods are worse
-        let insn = bus::get_bus()
-            .fetch(pc as BusType, INSN_SIZE as BusType * 8)
-            .unwrap();
-
-        cpu.set_exception(Exception::IllegalInstruction(insn), pc as CpuReg);
+        let mret: u32 = 0x30200073;
+        cpu.set_exception(Exception::IllegalInstruction(mret), pc as CpuReg);
 
         ReturnableImpl::throw();
     }
@@ -95,10 +89,8 @@ extern "C" fn sret_handler_cb(pc: usize) {
     let cpu = cpu::get_cpu();
 
     if cpu.csr.read_bit_mstatus(csr::bits::TSR) || cpu.mode == MppMode::Machine {
-        let insn = bus::get_bus()
-            .fetch(pc as BusType, INSN_SIZE as BusType * 8)
-            .unwrap();
-        cpu.set_exception(Exception::IllegalInstruction(insn), pc as CpuReg);
+        let sret: u32 = 0x10200073;
+        cpu.set_exception(Exception::IllegalInstruction(sret), pc as CpuReg);
 
         ReturnableImpl::throw();
     }
