@@ -3,6 +3,7 @@ use crate::cpu::csr;
 use crate::frontend::gpfn_state::GpfnState;
 use crate::frontend::insn_lookup::InsnData;
 use std::cell::RefCell;
+use std::collections::HashSet;
 
 pub type CpuReg = BusType;
 
@@ -257,6 +258,7 @@ pub struct Cpu {
     pub c_exception_pc: usize,
     pub mode: csr::MppMode,
     pub gpfn_state: GpfnState,
+    pub atomic_reservations: HashSet<BusType>, // TODO: this probably isn't core local, check later
     pub csr: &'static mut csr::Csr,
 }
 
@@ -272,6 +274,7 @@ impl Cpu {
             c_exception_pc: 0,
             mode: csr::MppMode::Machine,
             gpfn_state: GpfnState::new(),
+            atomic_reservations: HashSet::new(),
             csr: csr::get_csr(),
         }
     }

@@ -8,6 +8,7 @@ pub trait BusDevice {
     fn get_begin_addr(&self) -> BusType;
     fn get_end_addr(&self) -> BusType;
     fn tick(&mut self);
+    fn get_ptr(&mut self, addr: BusType) -> Result<*mut u8, Exception>;
 }
 
 pub struct Bus {
@@ -57,6 +58,16 @@ impl Bus {
         for device in &mut self.devices {
             device.tick();
         }
+    }
+
+    pub fn get_ptr(&mut self, addr: BusType) -> Result<*mut u8, Exception> {
+        for device in &mut self.devices {
+            if addr >= device.get_begin_addr() && addr < device.get_end_addr() {
+                return device.get_ptr(addr);
+            }
+        }
+
+        Err(Exception::LoadAccessFault(addr))
     }
 }
 

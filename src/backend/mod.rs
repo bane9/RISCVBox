@@ -32,3 +32,6 @@ pub use common::*;
 
 pub mod csr;
 pub use csr::CsrImpl;
+
+pub mod rva;
+pub use rva::RvaImpl;

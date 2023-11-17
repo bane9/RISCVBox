@@ -49,6 +49,10 @@ impl bus::BusDevice for ToHost {
     }
 
     fn tick(&mut self) {}
+
+    fn get_ptr(&mut self, _addr: BusType) -> Result<*mut u8, Exception> {
+        Ok(std::ptr::null_mut())
+    }
 }
 
 fn init_bus(mut rom: Vec<u8>, ram_size: usize) {
@@ -91,7 +95,7 @@ fn main() {
         timeout_thread();
     }
 
-    // let arg = "testbins/rv32um/bin/mulhu.bin";
+    // let arg = "testbins/rv32ua/bin/lrsc.bin";
     // let rom = util::read_file(arg).unwrap();
 
     init_bus(rom.clone(), ram_size);
@@ -171,4 +175,9 @@ fn test_rvi() {
 #[test]
 fn test_rvm() {
     run_tests_from_directory("testbins/rv32um/bin/");
+}
+
+#[test]
+fn test_rva() {
+    run_tests_from_directory("testbins/rv32ua/bin/");
 }

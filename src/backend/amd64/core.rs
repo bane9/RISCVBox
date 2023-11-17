@@ -762,6 +762,23 @@ macro_rules! emit_imul_reg_reg {
     }};
 }
 
+/////////// RVA
+
+#[macro_export]
+macro_rules! emit_atomic_access {
+    ($insn: expr) => {{
+        let mut insn = $insn;
+
+        let ret_insn = BackendCoreImpl::emit_ret();
+
+        emit_cmp_reg_imm!(insn, amd64_reg::RAX, 0);
+        emit_jz_imm!(insn, ret_insn.size());
+        insn.push_slice(ret_insn.as_slice());
+
+        return Ok(insn);
+    }};
+}
+
 pub struct BackendCoreImpl;
 
 impl BackendCore for BackendCoreImpl {

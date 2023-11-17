@@ -52,4 +52,10 @@ impl BusDevice for Ram {
     }
 
     fn tick(&mut self) {}
+
+    fn get_ptr(&mut self, addr: BusType) -> Result<*mut u8, Exception> {
+        let adj_addr = (addr as usize) - (self.get_begin_addr() as usize);
+
+        unsafe { Ok(self.mem.as_mut_ptr().add(adj_addr)) }
+    }
 }

@@ -132,4 +132,8 @@ impl BusDevice for Ns16550 {
     }
 
     fn tick(&mut self) {}
+
+    fn get_ptr(&mut self, _addr: BusType) -> Result<*mut u8, Exception> {
+        return Ok(std::ptr::null_mut());
+    }
 }
