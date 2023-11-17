@@ -91,7 +91,7 @@ fn main() {
         timeout_thread();
     }
 
-    // let arg = "testbins/rv32ui/bin/fence_i.bin";
+    // let arg = "testbins/rv32um/bin/mulhsu.bin";
     // let rom = util::read_file(arg).unwrap();
 
     init_bus(rom.clone(), ram_size);
@@ -154,7 +154,7 @@ fn run_tests_from_directory(dir: &str) {
     }
 
     println!(
-        "\n\ntest result: out for {} tests, {} passed and {} failed.",
+        "\n\nTest result: out of {} tests, {} passed and {} failed.",
         total,
         total - failed,
         failed
@@ -166,4 +166,9 @@ fn run_tests_from_directory(dir: &str) {
 #[test]
 fn test_rvi() {
     run_tests_from_directory("testbins/rv32ui/bin/");
+}
+
+#[test]
+fn test_rvm() {
+    run_tests_from_directory("testbins/rv32um/bin/");
 }

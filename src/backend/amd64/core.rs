@@ -646,22 +646,72 @@ macro_rules! emit_jmp_reg {
 
 #[macro_export]
 macro_rules! emit_mul_reg_imm {
-    ($enc:expr, $reg:expr, $imm:expr) => {{}};
+    ($enc:expr, $reg:expr, $imm:expr) => {{
+        assert!($reg < amd64_reg::R8);
+        emit_insn!($enc, [0x48, 0xF7, 0xC0 + $reg]);
+        emit_insn!($enc, ($imm as u32).to_le_bytes());
+    }};
 }
 
 #[macro_export]
-macro_rules! emit_mul_reg_reg {
-    ($enc:expr, $reg1:expr, $reg2:expr) => {{}};
+macro_rules! emit_mul_reg {
+    ($enc:expr, $reg1:expr) => {{
+        assert!($reg1 < amd64_reg::R8);
+        emit_insn!($enc, [0x48, 0xF7, (0xE0 as u8).wrapping_add($reg1)]);
+    }};
 }
 
 #[macro_export]
 macro_rules! emit_div_reg_imm {
-    ($enc:expr, $reg:expr, $imm:expr) => {{}};
+    ($enc:expr, $reg:expr, $imm:expr) => {{
+        assert!($reg < amd64_reg::R8);
+        emit_insn!($enc, [0x48, 0xF7, 0xF8 + $reg]);
+        emit_insn!($enc, ($imm as u32).to_le_bytes());
+    }};
 }
 
 #[macro_export]
 macro_rules! emit_div_reg_reg {
-    ($enc:expr, $reg1:expr, $reg2:expr) => {{}};
+    ($enc:expr, $reg1:expr, $reg2:expr) => {{
+        assert!($reg1 < amd64_reg::R8 && $reg2 < amd64_reg::R8);
+        emit_insn!(
+            $enc,
+            [
+                0xF7,
+                (0xF0 as u8).wrapping_add($reg2 << 3).wrapping_add($reg1)
+            ]
+        );
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_idiv_reg_reg {
+    ($enc:expr, $reg1:expr, $reg2:expr) => {{
+        assert!($reg1 < amd64_reg::R8 && $reg2 < amd64_reg::R8);
+        emit_insn!(
+            $enc,
+            [
+                0xF7,
+                (0xF8 as u8).wrapping_add($reg2 << 3).wrapping_add($reg1)
+            ]
+        );
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_imul_reg_reg {
+    ($enc:expr, $reg1:expr, $reg2:expr) => {{
+        assert!($reg1 < amd64_reg::R8 && $reg2 < amd64_reg::R8);
+        emit_insn!(
+            $enc,
+            [
+                0x48,
+                0x0F,
+                0xAF,
+                (0xC0 as u8).wrapping_add($reg1 << 3).wrapping_add($reg2)
+            ]
+        );
+    }};
 }
 
 pub struct BackendCoreImpl;
