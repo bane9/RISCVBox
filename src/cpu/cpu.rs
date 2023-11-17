@@ -1,5 +1,6 @@
 use crate::bus::bus::BusType;
 use crate::cpu::csr;
+use crate::frontend::gpfn_state::GpfnState;
 use crate::frontend::insn_lookup::InsnData;
 use std::cell::RefCell;
 
@@ -159,6 +160,8 @@ pub enum Exception {
     BlockExit = 0x101,
     Mret = 0x102,
     Sret = 0x103,
+    InvalidateJitBlock(CpuReg) = 0x104,
+    DiscardJitBlock(CpuReg) = 0x105,
 }
 
 impl Exception {
@@ -183,6 +186,8 @@ impl Exception {
             0x101 => Exception::BlockExit,
             0x102 => Exception::Mret,
             0x103 => Exception::Sret,
+            0x104 => Exception::InvalidateJitBlock(data),
+            0x105 => Exception::DiscardJitBlock(data),
             _ => Exception::None,
         }
     }
@@ -208,6 +213,8 @@ impl Exception {
             Exception::BlockExit => 0x101,
             Exception::Mret => 0x102,
             Exception::Sret => 0x103,
+            Exception::InvalidateJitBlock(_) => 0x104,
+            Exception::DiscardJitBlock(_) => 0x105,
         }
     }
 
@@ -232,6 +239,8 @@ impl Exception {
             Exception::BlockExit => &0,
             Exception::Mret => &0,
             Exception::Sret => &0,
+            Exception::InvalidateJitBlock(data) => data,
+            Exception::DiscardJitBlock(data) => data,
         };
 
         *data
@@ -247,6 +256,7 @@ pub struct Cpu {
     pub c_exception_data: usize,
     pub c_exception_pc: usize,
     pub mode: csr::MppMode,
+    pub gpfn_state: GpfnState,
     pub csr: &'static mut csr::Csr,
 }
 
@@ -261,6 +271,7 @@ impl Cpu {
             c_exception_data: 0,
             c_exception_pc: 0,
             mode: csr::MppMode::Machine,
+            gpfn_state: GpfnState::new(),
             csr: csr::get_csr(),
         }
     }

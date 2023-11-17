@@ -16,17 +16,17 @@ impl BusDevice for Ram {
     fn read(&mut self, addr: BusType, size: BusType) -> Result<BusType, Exception> {
         let adj_addr = (addr as usize) - (self.get_begin_addr() as usize);
 
-        match size {
-            8 => Ok(self.mem[adj_addr] as BusType),
-            16 => Ok(u16::from_le_bytes([self.mem[adj_addr], self.mem[adj_addr + 1]]) as BusType),
-            32 => Ok(u32::from_le_bytes([
-                self.mem[adj_addr],
-                self.mem[adj_addr + 1],
-                self.mem[adj_addr + 2],
-                self.mem[adj_addr + 3],
-            ]) as BusType),
-            _ => Err(Exception::LoadAccessFault(addr)),
+        let mut data: BusType = 0;
+
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                self.mem.as_ptr().add(adj_addr),
+                &mut data as *mut BusType as *mut u8,
+                size as usize / 8,
+            );
         }
+
+        Ok(data)
     }
 
     fn write(&mut self, addr: BusType, data: BusType, size: BusType) -> Result<(), Exception> {
@@ -36,7 +36,7 @@ impl BusDevice for Ram {
             std::ptr::copy_nonoverlapping(
                 &data as *const BusType as *const u8,
                 self.mem.as_mut_ptr().add(adj_addr),
-                size as usize,
+                size as usize / 8,
             );
         }
 

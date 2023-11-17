@@ -23,13 +23,9 @@ impl ExecCore {
         loop {
             let mut insn_data = cpu.insn_map.get_by_guest_idx(cpu.pc);
             if insn_data.is_none() {
-                let pc = cpu.pc;
+                let gpfn = cpu.pc as usize % RV_PAGE_SIZE;
 
-                self.parse_core
-                    .parse(cpu.pc as usize, cpu.pc as usize + INSN_PAGE_SIZE as usize)
-                    .unwrap();
-
-                cpu.pc = pc;
+                self.parse_core.parse(gpfn, gpfn + INSN_PAGE_SIZE).unwrap();
 
                 insn_data = cpu.insn_map.get_by_guest_idx(cpu.pc);
             }
@@ -69,6 +65,14 @@ impl ExecCore {
                 cpu::Exception::ForwardJumpFault(pc) => {
                     println!("ForwardJumpFault: pc = {:#x}", pc);
                     std::process::exit(1);
+                }
+                cpu::Exception::InvalidateJitBlock(gpfn) => {
+                    self.parse_core.invalidate(gpfn);
+                    cpu.pc = cpu.c_exception_pc as CpuReg + INSN_SIZE as CpuReg;
+                }
+                cpu::Exception::DiscardJitBlock(_pc) => {
+                    // If a mmu drops execute permission on a page, we can discard the jit block
+                    unimplemented!()
                 }
                 cpu::Exception::Mret | cpu::Exception::Sret => {}
                 cpu::Exception::None => {

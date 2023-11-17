@@ -2,7 +2,7 @@ use cpu::Exception;
 
 use crate::bus::{bus, BusType};
 use crate::cpu::{cpu, CpuReg};
-use crate::frontend::exec_core::INSN_SIZE;
+use crate::frontend::exec_core::{INSN_SIZE, RV_PAGE_OFFSET_MASK};
 use crate::util::EncodedInsn;
 
 use crate::backend::{ReturnableHandler, ReturnableImpl};
@@ -397,7 +397,15 @@ pub extern "C" fn c_bus_resolver_cb(bus_vars: usize) {
         let res = bus.write(addres, data, size);
 
         if res.is_err() {
-            cpu.exception = res.err().unwrap();
+            cpu.set_exception(res.err().unwrap(), bus_vars.pc);
+
+            ReturnableImpl::throw();
+        }
+
+        let gpfn = addres & RV_PAGE_OFFSET_MASK as CpuReg;
+
+        if cpu.gpfn_state.contains_gpfn(gpfn) {
+            cpu.set_exception(Exception::InvalidateJitBlock(gpfn), bus_vars.pc);
 
             ReturnableImpl::throw();
         }

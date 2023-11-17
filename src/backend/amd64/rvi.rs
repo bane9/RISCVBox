@@ -24,12 +24,10 @@ fn emit_jmp(mut cond: JumpVars) -> HostEncodedInsn {
     insn
 }
 
-macro_rules! emit_bus_access {
-    ($cond: expr) => {{
-        $cond.set_pc(cpu::get_cpu().pc);
+fn emit_bus_access(mut cond: BusAccessVars) -> HostEncodedInsn {
+    cond.set_pc(cpu::get_cpu().pc);
 
-        BackendCoreImpl::emit_void_call_with_1_arg(common::c_bus_resolver_cb, $cond.to_usize())
-    }};
+    BackendCoreImpl::emit_void_call_with_1_arg(common::c_bus_resolver_cb, cond.to_usize())
 }
 
 impl common::Rvi for RviImpl {
@@ -311,7 +309,7 @@ impl common::Rvi for RviImpl {
     }
 
     fn emit_lb(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access!(BusAccessVars::new(
+        Ok(emit_bus_access(BusAccessVars::new(
             backend::BusAccessCond::LoadByte,
             imm,
             rd as u32,
@@ -320,7 +318,7 @@ impl common::Rvi for RviImpl {
     }
 
     fn emit_lh(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access!(BusAccessVars::new(
+        Ok(emit_bus_access(BusAccessVars::new(
             backend::BusAccessCond::LoadHalf,
             imm,
             rd as u32,
@@ -329,7 +327,7 @@ impl common::Rvi for RviImpl {
     }
 
     fn emit_lw(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access!(BusAccessVars::new(
+        Ok(emit_bus_access(BusAccessVars::new(
             backend::BusAccessCond::LoadWord,
             imm,
             rd as u32,
@@ -338,7 +336,7 @@ impl common::Rvi for RviImpl {
     }
 
     fn emit_lbu(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access!(BusAccessVars::new(
+        Ok(emit_bus_access(BusAccessVars::new(
             backend::BusAccessCond::LoadByteUnsigned,
             imm,
             rd as u32,
@@ -347,7 +345,7 @@ impl common::Rvi for RviImpl {
     }
 
     fn emit_lhu(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access!(BusAccessVars::new(
+        Ok(emit_bus_access(BusAccessVars::new(
             backend::BusAccessCond::LoadHalfUnsigned,
             imm,
             rd as u32,
@@ -356,7 +354,7 @@ impl common::Rvi for RviImpl {
     }
 
     fn emit_sb(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access!(BusAccessVars::new(
+        Ok(emit_bus_access(BusAccessVars::new(
             backend::BusAccessCond::StoreByte,
             imm,
             rs2 as u32, // Intentionally flipped
@@ -365,7 +363,7 @@ impl common::Rvi for RviImpl {
     }
 
     fn emit_sh(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access!(BusAccessVars::new(
+        Ok(emit_bus_access(BusAccessVars::new(
             backend::BusAccessCond::StoreHalf,
             imm,
             rs2 as u32,
@@ -374,7 +372,7 @@ impl common::Rvi for RviImpl {
     }
 
     fn emit_sw(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access!(BusAccessVars::new(
+        Ok(emit_bus_access(BusAccessVars::new(
             backend::BusAccessCond::StoreWord,
             imm,
             rs2 as u32,

@@ -24,6 +24,11 @@ pub const INSN_SIZE_BITS: usize = INSN_SIZE * 8;
 pub const INSN_PAGE_SIZE: usize = 4096;
 pub const INSN_PAGE_READAHEAD: usize = 1;
 
+pub const RV_PAGE_SHIFT: usize = 12;
+pub const RV_PAGE_SIZE: usize = 1 << RV_PAGE_SHIFT;
+pub const RV_PAGE_MASK: usize = RV_PAGE_SIZE - 1;
+pub const RV_PAGE_OFFSET_MASK: usize = !RV_PAGE_MASK;
+
 pub type DecoderFn = fn(u32) -> JitCommon::DecodeRet;
 
 pub struct ParseCore {
@@ -37,6 +42,28 @@ impl ParseCore {
         }
     }
 
+    pub fn invalidate(&mut self, gpfn: CpuReg) {
+        let cpu = cpu::get_cpu();
+
+        cpu.gpfn_state.remove_gpfn(gpfn);
+
+        let idx: usize = cpu.insn_map.get_by_guest_idx(gpfn).unwrap().jit_block_idx;
+
+        self.code_pages.remove_code_page(idx);
+
+        println!(
+            "Invalidating range: {:x}-{:x}",
+            gpfn,
+            gpfn + INSN_PAGE_SIZE as CpuReg
+        );
+
+        let guest_start = gpfn as usize;
+        let guest_end = gpfn as usize + INSN_PAGE_SIZE;
+
+        self.parse(guest_start, guest_end)
+            .expect("Failed to parse page after invalidation");
+    }
+
     pub fn parse(
         &mut self,
         guest_start: usize,
@@ -44,19 +71,28 @@ impl ParseCore {
     ) -> Result<(), JitCommon::JitError> {
         let mut insn: u32 = 0;
 
+        assert!(guest_start % RV_PAGE_SIZE == 0);
+        assert!(guest_end % RV_PAGE_SIZE == 0);
+
         let cpu = cpu::get_cpu();
         let bus = bus::get_bus();
 
         let code_page: &mut CodePageImpl;
+        let code_page_idx: usize;
 
         // lol
         unsafe {
             let self_mut = self as *mut Self;
-            let (code_page_, _) = (*self_mut).code_pages.alloc_code_page();
+            let (code_page_, code_page_idx_) = (*self_mut).code_pages.alloc_code_page();
             code_page = code_page_;
+            code_page_idx = code_page_idx_;
         }
 
+        let old_pc = cpu.pc;
+
         cpu.pc = guest_start as CpuReg;
+
+        cpu.gpfn_state.add_gpfn(guest_start as CpuReg);
 
         while (cpu.pc as usize) < guest_end {
             let loaded_insn = bus.fetch(cpu.pc, INSN_SIZE_BITS as u32);
@@ -78,7 +114,7 @@ impl ParseCore {
 
             unsafe {
                 let code_page_mut = code_page as *mut CodePageImpl;
-                result = self.decode_single(&mut *code_page_mut, insn);
+                result = self.decode_single(&mut *code_page_mut, code_page_idx, insn);
             }
 
             cpu.pc += INSN_SIZE as u32;
@@ -87,6 +123,7 @@ impl ParseCore {
                 break;
             } else if result.is_err() {
                 self.code_pages.mark_all_pages(PageState::ReadExecute);
+                cpu.pc = old_pc;
                 return result;
             }
         }
@@ -97,12 +134,15 @@ impl ParseCore {
 
         code_page.mark_rx().unwrap();
 
+        cpu.pc = old_pc;
+
         Ok(())
     }
 
     fn decode_single(
         &mut self,
         code_page: &mut CodePageImpl,
+        code_page_idx: usize,
         insn: u32,
     ) -> Result<(), JitCommon::JitError> {
         static DECODERS: [DecoderFn; 4] = [
@@ -144,7 +184,8 @@ impl ParseCore {
 
         let cpu = cpu::get_cpu();
 
-        cpu.insn_map.add_mapping(cpu.pc, host_insn_ptr);
+        cpu.insn_map
+            .add_mapping(cpu.pc, host_insn_ptr, code_page_idx);
 
         Ok(())
     }

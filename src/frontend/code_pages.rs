@@ -24,6 +24,11 @@ impl CodePages {
         self.xmem[idx].push(insn.as_slice())
     }
 
+    pub fn remove_code_page(&mut self, idx: usize) {
+        self.xmem[idx].dealloc();
+        self.xmem.remove(idx);
+    }
+
     pub fn mark_all_pages(&mut self, state: PageState) {
         for xmem in self.xmem.iter_mut() {
             match state {
