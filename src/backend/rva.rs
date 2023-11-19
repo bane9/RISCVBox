@@ -84,8 +84,8 @@ extern "C" fn sc_w_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> us
     let cpu = cpu::get_cpu();
     let bus = bus::get_bus();
 
-    let rs1 = (rs1_rs2 >> 8) & 0b11111;
-    let rs2 = rs1_rs2 & 0b11111;
+    let rs1 = (rs1_rs2 >> 8) & 0x1f;
+    let rs2 = rs1_rs2 & 0x1f;
 
     let ptr: *mut u8;
     let addr: CpuReg;
@@ -109,39 +109,25 @@ extern "C" fn amoswapw_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -
     let cpu = cpu::get_cpu();
     let bus = bus::get_bus();
 
-    let rs1 = (rs1_rs2 >> 8) & 0b11111;
-    let rs2 = rs1_rs2 & 0b11111;
+    let rs1 = (rs1_rs2 >> 8) & 0x1f;
+    let rs2 = rs1_rs2 & 0x1f;
+
+    let val = cpu.regs[rs2];
 
     let addr1: u32;
-    let addr2: u32;
 
     let ptr1: *mut u8;
-    let ptr2: *mut u8;
 
     fetch_ptr!(ptr1, addr1, bus, cpu, rs1, pc);
-    fetch_ptr!(ptr2, addr2, bus, cpu, rs2, pc);
 
     unsafe {
         let ptr1 = ptr1 as *mut AtomicU32;
-        let ptr2 = ptr2 as *mut AtomicU32;
 
         let data = match aq_rel {
-            0b00 => (*ptr1).swap(
-                (*ptr2).load(std::sync::atomic::Ordering::Relaxed),
-                std::sync::atomic::Ordering::Relaxed,
-            ),
-            0b01 => (*ptr1).swap(
-                (*ptr2).load(std::sync::atomic::Ordering::Acquire),
-                std::sync::atomic::Ordering::Acquire,
-            ),
-            0b10 => (*ptr1).swap(
-                (*ptr2).load(std::sync::atomic::Ordering::Acquire),
-                std::sync::atomic::Ordering::Release,
-            ),
-            0b11 => (*ptr1).swap(
-                (*ptr2).load(std::sync::atomic::Ordering::Acquire),
-                std::sync::atomic::Ordering::AcqRel,
-            ),
+            0b00 => (*ptr1).swap(val, std::sync::atomic::Ordering::Relaxed),
+            0b01 => (*ptr1).swap(val, std::sync::atomic::Ordering::Acquire),
+            0b10 => (*ptr1).swap(val, std::sync::atomic::Ordering::Release),
+            0b11 => (*ptr1).swap(val, std::sync::atomic::Ordering::AcqRel),
             _ => unreachable!(),
         };
 
@@ -155,8 +141,8 @@ extern "C" fn amoadd_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> 
     let cpu = cpu::get_cpu();
     let bus = bus::get_bus();
 
-    let rs1 = (rs1_rs2 >> 8) & 0b11111;
-    let rs2 = rs1_rs2 & 0b11111;
+    let rs1 = (rs1_rs2 >> 8) & 0x1f;
+    let rs2 = rs1_rs2 & 0x1f;
 
     let addr1: u32;
 
@@ -186,8 +172,8 @@ extern "C" fn amoxor_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> 
     let cpu = cpu::get_cpu();
     let bus = bus::get_bus();
 
-    let rs1 = (rs1_rs2 >> 8) & 0b11111;
-    let rs2 = rs1_rs2 & 0b11111;
+    let rs1 = (rs1_rs2 >> 8) & 0x1f;
+    let rs2 = rs1_rs2 & 0x1f;
 
     let addr1: u32;
 
@@ -217,8 +203,8 @@ extern "C" fn amoor_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> u
     let cpu = cpu::get_cpu();
     let bus = bus::get_bus();
 
-    let rs1 = (rs1_rs2 >> 8) & 0b11111;
-    let rs2 = rs1_rs2 & 0b11111;
+    let rs1 = (rs1_rs2 >> 8) & 0x1f;
+    let rs2 = rs1_rs2 & 0x1f;
 
     let addr1: u32;
 
@@ -248,8 +234,8 @@ extern "C" fn amosub_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> 
     let cpu = cpu::get_cpu();
     let bus = bus::get_bus();
 
-    let rs1 = (rs1_rs2 >> 8) & 0b11111;
-    let rs2 = rs1_rs2 & 0b11111;
+    let rs1 = (rs1_rs2 >> 8) & 0x1f;
+    let rs2 = rs1_rs2 & 0x1f;
 
     let addr1: u32;
 
@@ -279,8 +265,8 @@ extern "C" fn amoand_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> 
     let cpu = cpu::get_cpu();
     let bus = bus::get_bus();
 
-    let rs1 = (rs1_rs2 >> 8) & 0b11111;
-    let rs2 = rs1_rs2 & 0b11111;
+    let rs1 = (rs1_rs2 >> 8) & 0x1f;
+    let rs2 = rs1_rs2 & 0x1f;
 
     let addr1: u32;
 
@@ -310,8 +296,8 @@ extern "C" fn amomin_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> 
     let cpu = cpu::get_cpu();
     let bus = bus::get_bus();
 
-    let rs1 = (rs1_rs2 >> 8) & 0b11111;
-    let rs2 = rs1_rs2 & 0b11111;
+    let rs1 = (rs1_rs2 >> 8) & 0x1f;
+    let rs2 = rs1_rs2 & 0x1f;
 
     let addr1: u32;
 
@@ -341,8 +327,8 @@ extern "C" fn amomax_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> 
     let cpu = cpu::get_cpu();
     let bus = bus::get_bus();
 
-    let rs1 = (rs1_rs2 >> 8) & 0b11111;
-    let rs2 = rs1_rs2 & 0b11111;
+    let rs1 = (rs1_rs2 >> 8) & 0x1f;
+    let rs2 = rs1_rs2 & 0x1f;
 
     let addr1: u32;
 
@@ -372,8 +358,8 @@ extern "C" fn amominu_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) ->
     let cpu = cpu::get_cpu();
     let bus = bus::get_bus();
 
-    let rs1 = (rs1_rs2 >> 8) & 0b11111;
-    let rs2 = rs1_rs2 & 0b11111;
+    let rs1 = (rs1_rs2 >> 8) & 0x1f;
+    let rs2 = rs1_rs2 & 0x1f;
 
     let addr1: u32;
 
@@ -403,8 +389,8 @@ extern "C" fn amomaxu_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) ->
     let cpu = cpu::get_cpu();
     let bus = bus::get_bus();
 
-    let rs1 = (rs1_rs2 >> 8) & 0b11111;
-    let rs2 = rs1_rs2 & 0b11111;
+    let rs1 = (rs1_rs2 >> 8) & 0x1f;
+    let rs2 = rs1_rs2 & 0x1f;
 
     let addr1: u32;
 

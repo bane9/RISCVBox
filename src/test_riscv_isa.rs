@@ -95,7 +95,7 @@ fn main() {
         timeout_thread();
     }
 
-    // let arg = "testbins/rv32ua/bin/lrsc.bin";
+    // let arg = "testbins/rv32ua/bin/amoswap_w.bin";
     // let rom = util::read_file(arg).unwrap();
 
     init_bus(rom.clone(), ram_size);
@@ -107,8 +107,20 @@ fn main() {
     std::process::exit(1); // It's only valid to exit from the tohost device
 }
 
+fn get_least_one_path(path: &[&str]) -> String {
+    for p in path {
+        if std::path::Path::new(p).exists() {
+            return p.to_string();
+        }
+    }
+
+    panic!("Please compile test_riscv_isa as either debug or release");
+}
+
 fn run_bin_as_subproccess(bin: &str) -> Output {
-    let child = std::process::Command::new("target/debug/deps/test_riscv_isa")
+    let path = get_least_one_path(&["target/debug/deps/", "target/release/deps/"]);
+
+    let child = std::process::Command::new(path + "test_riscv_isa")
         .arg(bin)
         .arg("timeout")
         .stdout(std::process::Stdio::piped())
