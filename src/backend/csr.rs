@@ -101,7 +101,7 @@ extern "C" fn mret_handler_cb(pc: usize) {
         ReturnableImpl::throw();
     }
 
-    cpu.pc = cpu.csr.read(csr::register::MEPC);
+    cpu.next_pc = cpu.csr.read(csr::register::MEPC);
     cpu.mode = cpu.csr.read_mpp_mode();
 
     if cpu.mode != MppMode::Machine {
@@ -127,7 +127,7 @@ extern "C" fn sret_handler_cb(pc: usize) {
         ReturnableImpl::throw();
     }
 
-    cpu.pc = cpu.csr.read(csr::register::SEPC);
+    cpu.next_pc = cpu.csr.read(csr::register::SEPC);
     cpu.mode = cpu.csr.read_mpp_mode();
 
     if cpu.mode == MppMode::User {
@@ -154,7 +154,7 @@ impl common::Csr for CsrImpl {
             csr,
             (rd << 8) | rs1,
             CSRRW,
-            cpu::get_cpu().pc as usize,
+            cpu::get_cpu().current_gpfn_offset as usize,
         );
 
         Ok(insn)
@@ -170,7 +170,7 @@ impl common::Csr for CsrImpl {
             csr,
             (rd << 8) | rs1,
             CSRRS,
-            cpu::get_cpu().pc as usize,
+            cpu::get_cpu().current_gpfn_offset as usize,
         );
 
         Ok(insn)
@@ -186,7 +186,7 @@ impl common::Csr for CsrImpl {
             csr,
             (rd << 8) | rs1,
             CSRRC,
-            cpu::get_cpu().pc as usize,
+            cpu::get_cpu().current_gpfn_offset as usize,
         );
 
         Ok(insn)
@@ -202,7 +202,7 @@ impl common::Csr for CsrImpl {
             csr,
             (rd << 8) | rs1,
             CSRRWI,
-            cpu::get_cpu().pc as usize,
+            cpu::get_cpu().current_gpfn_offset as usize,
         );
 
         Ok(insn)
@@ -218,7 +218,7 @@ impl common::Csr for CsrImpl {
             csr,
             (rd << 8) | rs1,
             CSRRSI,
-            cpu::get_cpu().pc as usize,
+            cpu::get_cpu().current_gpfn_offset as usize,
         );
 
         Ok(insn)
@@ -234,7 +234,7 @@ impl common::Csr for CsrImpl {
             csr,
             (rd << 8) | rs1,
             CSRRCI,
-            cpu::get_cpu().pc as usize,
+            cpu::get_cpu().current_gpfn_offset as usize,
         );
 
         Ok(insn)
@@ -247,21 +247,21 @@ impl common::Csr for CsrImpl {
         match cpu.mode {
             MppMode::Machine => {
                 let insn = BackendCoreImpl::emit_ret_with_exception(
-                    Exception::EnvironmentCallFromMMode(cpu.pc),
+                    Exception::EnvironmentCallFromMMode(cpu.current_gpfn_offset),
                 );
 
                 Ok(insn)
             }
             MppMode::Supervisor => {
                 let insn = BackendCoreImpl::emit_ret_with_exception(
-                    Exception::EnvironmentCallFromSMode(cpu.pc),
+                    Exception::EnvironmentCallFromSMode(cpu.current_gpfn_offset),
                 );
 
                 Ok(insn)
             }
             MppMode::User => {
                 let insn = BackendCoreImpl::emit_ret_with_exception(
-                    Exception::EnvironmentCallFromUMode(cpu.pc),
+                    Exception::EnvironmentCallFromUMode(cpu.current_gpfn_offset),
                 );
 
                 Ok(insn)
@@ -276,8 +276,10 @@ impl common::Csr for CsrImpl {
     }
 
     fn emit_sret() -> DecodeRet {
-        let mut insn =
-            BackendCoreImpl::emit_void_call_with_1_arg(sret_handler_cb, cpu::get_cpu().pc as usize);
+        let mut insn = BackendCoreImpl::emit_void_call_with_1_arg(
+            sret_handler_cb,
+            cpu::get_cpu().current_gpfn_offset as usize,
+        );
         let ret = BackendCoreImpl::emit_ret();
 
         insn.push_slice(ret.iter().as_slice());
@@ -286,8 +288,10 @@ impl common::Csr for CsrImpl {
     }
 
     fn emit_mret() -> DecodeRet {
-        let mut insn =
-            BackendCoreImpl::emit_void_call_with_1_arg(mret_handler_cb, cpu::get_cpu().pc as usize);
+        let mut insn = BackendCoreImpl::emit_void_call_with_1_arg(
+            mret_handler_cb,
+            cpu::get_cpu().current_gpfn_offset as usize,
+        );
         let ret = BackendCoreImpl::emit_ret();
 
         insn.push_slice(ret.iter().as_slice());

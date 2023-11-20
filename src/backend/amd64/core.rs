@@ -826,7 +826,7 @@ impl BackendCore for BackendCoreImpl {
 
         let cpu = cpu::get_cpu();
 
-        emit_set_exception!(insn, cpu, exc_int, exc_data, cpu.pc);
+        emit_set_exception!(insn, cpu, exc_int, exc_data, cpu.current_gpfn_offset);
 
         insn
     }

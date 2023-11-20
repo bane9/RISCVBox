@@ -16,21 +16,27 @@ impl ExecCore {
         }
     }
 
+    fn get_jit_ptr(&mut self) -> *mut u8 {
+        let cpu = cpu::get_cpu();
+
+        let mut insn_data = cpu.insn_map.get_by_guest_idx(cpu.next_pc);
+        if insn_data.is_none() {
+            self.parse_core.parse_gpfn(None).unwrap();
+
+            insn_data = cpu.insn_map.get_by_guest_idx(cpu.next_pc);
+        }
+
+        cpu.current_gpfn = cpu.next_pc >> RV_PAGE_SHIFT as CpuReg;
+
+        insn_data.unwrap().host_ptr
+    }
+
     pub fn exec_loop(&mut self, initial_pc: CpuReg) {
         let cpu = cpu::get_cpu();
-        cpu.pc = initial_pc;
+        cpu.next_pc = initial_pc;
 
         loop {
-            let mut insn_data = cpu.insn_map.get_by_guest_idx(cpu.pc);
-            if insn_data.is_none() {
-                let gpfn = cpu.pc as usize % RV_PAGE_SIZE;
-
-                self.parse_core
-                    .parse_gpfn((gpfn >> RV_PAGE_SHIFT) as BusType)
-                    .unwrap();
-
-                insn_data = cpu.insn_map.get_by_guest_idx(cpu.pc);
-            }
+            let host_ptr = self.get_jit_ptr();
 
             cpu.exception = cpu::Exception::None;
             cpu.c_exception = cpu::Exception::None.to_cpu_reg() as usize;
@@ -42,47 +48,54 @@ impl ExecCore {
             // }
 
             let ret = ReturnableImpl::handle(|| unsafe {
-                let host_ptr = insn_data.unwrap().host_ptr;
                 BackendCoreImpl::call_jit_ptr(host_ptr);
             });
 
             assert!(ret == ReturnStatus::ReturnOk);
 
-            if cpu.c_exception != cpu::Exception::None.to_cpu_reg() as usize {
-                cpu.exception = cpu::Exception::from_cpu_reg(
-                    cpu.c_exception as CpuReg,
-                    cpu.c_exception_data as CpuReg,
-                );
-            }
+            self.handle_guest_exception();
+        }
+    }
 
-            println!(
-                "ret_status: {:#x?} with pc 0x{:x} cpu.pc {:x}",
-                cpu.exception, cpu.c_exception_pc, cpu.pc
+    fn handle_guest_exception(&mut self) {
+        let cpu = cpu::get_cpu();
+
+        if cpu.c_exception != cpu::Exception::None.to_cpu_reg() as usize {
+            cpu.exception = cpu::Exception::from_cpu_reg(
+                cpu.c_exception as CpuReg,
+                cpu.c_exception_data as CpuReg,
             );
+        }
 
-            match cpu.exception {
-                cpu::Exception::BlockExit => {
-                    cpu.pc = cpu.c_exception_pc as CpuReg + INSN_SIZE as CpuReg;
-                }
-                cpu::Exception::ForwardJumpFault(pc) => {
-                    println!("ForwardJumpFault: pc = {:#x}", pc);
-                    std::process::exit(1);
-                }
-                cpu::Exception::InvalidateJitBlock(gpfn) => {
-                    self.parse_core.invalidate(gpfn);
-                    cpu.pc = cpu.c_exception_pc as CpuReg + INSN_SIZE as CpuReg;
-                }
-                cpu::Exception::DiscardJitBlock(_pc) => {
-                    // If a mmu drops execute permission on a page, we can discard the jit block
-                    unimplemented!()
-                }
-                cpu::Exception::Mret | cpu::Exception::Sret => {}
-                cpu::Exception::None => {
-                    unreachable!("Exiting jit block without setting an exception is invalid");
-                }
-                _ => {
-                    trap::handle_exception();
-                }
+        cpu.c_exception_pc |= (cpu.current_gpfn as usize) << RV_PAGE_SHIFT;
+
+        println!(
+            "ret_status: {:#x?} with pc 0x{:x} cpu.next_pc {:x}",
+            cpu.exception, cpu.c_exception_pc, cpu.next_pc
+        );
+
+        match cpu.exception {
+            cpu::Exception::BlockExit => {
+                cpu.next_pc = cpu.c_exception_pc as CpuReg + INSN_SIZE as CpuReg;
+            }
+            cpu::Exception::ForwardJumpFault(pc) => {
+                println!("ForwardJumpFault: pc = {:#x}", pc);
+                std::process::exit(1);
+            }
+            cpu::Exception::InvalidateJitBlock(gpfn) => {
+                self.parse_core.invalidate(gpfn);
+                cpu.next_pc = cpu.c_exception_pc as CpuReg + INSN_SIZE as CpuReg;
+            }
+            cpu::Exception::DiscardJitBlock(_pc) => {
+                // If a mmu drops execute permission on a page, we can discard the jit block
+                unimplemented!()
+            }
+            cpu::Exception::Mret | cpu::Exception::Sret => {}
+            cpu::Exception::None => {
+                unreachable!("Exiting jit block without setting an exception is invalid");
+            }
+            _ => {
+                trap::handle_exception();
             }
         }
     }

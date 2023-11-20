@@ -423,7 +423,7 @@ impl common::Rva for RvaImpl {
             rd as usize,
             rs1 as usize,
             (aq as usize) << 1 | rl as usize,
-            cpu::get_cpu().pc as usize,
+            cpu::get_cpu().current_gpfn_offset as usize,
         ))
     }
 
@@ -433,7 +433,7 @@ impl common::Rva for RvaImpl {
             rd as usize,
             (rs1 as usize) << 8 | rs2 as usize,
             (aq as usize) << 1 | rl as usize,
-            cpu::get_cpu().pc as usize,
+            cpu::get_cpu().current_gpfn_offset as usize,
         ))
     }
 
@@ -443,7 +443,7 @@ impl common::Rva for RvaImpl {
             rd as usize,
             (rs1 as usize) << 8 | rs2 as usize,
             (aq as usize) << 1 | rl as usize,
-            cpu::get_cpu().pc as usize,
+            cpu::get_cpu().current_gpfn_offset as usize,
         ))
     }
 
@@ -453,7 +453,7 @@ impl common::Rva for RvaImpl {
             rd as usize,
             (rs1 as usize) << 8 | rs2 as usize,
             (aq as usize) << 1 | rl as usize,
-            cpu::get_cpu().pc as usize,
+            cpu::get_cpu().current_gpfn_offset as usize,
         ))
     }
 
@@ -463,7 +463,7 @@ impl common::Rva for RvaImpl {
             rd as usize,
             (rs1 as usize) << 8 | rs2 as usize,
             (aq as usize) << 1 | rl as usize,
-            cpu::get_cpu().pc as usize,
+            cpu::get_cpu().current_gpfn_offset as usize,
         ))
     }
 
@@ -473,7 +473,7 @@ impl common::Rva for RvaImpl {
             rd as usize,
             (rs1 as usize) << 8 | rs2 as usize,
             (aq as usize) << 1 | rl as usize,
-            cpu::get_cpu().pc as usize,
+            cpu::get_cpu().current_gpfn_offset as usize,
         ))
     }
 
@@ -483,7 +483,7 @@ impl common::Rva for RvaImpl {
             rd as usize,
             (rs1 as usize) << 8 | rs2 as usize,
             (aq as usize) << 1 | rl as usize,
-            cpu::get_cpu().pc as usize,
+            cpu::get_cpu().current_gpfn_offset as usize,
         ))
     }
 
@@ -493,7 +493,7 @@ impl common::Rva for RvaImpl {
             rd as usize,
             (rs1 as usize) << 8 | rs2 as usize,
             (aq as usize) << 1 | rl as usize,
-            cpu::get_cpu().pc as usize,
+            cpu::get_cpu().current_gpfn_offset as usize,
         ))
     }
 
@@ -503,7 +503,7 @@ impl common::Rva for RvaImpl {
             rd as usize,
             (rs1 as usize) << 8 | rs2 as usize,
             (aq as usize) << 1 | rl as usize,
-            cpu::get_cpu().pc as usize,
+            cpu::get_cpu().current_gpfn_offset as usize,
         ))
     }
 
@@ -513,7 +513,7 @@ impl common::Rva for RvaImpl {
             rd as usize,
             (rs1 as usize) << 8 | rs2 as usize,
             (aq as usize) << 1 | rl as usize,
-            cpu::get_cpu().pc as usize,
+            cpu::get_cpu().current_gpfn_offset as usize,
         ))
     }
 
@@ -523,7 +523,7 @@ impl common::Rva for RvaImpl {
             rd as usize,
             (rs1 as usize) << 8 | rs2 as usize,
             (aq as usize) << 1 | rl as usize,
-            cpu::get_cpu().pc as usize,
+            cpu::get_cpu().current_gpfn_offset as usize,
         ))
     }
 }

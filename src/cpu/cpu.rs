@@ -1,5 +1,6 @@
 use crate::bus::bus::BusType;
 use crate::bus::mmu::{Mmu, Sv39Mmu};
+use crate::cpu::cpu;
 use crate::cpu::csr;
 use crate::frontend::gpfn_state::GpfnState;
 use crate::frontend::insn_lookup::InsnData;
@@ -222,35 +223,37 @@ impl Exception {
 
     pub fn get_data(&self) -> CpuReg {
         let data = match self {
-            Exception::InstructionAddressMisaligned(data) => data,
-            Exception::InstructionAccessFault(data) => data,
-            Exception::IllegalInstruction(data) => data,
-            Exception::Breakpoint => &0,
-            Exception::LoadAddressMisaligned(data) => data,
-            Exception::LoadAccessFault(data) => data,
-            Exception::StoreAddressMisaligned(data) => data,
-            Exception::StoreAccessFault(data) => data,
-            Exception::EnvironmentCallFromUMode(data) => data,
-            Exception::EnvironmentCallFromSMode(data) => data,
-            Exception::EnvironmentCallFromMMode(data) => data,
-            Exception::InstructionPageFault(data) => data,
-            Exception::LoadPageFault(data) => data,
-            Exception::StorePageFault(data) => data,
-            Exception::None => &0,
-            Exception::ForwardJumpFault(data) => data,
-            Exception::BlockExit => &0,
-            Exception::Mret => &0,
-            Exception::Sret => &0,
-            Exception::InvalidateJitBlock(data) => data,
-            Exception::DiscardJitBlock(data) => data,
+            Exception::InstructionAddressMisaligned(data) => *data,
+            Exception::InstructionAccessFault(data) => *data,
+            Exception::IllegalInstruction(data) => *data,
+            Exception::Breakpoint => 0,
+            Exception::LoadAddressMisaligned(data) => *data,
+            Exception::LoadAccessFault(data) => *data,
+            Exception::StoreAddressMisaligned(data) => *data,
+            Exception::StoreAccessFault(data) => *data,
+            Exception::EnvironmentCallFromUMode(_data) => cpu::get_cpu().c_exception_pc as CpuReg,
+            Exception::EnvironmentCallFromSMode(_data) => cpu::get_cpu().c_exception_pc as CpuReg,
+            Exception::EnvironmentCallFromMMode(_data) => cpu::get_cpu().c_exception_pc as CpuReg,
+            Exception::InstructionPageFault(data) => *data,
+            Exception::LoadPageFault(data) => *data,
+            Exception::StorePageFault(data) => *data,
+            Exception::None => 0,
+            Exception::ForwardJumpFault(data) => *data,
+            Exception::BlockExit => 0,
+            Exception::Mret => 0,
+            Exception::Sret => 0,
+            Exception::InvalidateJitBlock(data) => *data,
+            Exception::DiscardJitBlock(data) => *data,
         };
 
-        *data
+        data
     }
 }
 
 pub struct Cpu {
-    pub pc: CpuReg,
+    pub next_pc: CpuReg,
+    pub current_gpfn: CpuReg,
+    pub current_gpfn_offset: CpuReg,
     pub regs: [CpuReg; 32],
     pub insn_map: InsnData,
     pub exception: Exception,
@@ -267,7 +270,9 @@ pub struct Cpu {
 impl Cpu {
     pub fn new() -> Cpu {
         Cpu {
-            pc: 0,
+            next_pc: 0,
+            current_gpfn: 0,
+            current_gpfn_offset: 0,
             regs: [0; 32],
             insn_map: InsnData::new(),
             exception: Exception::None,

@@ -1,5 +1,6 @@
 use crate::backend::common;
 use crate::backend::target::core::{amd64_reg, BackendCore, BackendCoreImpl};
+use crate::frontend::exec_core::RV_PAGE_SHIFT;
 use crate::*;
 use common::{
     BusAccessVars, DecodeRet, HostEncodedInsn, JumpCond, JumpVars, PCAccess, UsizeConversions,
@@ -8,7 +9,7 @@ use common::{
 pub struct RviImpl;
 
 fn emit_jmp(mut cond: JumpVars) -> HostEncodedInsn {
-    cond.set_pc(cpu::get_cpu().pc);
+    cond.set_pc(cpu::get_cpu().current_gpfn_offset);
 
     let mut insn =
         BackendCoreImpl::emit_usize_call_with_1_arg(common::c_jump_resolver_cb, cond.to_usize());
@@ -25,7 +26,7 @@ fn emit_jmp(mut cond: JumpVars) -> HostEncodedInsn {
 }
 
 fn emit_bus_access(mut cond: BusAccessVars) -> HostEncodedInsn {
-    cond.set_pc(cpu::get_cpu().pc);
+    cond.set_pc(cpu::get_cpu().current_gpfn_offset);
 
     BackendCoreImpl::emit_void_call_with_1_arg(common::c_bus_resolver_cb, cond.to_usize())
 }
@@ -230,7 +231,8 @@ impl common::Rvi for RviImpl {
         emit_mov_dword_ptr_imm!(
             insn,
             amd64_reg::RBX,
-            (cpu.pc as i64).wrapping_add(imm as i64)
+            (((cpu.current_gpfn << RV_PAGE_SHIFT) | cpu.current_gpfn_offset) as i64)
+                .wrapping_add(imm as i64)
         );
 
         Ok(insn)

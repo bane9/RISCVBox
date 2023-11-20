@@ -87,7 +87,7 @@ pub fn handle_interrupt(int_val: Interrupt, pc: CpuReg) {
             int_val as CpuReg * 4
         };
 
-        cpu.pc = (stvec_val & !1) + vt_offset;
+        cpu.next_pc = (stvec_val & !1) + vt_offset;
 
         cpu.csr.write(csr::register::SEPC, pc & !1);
         cpu.csr
@@ -104,7 +104,7 @@ pub fn handle_interrupt(int_val: Interrupt, pc: CpuReg) {
             int_val as CpuReg * 4
         };
 
-        cpu.pc = (mtvec_val & !1) + vt_offset;
+        cpu.next_pc = (mtvec_val & !1) + vt_offset;
 
         cpu.csr.write(csr::register::MEPC, pc & !1);
         cpu.csr
@@ -131,7 +131,7 @@ pub fn handle_exception() {
 
         let stvec_val = cpu.csr.read(csr::register::STVEC);
 
-        cpu.pc = stvec_val & !1;
+        cpu.next_pc = stvec_val & !1;
 
         cpu.csr.write(csr::register::SEPC, pc & !1);
         cpu.csr
@@ -143,7 +143,7 @@ pub fn handle_exception() {
 
         let mtvec_val = cpu.csr.read(csr::register::MTVEC);
 
-        cpu.pc = mtvec_val & !1;
+        cpu.next_pc = mtvec_val & !1;
 
         cpu.csr.write(csr::register::MEPC, pc & !1);
         cpu.csr

@@ -2,7 +2,7 @@ use cpu::Exception;
 
 use crate::bus::{bus, BusType};
 use crate::cpu::{cpu, CpuReg};
-use crate::frontend::exec_core::{INSN_SIZE, RV_PAGE_OFFSET_MASK};
+use crate::frontend::exec_core::{INSN_SIZE, RV_PAGE_OFFSET_MASK, RV_PAGE_SHIFT};
 use crate::util::EncodedInsn;
 
 use crate::backend::{ReturnableHandler, ReturnableImpl};
@@ -308,6 +308,11 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize) -> usize {
     {
         cpu.regs[jmp_cond.reg1 as usize] = jmp_cond.pc + INSN_SIZE as u32;
     }
+
+    // If we are jumping to a different page (block boundary won't protect us here)
+    // we need to update the current_gpfn.
+    // TODO: block exit on each cross page jump?
+    cpu.current_gpfn = jmp_addr >> RV_PAGE_SHIFT as CpuReg;
 
     host_addr.unwrap().host_ptr as usize
 }
