@@ -109,10 +109,10 @@ fn main() {
     std::process::exit(1); // It's only valid to exit from the tohost device
 }
 
-fn get_least_one_path(path: &[&str]) -> Option<String> {
-    for p in path {
-        if std::path::Path::new(p).exists() {
-            return Some(p.to_string());
+fn get_least_one_file(files: &[&str]) -> Option<String> {
+    for file in files {
+        if std::path::Path::new(file).exists() {
+            return Some(file.to_string());
         }
     }
 
@@ -120,13 +120,18 @@ fn get_least_one_path(path: &[&str]) -> Option<String> {
 }
 
 fn run_bin_as_subproccess(bin: &str) -> Output {
-    let path = get_least_one_path(&["target/debug/deps/", "target/release/deps/"]);
+    let path = get_least_one_file(&[
+        "target/debug/test_riscv_isa",
+        "target/release/test_riscv_isa",
+        "target/debug/test_riscv_isa.exe",
+        "target/release/test_riscv_isa.exe",
+    ]);
 
     if path.is_none() {
         panic!("Please compile test_riscv_isa as debug or release first")
     }
 
-    let child = std::process::Command::new(path.unwrap() + "test_riscv_isa")
+    let child = std::process::Command::new(path.unwrap())
         .arg(bin)
         .arg("timeout")
         .stdout(std::process::Stdio::piped())
