@@ -95,7 +95,7 @@ fn main() {
         timeout_thread();
     }
 
-    // let arg = "testbins/rv32ua/bin/amoswap_w.bin";
+    // let arg = "testbins/rv32ui/bin/add.bin";
     // let rom = util::read_file(arg).unwrap();
 
     init_backend_csr();

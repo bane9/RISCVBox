@@ -48,7 +48,9 @@ fn csr_satp_handler(csr_reg: usize, csr_val: usize) -> Result<usize, Exception> 
 static mut CSR_HANDLERS: [CsrHandler; csr::CSR_COUNT] = [csr_default_handler; csr::CSR_COUNT];
 
 pub fn init_backend_csr() {
-    let &mut csr_handlers = unsafe { &mut CSR_HANDLERS };
+    let &mut mut csr_handlers = unsafe { &mut CSR_HANDLERS };
+
+    csr_handlers[csr::register::SATP] = csr_satp_handler;
 }
 
 extern "C" fn csr_handler_cb(csr_reg: usize, rd_rhs: usize, op: usize, pc: usize) {
@@ -57,7 +59,7 @@ extern "C" fn csr_handler_cb(csr_reg: usize, rd_rhs: usize, op: usize, pc: usize
     let rd = (rd_rhs >> 8) & 0x1f;
     let rhs = rd_rhs & 0xff;
 
-    let val: usize = if rhs & CSR_REG_ACCESS_FLAG != 0 {
+    let val: usize = if rd_rhs & CSR_REG_ACCESS_FLAG != 0 {
         cpu.regs[rhs & !CSR_REG_ACCESS_FLAG] as usize
     } else {
         rhs

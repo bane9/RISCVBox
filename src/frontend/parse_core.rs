@@ -5,8 +5,6 @@ use crate::backend::common::HostEncodedInsn;
 use crate::backend::target::core::BackendCoreImpl;
 use crate::bus::bus;
 use crate::bus::bus::BusType;
-use crate::bus::mmu::AccessType;
-use crate::bus::mmu::Mmu;
 use crate::cpu;
 use crate::cpu::CpuReg;
 use crate::cpu::Exception;
@@ -48,9 +46,13 @@ impl ParseCore {
     pub fn invalidate(&mut self, gpfn: CpuReg) {
         let cpu = cpu::get_cpu();
 
-        cpu.gpfn_state.remove_gpfn(gpfn);
+        cpu.gpfn_state.remove_gpfn(gpfn << RV_PAGE_SHIFT);
 
-        let idx: usize = cpu.insn_map.get_by_guest_idx(gpfn).unwrap().jit_block_idx;
+        let idx: usize = cpu
+            .insn_map
+            .get_by_guest_idx(gpfn << RV_PAGE_SHIFT)
+            .unwrap()
+            .jit_block_idx;
 
         self.code_pages.remove_code_page(idx);
 
@@ -60,22 +62,14 @@ impl ParseCore {
             gpfn + INSN_PAGE_SIZE as CpuReg
         );
 
-        let guest_start = gpfn as usize;
-        let guest_end = gpfn as usize + INSN_PAGE_SIZE;
-
-        self.parse(guest_start, guest_end)
+        self.parse_gpfn(gpfn)
             .expect("Failed to parse page after invalidation");
     }
 
-    pub fn parse(
-        &mut self,
-        guest_start: usize,
-        guest_end: usize,
-    ) -> Result<(), JitCommon::JitError> {
+    pub fn parse_gpfn(&mut self, gpfn: BusType) -> Result<(), JitCommon::JitError> {
         let mut insn: u32 = 0;
 
-        assert!(guest_start % RV_PAGE_SIZE == 0);
-        assert!(guest_end % RV_PAGE_SIZE == 0);
+        assert!((gpfn as usize) << RV_PAGE_SHIFT < BusType::MAX as usize);
 
         let cpu = cpu::get_cpu();
         let bus = bus::get_bus();
@@ -92,22 +86,16 @@ impl ParseCore {
         }
 
         let old_pc = cpu.pc;
-        let mut virt_pc = old_pc;
 
-        cpu.pc = cpu
-            .mmu
-            .translate(guest_start as CpuReg, AccessType::Fetch)
-            .unwrap();
+        let guest_start = gpfn << RV_PAGE_SHIFT;
+        let guest_end = guest_start + RV_PAGE_SIZE as BusType;
 
-        let guest_end = cpu
-            .mmu
-            .translate(guest_end as CpuReg, AccessType::Fetch)
-            .unwrap();
+        cpu.pc = guest_start as BusType;
 
         cpu.gpfn_state.add_gpfn(guest_start as CpuReg);
 
-        while cpu.pc < guest_end {
-            let loaded_insn = bus.translate(cpu.pc, &cpu.mmu);
+        while cpu.pc < guest_end as BusType {
+            let loaded_insn = bus.fetch_nommu(cpu.pc, INSN_SIZE_BITS as BusType);
 
             // if loaded_insn.is_err() {
             //     cpu.pc += INSN_SIZE as u32;
@@ -126,11 +114,10 @@ impl ParseCore {
 
             unsafe {
                 let code_page_mut = code_page as *mut CodePageImpl;
-                result = self.decode_single(&mut *code_page_mut, code_page_idx, insn, virt_pc);
+                result = self.decode_single(&mut *code_page_mut, code_page_idx, insn);
             }
 
             cpu.pc += INSN_SIZE as u32;
-            virt_pc += INSN_SIZE as u32;
 
             if let Err(JitCommon::JitError::ReachedBlockBoundary) = result {
                 break;
@@ -157,13 +144,12 @@ impl ParseCore {
         code_page: &mut CodePageImpl,
         code_page_idx: usize,
         insn: u32,
-        virt_pc: BusType,
     ) -> Result<(), JitCommon::JitError> {
         static DECODERS: [DecoderFn; 4] = [
             rvi::decode_rvi,
             rvm::decode_rvm,
-            rva::decode_rva,
             csr::decode_csr,
+            rva::decode_rva,
         ];
 
         let mut out_res: JitCommon::DecodeRet = Err(JitCommon::JitError::InvalidInstruction(insn));
@@ -198,14 +184,8 @@ impl ParseCore {
 
         let cpu = cpu::get_cpu();
 
-        let virt_pc = if cpu.mmu.is_active() {
-            Some(virt_pc)
-        } else {
-            None
-        };
-
         cpu.insn_map
-            .add_mapping(cpu.pc, host_insn_ptr, code_page_idx, virt_pc);
+            .add_mapping(cpu.pc, host_insn_ptr, code_page_idx);
 
         Ok(())
     }

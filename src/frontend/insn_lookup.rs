@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use crate::bus::BusType;
 
@@ -10,7 +10,7 @@ pub struct InsnMappingData {
 }
 
 pub struct InsnData {
-    mapping: HashMap<BusType, Arc<InsnMappingData>>,
+    mapping: HashMap<BusType, InsnMappingData>,
 }
 
 impl InsnData {
@@ -20,49 +20,19 @@ impl InsnData {
         }
     }
 
-    pub fn add_mapping(
-        &mut self,
-        guest_idx: BusType,
-        host_ptr: *mut u8,
-        jit_block_idx: usize,
-        virt_addr: Option<BusType>,
-    ) {
-        if virt_addr.is_some() {
-            let virt_addr = virt_addr.unwrap();
-
-            let mapping = self.mapping.get(&guest_idx);
-
-            if mapping.is_some() {
-                self.mapping.insert(virt_addr, mapping.unwrap().clone());
-            } else {
-                let new = self
-                    .mapping
-                    .insert(
-                        guest_idx,
-                        Arc::new(InsnMappingData {
-                            host_ptr,
-                            guest_idx,
-                            jit_block_idx,
-                        }),
-                    )
-                    .unwrap();
-
-                self.mapping.insert(virt_addr, new);
-            }
-        } else {
-            self.mapping.insert(
+    pub fn add_mapping(&mut self, guest_idx: BusType, host_ptr: *mut u8, jit_block_idx: usize) {
+        self.mapping.insert(
+            guest_idx,
+            InsnMappingData {
+                host_ptr,
                 guest_idx,
-                Arc::new(InsnMappingData {
-                    host_ptr,
-                    guest_idx,
-                    jit_block_idx,
-                }),
-            );
-        }
+                jit_block_idx,
+            },
+        );
     }
 
     pub fn get_by_guest_idx(&self, guest_idx: BusType) -> Option<&InsnMappingData> {
-        self.mapping.get(&guest_idx).map(|x| x.as_ref())
+        self.mapping.get(&guest_idx)
     }
 
     pub fn get_by_host_ptr(&self, host_ptr: *mut u8) -> Option<&InsnMappingData> {

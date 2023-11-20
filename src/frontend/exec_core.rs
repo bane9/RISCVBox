@@ -25,7 +25,9 @@ impl ExecCore {
             if insn_data.is_none() {
                 let gpfn = cpu.pc as usize % RV_PAGE_SIZE;
 
-                self.parse_core.parse(gpfn, gpfn + INSN_PAGE_SIZE).unwrap();
+                self.parse_core
+                    .parse_gpfn((gpfn >> RV_PAGE_SHIFT) as BusType)
+                    .unwrap();
 
                 insn_data = cpu.insn_map.get_by_guest_idx(cpu.pc);
             }
