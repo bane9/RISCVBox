@@ -1,10 +1,11 @@
+use crate::bus::mmu::*;
 use crate::cpu::Exception;
 
 pub type BusType = u32;
 
 pub trait BusDevice {
-    fn read(&mut self, addr: BusType, size: BusType) -> Result<BusType, Exception>;
-    fn write(&mut self, addr: BusType, data: BusType, size: BusType) -> Result<(), Exception>;
+    fn load(&mut self, addr: BusType, size: BusType) -> Result<BusType, Exception>;
+    fn store(&mut self, addr: BusType, data: BusType, size: BusType) -> Result<(), Exception>;
     fn get_begin_addr(&self) -> BusType;
     fn get_end_addr(&self) -> BusType;
     fn tick(&mut self);
@@ -26,28 +27,61 @@ impl Bus {
         self.devices.push(device);
     }
 
-    pub fn translate(&self, addr: BusType) -> Result<BusType, Exception> {
-        return Ok(addr);
+    pub fn translate(&self, addr: BusType, mmu: &Sv39Mmu) -> Result<BusType, Exception> {
+        return mmu.translate(addr, AccessType::Fetch);
     }
 
-    pub fn read(&mut self, addr: BusType, size: BusType) -> Result<BusType, Exception> {
+    pub fn load(
+        &mut self,
+        addr: BusType,
+        size: BusType,
+        mmu: &Sv39Mmu,
+    ) -> Result<BusType, Exception> {
+        return self.load_nommu(addr, size);
+    }
+
+    pub fn fetch(
+        &mut self,
+        addr: BusType,
+        size: BusType,
+        mmu: &Sv39Mmu,
+    ) -> Result<BusType, Exception> {
+        return self.load_nommu(addr, size);
+    }
+
+    pub fn store(
+        &mut self,
+        addr: BusType,
+        data: BusType,
+        size: BusType,
+        mmu: &Sv39Mmu,
+    ) -> Result<(), Exception> {
+        return self.store_nommu(addr, data, size);
+    }
+
+    pub fn load_nommu(&mut self, addr: BusType, size: BusType) -> Result<BusType, Exception> {
         for device in &mut self.devices {
             if addr >= device.get_begin_addr() && addr < device.get_end_addr() {
-                return device.read(addr, size);
+                return device.load(addr, size);
             }
         }
 
         Err(Exception::LoadAccessFault(addr))
     }
 
-    pub fn fetch(&mut self, addr: BusType, size: BusType) -> Result<BusType, Exception> {
-        self.read(addr, size)
+    pub fn fetch_nommu(&mut self, addr: BusType, size: BusType) -> Result<BusType, Exception> {
+        self.load_nommu(addr, size)
     }
 
-    pub fn write(&mut self, addr: BusType, data: BusType, size: BusType) -> Result<(), Exception> {
+    pub fn store_nommu(
+        &mut self,
+        addr: BusType,
+        data: BusType,
+        size: BusType,
+    ) -> Result<(), Exception> {
         for device in &mut self.devices {
             if addr >= device.get_begin_addr() && addr < device.get_end_addr() {
-                return device.write(addr, data, size);
+                return device.store(addr, data, size);
             }
         }
 

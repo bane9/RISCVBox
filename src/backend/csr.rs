@@ -2,14 +2,16 @@ use common::DecodeRet;
 
 use crate::backend::common;
 use crate::backend::target::core::{BackendCore, BackendCoreImpl};
-use crate::cpu::csr::{self, MppMode};
+use crate::bus::mmu::Mmu;
+use crate::bus::BusType;
+use crate::cpu::csr::{self, CsrType, MppMode};
 use crate::cpu::{self, CpuReg, Exception};
 
 use super::{ReturnableHandler, ReturnableImpl};
 
 pub struct CsrImpl;
 
-type CsrHandler = fn(usize, usize) -> usize;
+type CsrHandler = fn(usize, usize) -> Result<usize, Exception>;
 
 const CSR_REG_ACCESS_FLAG: usize = 1 << (usize::BITS - 1);
 
@@ -20,18 +22,40 @@ const CSRRWI: usize = 3;
 const CSRRSI: usize = 4;
 const CSRRCI: usize = 5;
 
-fn csr_default_handler(csr_reg: usize, csr_val: usize) -> usize {
+fn csr_default_handler(csr_reg: usize, csr_val: usize) -> Result<usize, Exception> {
     let csr = csr::get_csr();
 
     csr.write(csr_reg, csr_val as u32);
 
-    return csr_val;
+    Ok(csr_val)
 }
 
-const CSR_HANDLERS: [CsrHandler; csr::CSR_COUNT] = [csr_default_handler; csr::CSR_COUNT];
-
-extern "C" fn csr_handler_cb(csr_reg: usize, rd: usize, rhs: usize, op: usize) {
+fn csr_satp_handler(csr_reg: usize, csr_val: usize) -> Result<usize, Exception> {
     let cpu = cpu::get_cpu();
+
+    if cpu.csr.read_bit_mstatus(csr::bits::TVM) {
+        // TODO: replace 0 with the correct value
+        return Err(Exception::IllegalInstruction(0));
+    }
+
+    let val = csr_default_handler(csr_reg, csr_val);
+
+    cpu.mmu.update(val.unwrap() as BusType);
+
+    val
+}
+
+static mut CSR_HANDLERS: [CsrHandler; csr::CSR_COUNT] = [csr_default_handler; csr::CSR_COUNT];
+
+pub fn init_backend_csr() {
+    let &mut csr_handlers = unsafe { &mut CSR_HANDLERS };
+}
+
+extern "C" fn csr_handler_cb(csr_reg: usize, rd_rhs: usize, op: usize, pc: usize) {
+    let cpu = cpu::get_cpu();
+
+    let rd = (rd_rhs >> 8) & 0x1f;
+    let rhs = rd_rhs & 0xff;
 
     let val: usize = if rhs & CSR_REG_ACCESS_FLAG != 0 {
         cpu.regs[rhs & !CSR_REG_ACCESS_FLAG] as usize
@@ -51,10 +75,16 @@ extern "C" fn csr_handler_cb(csr_reg: usize, rd: usize, rhs: usize, op: usize) {
         _ => panic!("Invalid CSR operation"),
     };
 
-    let rd_val = CSR_HANDLERS[csr_reg](csr_reg, new_csr_val) as u32;
+    let rd_val = unsafe { &CSR_HANDLERS }[csr_reg](csr_reg, new_csr_val);
+
+    if rd_val.is_err() {
+        cpu.set_exception(rd_val.err().unwrap(), pc as CpuReg);
+
+        ReturnableImpl::throw();
+    }
 
     if rd != 0 {
-        cpu.regs[rd] = rd_val;
+        cpu.regs[rd] = rd_val.unwrap() as CsrType;
     }
 }
 
@@ -117,7 +147,13 @@ impl common::Csr for CsrImpl {
         let rs1 = (rs1 as usize) | CSR_REG_ACCESS_FLAG;
         let csr = csr as usize;
 
-        let insn = BackendCoreImpl::emit_void_call_with_4_args(csr_handler_cb, csr, rd, rs1, CSRRW);
+        let insn = BackendCoreImpl::emit_void_call_with_4_args(
+            csr_handler_cb,
+            csr,
+            (rd << 8) | rs1,
+            CSRRW,
+            cpu::get_cpu().pc as usize,
+        );
 
         Ok(insn)
     }
@@ -127,7 +163,13 @@ impl common::Csr for CsrImpl {
         let rs1 = (rs1 as usize) | CSR_REG_ACCESS_FLAG;
         let csr = csr as usize;
 
-        let insn = BackendCoreImpl::emit_void_call_with_4_args(csr_handler_cb, csr, rd, rs1, CSRRS);
+        let insn = BackendCoreImpl::emit_void_call_with_4_args(
+            csr_handler_cb,
+            csr,
+            (rd << 8) | rs1,
+            CSRRS,
+            cpu::get_cpu().pc as usize,
+        );
 
         Ok(insn)
     }
@@ -137,7 +179,13 @@ impl common::Csr for CsrImpl {
         let rs1 = (rs1 as usize) | CSR_REG_ACCESS_FLAG;
         let csr = csr as usize;
 
-        let insn = BackendCoreImpl::emit_void_call_with_4_args(csr_handler_cb, csr, rd, rs1, CSRRC);
+        let insn = BackendCoreImpl::emit_void_call_with_4_args(
+            csr_handler_cb,
+            csr,
+            (rd << 8) | rs1,
+            CSRRC,
+            cpu::get_cpu().pc as usize,
+        );
 
         Ok(insn)
     }
@@ -147,8 +195,13 @@ impl common::Csr for CsrImpl {
         let rs1 = zimm as usize;
         let csr = csr as usize;
 
-        let insn =
-            BackendCoreImpl::emit_void_call_with_4_args(csr_handler_cb, csr, rd, rs1, CSRRWI);
+        let insn = BackendCoreImpl::emit_void_call_with_4_args(
+            csr_handler_cb,
+            csr,
+            (rd << 8) | rs1,
+            CSRRWI,
+            cpu::get_cpu().pc as usize,
+        );
 
         Ok(insn)
     }
@@ -158,8 +211,13 @@ impl common::Csr for CsrImpl {
         let rs1 = zimm as usize;
         let csr = csr as usize;
 
-        let insn =
-            BackendCoreImpl::emit_void_call_with_4_args(csr_handler_cb, csr, rd, rs1, CSRRSI);
+        let insn = BackendCoreImpl::emit_void_call_with_4_args(
+            csr_handler_cb,
+            csr,
+            (rd << 8) | rs1,
+            CSRRSI,
+            cpu::get_cpu().pc as usize,
+        );
 
         Ok(insn)
     }
@@ -169,8 +227,13 @@ impl common::Csr for CsrImpl {
         let rs1 = zimm as usize;
         let csr = csr as usize;
 
-        let insn =
-            BackendCoreImpl::emit_void_call_with_4_args(csr_handler_cb, csr, rd, rs1, CSRRCI);
+        let insn = BackendCoreImpl::emit_void_call_with_4_args(
+            csr_handler_cb,
+            csr,
+            (rd << 8) | rs1,
+            CSRRCI,
+            cpu::get_cpu().pc as usize,
+        );
 
         Ok(insn)
     }

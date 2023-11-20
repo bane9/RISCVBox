@@ -10,22 +10,22 @@ mod xmem;
 use std::thread;
 use std::time::Duration;
 
-use std::process::Output;
-
+use backend::csr::init_backend_csr;
 use bus::{ram::RAM_BEGIN_ADDR, BusType};
 use cpu::Exception;
 use frontend::exec_core::ExecCoreThreadPool;
+use std::process::Output;
 
 const TOHOSTADDR: BusType = 0x01000000;
 
 struct ToHost;
 
 impl bus::BusDevice for ToHost {
-    fn read(&mut self, _addr: BusType, _size: BusType) -> Result<BusType, Exception> {
+    fn load(&mut self, _addr: BusType, _size: BusType) -> Result<BusType, Exception> {
         Ok(0)
     }
 
-    fn write(&mut self, _addr: BusType, _data: BusType, _size: BusType) -> Result<(), Exception> {
+    fn store(&mut self, _addr: BusType, _data: BusType, _size: BusType) -> Result<(), Exception> {
         let cpu = cpu::get_cpu();
 
         let a0 = if cpu.regs[cpu::RegName::A0 as usize] == 0 {
@@ -98,6 +98,8 @@ fn main() {
     // let arg = "testbins/rv32ua/bin/amoswap_w.bin";
     // let rom = util::read_file(arg).unwrap();
 
+    init_backend_csr();
+
     init_bus(rom.clone(), ram_size);
 
     let exec_thread_pool = ExecCoreThreadPool::new(RAM_BEGIN_ADDR, 1);
@@ -107,20 +109,24 @@ fn main() {
     std::process::exit(1); // It's only valid to exit from the tohost device
 }
 
-fn get_least_one_path(path: &[&str]) -> String {
+fn get_least_one_path(path: &[&str]) -> Option<String> {
     for p in path {
         if std::path::Path::new(p).exists() {
-            return p.to_string();
+            return Some(p.to_string());
         }
     }
 
-    panic!("Please compile test_riscv_isa as either debug or release");
+    None
 }
 
 fn run_bin_as_subproccess(bin: &str) -> Output {
     let path = get_least_one_path(&["target/debug/deps/", "target/release/deps/"]);
 
-    let child = std::process::Command::new(path + "test_riscv_isa")
+    if path.is_none() {
+        panic!("Please compile test_riscv_isa as debug or release first")
+    }
+
+    let child = std::process::Command::new(path.unwrap() + "test_riscv_isa")
         .arg(bin)
         .arg("timeout")
         .stdout(std::process::Stdio::piped())

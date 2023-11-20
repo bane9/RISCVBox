@@ -13,7 +13,7 @@ impl Ram {
 }
 
 impl BusDevice for Ram {
-    fn read(&mut self, addr: BusType, size: BusType) -> Result<BusType, Exception> {
+    fn load(&mut self, addr: BusType, size: BusType) -> Result<BusType, Exception> {
         let adj_addr = (addr as usize) - (self.get_begin_addr() as usize);
 
         let mut data: BusType = 0;
@@ -29,7 +29,7 @@ impl BusDevice for Ram {
         Ok(data)
     }
 
-    fn write(&mut self, addr: BusType, data: BusType, size: BusType) -> Result<(), Exception> {
+    fn store(&mut self, addr: BusType, data: BusType, size: BusType) -> Result<(), Exception> {
         let adj_addr = (addr as usize) - (self.get_begin_addr() as usize);
 
         unsafe {

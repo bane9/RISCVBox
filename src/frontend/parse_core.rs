@@ -4,6 +4,9 @@ use crate::backend::common::HostEncodedInsn;
 
 use crate::backend::target::core::BackendCoreImpl;
 use crate::bus::bus;
+use crate::bus::bus::BusType;
+use crate::bus::mmu::AccessType;
+use crate::bus::mmu::Mmu;
 use crate::cpu;
 use crate::cpu::CpuReg;
 use crate::cpu::Exception;
@@ -89,13 +92,22 @@ impl ParseCore {
         }
 
         let old_pc = cpu.pc;
+        let mut virt_pc = old_pc;
 
-        cpu.pc = guest_start as CpuReg;
+        cpu.pc = cpu
+            .mmu
+            .translate(guest_start as CpuReg, AccessType::Fetch)
+            .unwrap();
+
+        let guest_end = cpu
+            .mmu
+            .translate(guest_end as CpuReg, AccessType::Fetch)
+            .unwrap();
 
         cpu.gpfn_state.add_gpfn(guest_start as CpuReg);
 
-        while (cpu.pc as usize) < guest_end {
-            let loaded_insn = bus.fetch(cpu.pc, INSN_SIZE_BITS as u32);
+        while cpu.pc < guest_end {
+            let loaded_insn = bus.translate(cpu.pc, &cpu.mmu);
 
             // if loaded_insn.is_err() {
             //     cpu.pc += INSN_SIZE as u32;
@@ -114,10 +126,11 @@ impl ParseCore {
 
             unsafe {
                 let code_page_mut = code_page as *mut CodePageImpl;
-                result = self.decode_single(&mut *code_page_mut, code_page_idx, insn);
+                result = self.decode_single(&mut *code_page_mut, code_page_idx, insn, virt_pc);
             }
 
             cpu.pc += INSN_SIZE as u32;
+            virt_pc += INSN_SIZE as u32;
 
             if let Err(JitCommon::JitError::ReachedBlockBoundary) = result {
                 break;
@@ -144,6 +157,7 @@ impl ParseCore {
         code_page: &mut CodePageImpl,
         code_page_idx: usize,
         insn: u32,
+        virt_pc: BusType,
     ) -> Result<(), JitCommon::JitError> {
         static DECODERS: [DecoderFn; 4] = [
             rvi::decode_rvi,
@@ -184,8 +198,14 @@ impl ParseCore {
 
         let cpu = cpu::get_cpu();
 
+        let virt_pc = if cpu.mmu.is_active() {
+            Some(virt_pc)
+        } else {
+            None
+        };
+
         cpu.insn_map
-            .add_mapping(cpu.pc, host_insn_ptr, code_page_idx);
+            .add_mapping(cpu.pc, host_insn_ptr, code_page_idx, virt_pc);
 
         Ok(())
     }

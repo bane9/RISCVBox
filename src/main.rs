@@ -7,6 +7,7 @@ mod frontend;
 mod util;
 mod xmem;
 
+use backend::csr::init_backend_csr;
 use bus::ram::RAM_BEGIN_ADDR;
 use frontend::exec_core::ExecCoreThreadPool;
 
@@ -27,6 +28,8 @@ fn init_bus(mut rom: Vec<u8>, ram_size: usize) {
 fn main() {
     let ram_size = util::size_mib(4);
     let rom = util::read_file("test.bin").unwrap();
+
+    init_backend_csr();
 
     init_bus(rom.clone(), ram_size);
 

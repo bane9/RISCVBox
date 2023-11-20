@@ -285,7 +285,7 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize) -> usize {
 
     let bus = bus::get_bus();
 
-    let jmp_addr = bus.translate(jmp_addr as BusType);
+    let jmp_addr = bus.translate(jmp_addr as BusType, &cpu.mmu);
 
     if jmp_addr.is_err() {
         cpu.set_exception(jmp_addr.err().unwrap(), jmp_cond.pc);
@@ -372,7 +372,7 @@ pub extern "C" fn c_bus_resolver_cb(bus_vars: usize) {
     let bus = bus::get_bus();
 
     if is_load {
-        let data = bus.read(addres, size);
+        let data = bus.load(addres, size, &cpu.mmu);
 
         if data.is_err() {
             cpu.exception = data.err().unwrap();
@@ -394,7 +394,7 @@ pub extern "C" fn c_bus_resolver_cb(bus_vars: usize) {
     } else {
         let data = cpu.regs[bus_vars.reg1 as usize];
 
-        let res = bus.write(addres, data, size);
+        let res = bus.store(addres, data, size, &cpu.mmu);
 
         if res.is_err() {
             cpu.set_exception(res.err().unwrap(), bus_vars.pc);
