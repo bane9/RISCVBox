@@ -1,27 +1,40 @@
-use crate::cpu::{
-    cpu,
-    csr::{self},
+use crate::{
+    cpu::{
+        cpu,
+        csr::{self},
+    },
+    frontend::exec_core::INSN_SIZE,
 };
 use cpu::{Exception, Interrupt};
 
 use super::{csr::MppMode, CpuReg};
 
-pub fn has_pending_interrupt() -> Option<Interrupt> {
+pub fn are_interrupts_enabled() -> bool {
     let cpu = cpu::get_cpu();
 
     match cpu.mode {
         csr::MppMode::Machine => {
             if !cpu.csr.read_bit_mstatus(csr::bits::MIE) {
-                return None;
+                return false;
             }
         }
         csr::MppMode::Supervisor => {
             if !cpu.csr.read_bit_sstatus(csr::bits::SIE) {
-                return None;
+                return false;
             }
         }
         csr::MppMode::User => {}
     }
+
+    return true;
+}
+
+pub fn has_pending_interrupt() -> Option<Interrupt> {
+    if !are_interrupts_enabled() {
+        return None;
+    }
+
+    let cpu = cpu::get_cpu();
 
     let mie = cpu.csr.read(csr::register::MIE);
     let mip = cpu.csr.read(csr::register::MIP);
@@ -67,7 +80,7 @@ pub fn has_pending_interrupt() -> Option<Interrupt> {
     None
 }
 
-pub fn handle_interrupt(int_val: Interrupt, pc: CpuReg) {
+pub fn handle_interrupt(int_val: Interrupt) {
     assert!(int_val != Interrupt::None);
 
     let cpu = cpu::get_cpu();
@@ -80,6 +93,8 @@ pub fn handle_interrupt(int_val: Interrupt, pc: CpuReg) {
         false
     };
 
+    let pc = (cpu.c_exception_pc) as CpuReg;
+
     if mideleg_flag & (mode == MppMode::Supervisor || mode == MppMode::User) {
         cpu.mode = MppMode::Supervisor;
 
@@ -87,12 +102,18 @@ pub fn handle_interrupt(int_val: Interrupt, pc: CpuReg) {
         let vt_offset = if stvec_val & 1 == 0 {
             0
         } else {
-            int_val as CpuReg * 4
+            int_val as CpuReg * INSN_SIZE as CpuReg
         };
 
         cpu.next_pc = (stvec_val & !1) + vt_offset;
-        // TODO: This is incomplete
+
         cpu.csr.write(csr::register::SEPC, pc & !1);
+        cpu.csr.write(
+            csr::register::SCAUSE,
+            cpu.exception.to_cpu_reg() | (1 << (CpuReg::BITS - 1)),
+        );
+        cpu.csr
+            .write(csr::register::STVAL, cpu.c_exception_data as CpuReg);
         cpu.csr
             .write_bit_sstatus(csr::bits::SPIE, cpu.csr.read_bit_sstatus(csr::bits::SIE));
         cpu.csr.write_bit_sstatus(csr::bits::SIE, false);
@@ -104,12 +125,18 @@ pub fn handle_interrupt(int_val: Interrupt, pc: CpuReg) {
         let vt_offset = if mtvec_val & 1 == 0 {
             0
         } else {
-            int_val as CpuReg * 4
+            int_val as CpuReg * INSN_SIZE as CpuReg
         };
 
         cpu.next_pc = (mtvec_val & !1) + vt_offset;
 
         cpu.csr.write(csr::register::MEPC, pc & !1);
+        cpu.csr.write(
+            csr::register::MCAUSE,
+            cpu.exception.to_cpu_reg() | (1 << (CpuReg::BITS - 1)),
+        );
+        cpu.csr
+            .write(csr::register::MTVAL, cpu.c_exception_data as CpuReg);
         cpu.csr
             .write_bit_mstatus(csr::bits::MPIE, cpu.csr.read_bit_mstatus(csr::bits::MIE));
         cpu.csr.write_bit_mstatus(csr::bits::MIE, false);

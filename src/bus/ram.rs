@@ -51,11 +51,13 @@ impl BusDevice for Ram {
         return self.get_begin_addr() + self.mem.len() as BusType;
     }
 
-    fn tick(&mut self) {}
+    fn tick_core_local(&mut self) {}
 
     fn get_ptr(&mut self, addr: BusType) -> Result<*mut u8, Exception> {
         let adj_addr = (addr as usize) - (self.get_begin_addr() as usize);
 
         unsafe { Ok(self.mem.as_mut_ptr().add(adj_addr)) }
     }
+
+    fn tick_from_main_thread(&mut self) {}
 }

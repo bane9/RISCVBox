@@ -20,3 +20,4 @@ name = "test_riscv_isa"
 path = "src/test_riscv_isa.rs"
 
 [dependencies]
+chrono = "0.4.31"

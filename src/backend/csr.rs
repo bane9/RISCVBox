@@ -328,7 +328,12 @@ impl common::Csr for CsrImpl {
     }
 
     fn emit_wfi() -> DecodeRet {
-        todo!()
+        let mut insn = BackendCoreImpl::emit_ret_with_exception(Exception::Wfi);
+        let ret = BackendCoreImpl::emit_ret();
+
+        insn.push_slice(ret.iter().as_slice());
+
+        Ok(insn)
     }
 
     fn emit_sfence_vma() -> DecodeRet {

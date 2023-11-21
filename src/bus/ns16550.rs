@@ -131,9 +131,11 @@ impl BusDevice for Ns16550 {
         return (UART_BASE_ADDRESS + 8) as BusType;
     }
 
-    fn tick(&mut self) {}
+    fn tick_core_local(&mut self) {}
 
     fn get_ptr(&mut self, _addr: BusType) -> Result<*mut u8, Exception> {
         return Ok(std::ptr::null_mut());
     }
+
+    fn tick_from_main_thread(&mut self) {}
 }

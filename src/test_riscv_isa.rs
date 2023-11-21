@@ -53,11 +53,12 @@ impl bus::BusDevice for ToHost {
         TOHOSTADDR + 16
     }
 
-    fn tick(&mut self) {}
-
     fn get_ptr(&mut self, _addr: BusType) -> Result<*mut u8, Exception> {
         Ok(std::ptr::null_mut())
     }
+
+    fn tick_core_local(&mut self) {}
+    fn tick_from_main_thread(&mut self) {}
 }
 
 fn init_bus(mut rom: Vec<u8>, ram_size: usize) {
@@ -100,7 +101,7 @@ fn main() {
         timeout_thread();
     }
 
-    // let arg = "testbins/rv32si/bin/sbreak.bin";
+    // let arg = "testbins/rv32si/bin/wfi.bin";
     // let rom = util::read_file(arg).unwrap();
 
     init_backend_csr();

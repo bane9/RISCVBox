@@ -20,9 +20,24 @@ impl ExecCore {
     fn get_jit_ptr(&mut self) -> *mut u8 {
         let cpu = cpu::get_cpu();
 
-        let next_phys_pc = bus::get_bus()
-            .translate(cpu.next_pc, &cpu.mmu, AccessType::Fetch)
-            .unwrap();
+        if cpu.exception != cpu::Exception::None {
+            let int = trap::has_pending_interrupt();
+
+            if int.is_some() {
+                trap::handle_interrupt(int.unwrap());
+            }
+        }
+
+        let mut next_phys_pc = bus::get_bus().translate(cpu.next_pc, &cpu.mmu, AccessType::Fetch);
+
+        if next_phys_pc.is_err() {
+            cpu.set_exception(next_phys_pc.err().unwrap(), cpu.next_pc);
+            trap::handle_exception();
+
+            next_phys_pc = bus::get_bus().translate(cpu.next_pc, &cpu.mmu, AccessType::Fetch);
+        }
+
+        let next_phys_pc = next_phys_pc.expect("Failed to translate pc after exception");
 
         let mut insn_data = cpu.insn_map.get_by_guest_idx(next_phys_pc);
         if insn_data.is_none() {
@@ -36,8 +51,9 @@ impl ExecCore {
         insn_data.unwrap().host_ptr
     }
 
-    pub fn exec_loop(&mut self, initial_pc: CpuReg) {
+    pub fn exec_loop(&mut self, core_id: CpuReg, initial_pc: CpuReg) {
         let cpu = cpu::get_cpu();
+        cpu.core_id = core_id;
         cpu.next_pc = initial_pc;
 
         loop {
@@ -104,6 +120,25 @@ impl ExecCore {
                 // If a mmu drops execute permission on a page, we can discard the jit block
                 unimplemented!()
             }
+            cpu::Exception::Wfi => {
+                if trap::are_interrupts_enabled() {
+                    let bus = bus::get_bus();
+
+                    // I hate this from the bottom of my heart but the altrenative is making
+                    // all csr accesses atomic which I hate even more so this will have to do
+                    loop {
+                        bus.tick_core_local();
+
+                        if trap::has_pending_interrupt().is_some() {
+                            break;
+                        }
+
+                        std::thread::sleep(std::time::Duration::from_millis(100));
+                    }
+                }
+
+                cpu.next_pc = cpu.c_exception_pc as CpuReg + INSN_SIZE as CpuReg;
+            }
             cpu::Exception::Mret | cpu::Exception::Sret => {}
             cpu::Exception::None => {
                 unreachable!("Exiting jit block without setting an exception is invalid");
@@ -115,10 +150,10 @@ impl ExecCore {
     }
 }
 
-pub fn exec_core_thread(initial_pc: CpuReg) {
+pub fn exec_core_thread(cpu_core_idx: usize, initial_pc: CpuReg) {
     let mut exec_core = ExecCore::new();
 
-    exec_core.exec_loop(initial_pc);
+    exec_core.exec_loop(cpu_core_idx as CpuReg, initial_pc);
 }
 
 pub struct ExecCoreThreadPool {
@@ -129,8 +164,10 @@ impl ExecCoreThreadPool {
     pub fn new(ram_begin_addr: BusType, thread_count: usize) -> Self {
         let mut threads = Vec::new();
 
-        for _ in 0..thread_count {
-            threads.push(std::thread::spawn(move || exec_core_thread(ram_begin_addr)));
+        for core_id in 0..thread_count {
+            threads.push(std::thread::spawn(move || {
+                exec_core_thread(core_id, ram_begin_addr)
+            }));
         }
 
         Self { threads }

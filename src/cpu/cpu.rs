@@ -166,6 +166,7 @@ pub enum Exception {
     InvalidateJitBlock(CpuReg) = 0x104,
     DiscardJitBlock(CpuReg) = 0x105,
     MmuStateUpdate = 0x106,
+    Wfi = 0x107,
 }
 
 impl Exception {
@@ -193,6 +194,7 @@ impl Exception {
             0x104 => Exception::InvalidateJitBlock(data),
             0x105 => Exception::DiscardJitBlock(data),
             0x106 => Exception::MmuStateUpdate,
+            0x107 => Exception::Wfi,
             _ => Exception::None,
         }
     }
@@ -221,6 +223,7 @@ impl Exception {
             Exception::InvalidateJitBlock(_) => 0x104,
             Exception::DiscardJitBlock(_) => 0x105,
             Exception::MmuStateUpdate => 0x106,
+            Exception::Wfi => 0x107,
         }
     }
 
@@ -248,6 +251,7 @@ impl Exception {
             Exception::InvalidateJitBlock(data) => *data,
             Exception::DiscardJitBlock(data) => *data,
             Exception::MmuStateUpdate => 0,
+            Exception::Wfi => 0,
         };
 
         data
@@ -255,6 +259,7 @@ impl Exception {
 }
 
 pub struct Cpu {
+    pub core_id: CpuReg,
     pub next_pc: CpuReg,
     pub current_gpfn: CpuReg,
     pub current_gpfn_offset: CpuReg,
@@ -274,6 +279,7 @@ pub struct Cpu {
 impl Cpu {
     pub fn new() -> Cpu {
         Cpu {
+            core_id: CpuReg::MAX,
             next_pc: 0,
             current_gpfn: 0,
             current_gpfn_offset: 0,

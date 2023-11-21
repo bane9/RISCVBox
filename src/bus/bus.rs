@@ -1,5 +1,5 @@
 use crate::bus::mmu::*;
-use crate::cpu::Exception;
+use crate::cpu::*;
 
 pub type BusType = u32;
 
@@ -8,7 +8,8 @@ pub trait BusDevice {
     fn store(&mut self, addr: BusType, data: BusType, size: BusType) -> Result<(), Exception>;
     fn get_begin_addr(&self) -> BusType;
     fn get_end_addr(&self) -> BusType;
-    fn tick(&mut self);
+    fn tick_core_local(&mut self);
+    fn tick_from_main_thread(&mut self);
     fn get_ptr(&mut self, addr: BusType) -> Result<*mut u8, Exception>;
 }
 
@@ -117,9 +118,15 @@ impl Bus {
         Err(Exception::StoreAccessFault(addr))
     }
 
-    pub fn tick(&mut self) {
+    pub fn tick_core_local(&mut self) {
         for device in &mut self.devices {
-            device.tick();
+            device.tick_core_local();
+        }
+    }
+
+    pub fn tick_from_main_thread(&mut self) {
+        for device in &mut self.devices {
+            device.tick_from_main_thread();
         }
     }
 

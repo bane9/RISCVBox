@@ -57,10 +57,8 @@ pub const FS: usize = 0x6000;
 pub const XS: usize = 0x18000;
 pub const SUM: usize = 1 << 18;
 pub const MXR: usize = 1 << 19;
-pub const UXL: usize = 0x300000000;
-pub const SD: usize = 1 << 63;
 
-pub const SSTATUS: usize = SIE | SPIE | UBE | SPP | FS | XS | SUM | MXR | UXL | SD;
+pub const SSTATUS: usize = SIE | SPIE | UBE | SPP | FS | XS | SUM | MXR;
 
 pub const MIE: usize = 1 << 3;
 pub const MPIE: usize = 1 << 7;
@@ -140,8 +138,8 @@ impl Csr {
 
     pub fn read(&self, addr: usize) -> CsrType {
         match addr {
-            SSTATUS => self.regs[register::MSTATUS] & SSTATUS as CsrType,
-            SIE => self.regs[register::SIE] & self.regs[register::MIDELEG],
+            register::SSTATUS => self.regs[register::MSTATUS] & SSTATUS as CsrType,
+            register::SIE => self.regs[register::SIE] & self.regs[register::MIDELEG],
             register::SIP => self.regs[register::MIP] & self.regs[register::MIDELEG],
             _ => self.regs[addr],
         }
@@ -149,12 +147,12 @@ impl Csr {
 
     pub fn write(&mut self, addr: usize, data: CsrType) {
         match addr {
-            SSTATUS => {
+            register::SSTATUS => {
                 let val = (self.regs[register::MSTATUS as usize] & !SSTATUS as u32)
                     | (data & SSTATUS as u32);
                 self.regs[register::MSTATUS as usize] = val;
             }
-            SIE => {
+            register::SIE => {
                 let val = (self.regs[register::MIE] & !self.regs[register::MIDELEG as usize])
                     | (data & self.regs[register::MIDELEG as usize]);
                 self.regs[register::MIE as usize] = val;
@@ -215,11 +213,11 @@ impl Csr {
     }
 
     pub fn read_bit_sstatus(&self, bit: usize) -> bool {
-        self.read_bit(SSTATUS, bit)
+        self.read_bit(register::SSTATUS, bit)
     }
 
     pub fn write_bit_sstatus(&mut self, bit: usize, bit_value: bool) {
-        self.write_bit(SSTATUS, bit, bit_value);
+        self.write_bit(register::SSTATUS, bit, bit_value);
     }
 }
 
