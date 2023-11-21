@@ -100,7 +100,7 @@ fn main() {
         timeout_thread();
     }
 
-    // let arg = "testbins/rv32si/bin/dirty.bin";
+    // let arg = "testbins/rv32si/bin/sbreak.bin";
     // let rom = util::read_file(arg).unwrap();
 
     init_backend_csr();

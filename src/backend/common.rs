@@ -212,6 +212,7 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize) -> usize {
         JumpCond::AlwaysAbsolute => {
             let pc = cpu.regs[jmp_cond.reg2 as usize] as i64;
             let pc = pc.wrapping_add(jmp_cond.imm as i64);
+            let pc = pc & !1;
 
             (pc as u32, true)
         }
@@ -299,7 +300,7 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize) -> usize {
     let host_addr = cpu.insn_map.get_by_guest_idx(jmp_addr);
 
     if host_addr.is_none() {
-        cpu.set_exception(Exception::ForwardJumpFault(jmp_cond.pc), jmp_cond.pc);
+        cpu.set_exception(Exception::ForwardJumpFault(jmp_addr), jmp_cond.pc);
 
         ReturnableImpl::throw();
     }

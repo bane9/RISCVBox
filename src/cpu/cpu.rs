@@ -229,7 +229,7 @@ impl Exception {
             Exception::InstructionAddressMisaligned(data) => *data,
             Exception::InstructionAccessFault(data) => *data,
             Exception::IllegalInstruction(data) => *data,
-            Exception::Breakpoint => 0,
+            Exception::Breakpoint => cpu::get_cpu().c_exception_pc as CpuReg,
             Exception::LoadAddressMisaligned(data) => *data,
             Exception::LoadAccessFault(data) => *data,
             Exception::StoreAddressMisaligned(data) => *data,

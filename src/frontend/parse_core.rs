@@ -57,12 +57,6 @@ impl ParseCore {
 
         self.code_pages.remove_code_page(idx);
 
-        println!(
-            "Invalidating range: {:x}-{:x}",
-            gpfn,
-            gpfn + INSN_PAGE_SIZE as CpuReg
-        );
-
         self.parse_gpfn(Some(gpfn))
             .expect("Failed to parse page after invalidation");
     }
@@ -106,17 +100,16 @@ impl ParseCore {
                 INSN_SIZE_BITS as BusType,
             );
 
-            // if loaded_insn.is_err() {
-            //     cpu.pc += INSN_SIZE as u32;
-            //     continue;
-            // }
-
-            unsafe {
-                std::ptr::copy_nonoverlapping(
-                    &loaded_insn.unwrap() as *const u32 as *const u8,
-                    &mut insn as *mut u32 as *mut u8,
-                    INSN_SIZE,
-                );
+            if loaded_insn.is_ok() {
+                unsafe {
+                    std::ptr::copy_nonoverlapping(
+                        &loaded_insn.unwrap() as *const u32 as *const u8,
+                        &mut insn as *mut u32 as *mut u8,
+                        INSN_SIZE,
+                    );
+                }
+            } else {
+                insn = 0;
             }
 
             let result: Result<(), JitCommon::JitError>;

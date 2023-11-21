@@ -86,7 +86,7 @@ extern "C" fn csr_handler_cb(csr_reg: usize, rd_rhs: usize, op: usize, pc: usize
     }
 
     if rd != 0 {
-        cpu.regs[rd] = rd_val.unwrap() as CsrType;
+        cpu.regs[rd] = csr_val as CsrType;
     }
 
     if csr_reg == csr::register::SATP {
@@ -295,7 +295,10 @@ impl common::Csr for CsrImpl {
     }
 
     fn emit_ebreak() -> DecodeRet {
-        let insn = BackendCoreImpl::emit_ret_with_exception(Exception::Breakpoint);
+        let mut insn = BackendCoreImpl::emit_ret_with_exception(Exception::Breakpoint);
+        let ret = BackendCoreImpl::emit_ret();
+
+        insn.push_slice(ret.iter().as_slice());
 
         Ok(insn)
     }

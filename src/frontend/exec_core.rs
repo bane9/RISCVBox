@@ -84,8 +84,17 @@ impl ExecCore {
                 cpu.next_pc = cpu.c_exception_pc as CpuReg + INSN_SIZE as CpuReg;
             }
             cpu::Exception::ForwardJumpFault(pc) => {
-                println!("ForwardJumpFault: pc = {:#x}", pc);
-                std::process::exit(1);
+                // We'll enter here both on unmapped jumps and missaligned jumps
+                // In the case of missaligned jumps, we'll forward the exception
+                // to the trap handler
+
+                if pc % INSN_SIZE as CpuReg != 0 {
+                    cpu.exception = cpu::Exception::InstructionAddressMisaligned(pc);
+                    println!("Forward jump forwarding as {:?}", cpu.exception);
+                    trap::handle_exception();
+                } else {
+                    cpu.next_pc = cpu.c_exception_pc as CpuReg;
+                }
             }
             cpu::Exception::InvalidateJitBlock(gpfn) => {
                 self.parse_core.invalidate(gpfn);

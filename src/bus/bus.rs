@@ -44,7 +44,13 @@ impl Bus {
     ) -> Result<BusType, Exception> {
         let phys_addr = self.translate(addr, mmu, AccessType::Load)?;
 
-        return self.load_nommu(phys_addr, size);
+        let res = self.load_nommu(phys_addr, size);
+
+        if res.is_err() {
+            return Err(Exception::LoadPageFault(addr));
+        }
+
+        res
     }
 
     pub fn fetch(
@@ -73,7 +79,13 @@ impl Bus {
     ) -> Result<(), Exception> {
         let phys_addr = self.translate(addr, mmu, AccessType::Store)?;
 
-        return self.store_nommu(phys_addr, data, size);
+        let res = self.store_nommu(phys_addr, data, size);
+
+        if res.is_err() {
+            return Err(Exception::StorePageFault(addr));
+        }
+
+        res
     }
 
     pub fn load_nommu(&mut self, addr: BusType, size: BusType) -> Result<BusType, Exception> {

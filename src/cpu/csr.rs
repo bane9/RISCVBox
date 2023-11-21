@@ -140,9 +140,9 @@ impl Csr {
 
     pub fn read(&self, addr: usize) -> CsrType {
         match addr {
-            SSTATUS => self.regs[SSTATUS] | SSTATUS as CsrType,
-            SIE => self.regs[SIE] | SIE as CsrType,
-            register::SIP => self.regs[register::SIP] | register::SIP as CsrType,
+            SSTATUS => self.regs[register::MSTATUS] & SSTATUS as CsrType,
+            SIE => self.regs[register::SIE] & self.regs[register::MIDELEG],
+            register::SIP => self.regs[register::MIP] & self.regs[register::MIDELEG],
             _ => self.regs[addr],
         }
     }
@@ -155,7 +155,7 @@ impl Csr {
                 self.regs[register::MSTATUS as usize] = val;
             }
             SIE => {
-                let val = (self.regs[MIE as usize] & !self.regs[register::MIDELEG as usize])
+                let val = (self.regs[register::MIE] & !self.regs[register::MIDELEG as usize])
                     | (data & self.regs[register::MIDELEG as usize]);
                 self.regs[register::MIE as usize] = val;
             }
