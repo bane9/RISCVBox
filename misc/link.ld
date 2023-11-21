@@ -53,4 +53,8 @@ SECTIONS
   { 
     *(.tohost)
   } >TOHOST AT >RAM
+
+  /DISCARD/ : {
+    *(.riscv.attributes)
+  }
 }

@@ -48,9 +48,9 @@ fn csr_satp_handler(csr_reg: usize, csr_val: usize) -> Result<usize, Exception> 
 static mut CSR_HANDLERS: [CsrHandler; csr::CSR_COUNT] = [csr_default_handler; csr::CSR_COUNT];
 
 pub fn init_backend_csr() {
-    let &mut mut csr_handlers = unsafe { &mut CSR_HANDLERS };
-
-    csr_handlers[csr::register::SATP] = csr_satp_handler;
+    unsafe {
+        CSR_HANDLERS[csr::register::SATP] = csr_satp_handler;
+    }
 }
 
 extern "C" fn csr_handler_cb(csr_reg: usize, rd_rhs: usize, op: usize, pc: usize) {
@@ -87,6 +87,12 @@ extern "C" fn csr_handler_cb(csr_reg: usize, rd_rhs: usize, op: usize, pc: usize
 
     if rd != 0 {
         cpu.regs[rd] = rd_val.unwrap() as CsrType;
+    }
+
+    if csr_reg == csr::register::SATP {
+        cpu.set_exception(Exception::MmuStateUpdate, pc as CpuReg);
+
+        ReturnableImpl::throw();
     }
 }
 
@@ -141,6 +147,41 @@ extern "C" fn sret_handler_cb(pc: usize) {
     cpu.csr.write_mpp_mode(MppMode::User);
 
     cpu.set_exception(Exception::Sret, pc as CpuReg);
+}
+
+extern "C" fn sfence_vma_cb(pc: usize) {
+    let cpu = cpu::get_cpu();
+
+    cpu.mmu.update(cpu.csr.read(csr::register::SATP));
+
+    cpu.set_exception(Exception::MmuStateUpdate, pc as CpuReg);
+
+    ReturnableImpl::throw();
+}
+
+extern "C" fn ecall_cb(pc: usize) {
+    let cpu = cpu::get_cpu();
+
+    match cpu.mode {
+        MppMode::Machine => {
+            cpu.set_exception(
+                Exception::EnvironmentCallFromMMode(cpu.current_gpfn_offset),
+                pc as CpuReg,
+            );
+        }
+        MppMode::Supervisor => {
+            cpu.set_exception(
+                Exception::EnvironmentCallFromSMode(cpu.current_gpfn_offset),
+                pc as CpuReg,
+            );
+        }
+        MppMode::User => {
+            cpu.set_exception(
+                Exception::EnvironmentCallFromUMode(cpu.current_gpfn_offset),
+                pc as CpuReg,
+            );
+        }
+    }
 }
 
 impl common::Csr for CsrImpl {
@@ -241,32 +282,16 @@ impl common::Csr for CsrImpl {
     }
 
     fn emit_ecall() -> DecodeRet {
-        let cpu = cpu::get_cpu();
+        let mut call = BackendCoreImpl::emit_void_call_with_1_arg(
+            ecall_cb,
+            cpu::get_cpu().current_gpfn_offset as usize,
+        );
 
-        // TODO: check at runtime
-        match cpu.mode {
-            MppMode::Machine => {
-                let insn = BackendCoreImpl::emit_ret_with_exception(
-                    Exception::EnvironmentCallFromMMode(cpu.current_gpfn_offset),
-                );
+        let ret = BackendCoreImpl::emit_ret();
 
-                Ok(insn)
-            }
-            MppMode::Supervisor => {
-                let insn = BackendCoreImpl::emit_ret_with_exception(
-                    Exception::EnvironmentCallFromSMode(cpu.current_gpfn_offset),
-                );
+        call.push_slice(ret.as_slice());
 
-                Ok(insn)
-            }
-            MppMode::User => {
-                let insn = BackendCoreImpl::emit_ret_with_exception(
-                    Exception::EnvironmentCallFromUMode(cpu.current_gpfn_offset),
-                );
-
-                Ok(insn)
-            }
-        }
+        Ok(call)
     }
 
     fn emit_ebreak() -> DecodeRet {
@@ -301,5 +326,14 @@ impl common::Csr for CsrImpl {
 
     fn emit_wfi() -> DecodeRet {
         todo!()
+    }
+
+    fn emit_sfence_vma() -> DecodeRet {
+        let insn = BackendCoreImpl::emit_void_call_with_1_arg(
+            sfence_vma_cb,
+            cpu::get_cpu().current_gpfn_offset as usize,
+        );
+
+        Ok(insn)
     }
 }

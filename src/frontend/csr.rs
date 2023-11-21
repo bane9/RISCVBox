@@ -18,6 +18,7 @@ pub fn decode_csr(insn: u32) -> DecodeRet {
                         0b0000001 => CsrImpl::emit_ebreak(),
                         0b0011000 => CsrImpl::emit_mret(),
                         0b0101000 => CsrImpl::emit_sret(),
+                        0b0001001 => CsrImpl::emit_sfence_vma(),
                         _ => Err(JitError::InvalidInstruction(insn)),
                     }
                 }

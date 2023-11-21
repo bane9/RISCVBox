@@ -141,7 +141,6 @@ impl Csr {
     pub fn read(&self, addr: usize) -> CsrType {
         match addr {
             SSTATUS => self.regs[SSTATUS] | SSTATUS as CsrType,
-            register::MSTATUS => self.regs[register::MSTATUS] | register::MSTATUS as CsrType,
             SIE => self.regs[SIE] | SIE as CsrType,
             register::SIP => self.regs[register::SIP] | register::SIP as CsrType,
             _ => self.regs[addr],

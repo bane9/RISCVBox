@@ -1,6 +1,6 @@
-use crate::cpu::csr::*;
 use crate::cpu::*;
 use crate::util::read_bits;
+use crate::{cpu::csr::*, util::read_bit};
 
 use super::{bus, BusType};
 
@@ -65,26 +65,30 @@ pub trait Mmu {
 
     fn create_exeption(addr: BusType, access_type: AccessType) -> Result<BusType, Exception> {
         match access_type {
-            AccessType::Load => Err(Exception::LoadAccessFault(addr)),
-            AccessType::Store => Err(Exception::StoreAccessFault(addr)),
-            AccessType::Fetch => Err(Exception::InstructionAccessFault(addr)),
+            AccessType::Load => Err(Exception::LoadPageFault(addr)),
+            AccessType::Store => Err(Exception::StorePageFault(addr)),
+            AccessType::Fetch => Err(Exception::InstructionPageFault(addr)),
         }
     }
 }
 
 pub struct Sv39Mmu {
     mppn: BusType,
+    enabled: bool,
 }
 
 impl Mmu for Sv39Mmu {
     type PnArr = [BusType; 2];
 
     fn new() -> Self {
-        Sv39Mmu { mppn: 0 }
+        Sv39Mmu {
+            mppn: 0,
+            enabled: false,
+        }
     }
 
     fn translate(&self, addr: BusType, access_type: AccessType) -> Result<BusType, Exception> {
-        if self.mppn == 0 {
+        if !self.enabled {
             return Ok(addr);
         }
 
@@ -158,7 +162,7 @@ impl Mmu for Sv39Mmu {
             }
 
             if bus::get_bus()
-                .store_nommu(addr, pte.pte, self.get_pte_size() * 8)
+                .store_nommu(pte.phys_base, pte.pte, self.get_pte_size() * 8)
                 .is_err()
             {
                 return Self::create_exeption(addr, access_type);
@@ -240,6 +244,8 @@ impl Mmu for Sv39Mmu {
         let ppn = read_bits(satp, 0, 22);
 
         self.mppn = (ppn << 12) as BusType;
+
+        self.enabled = read_bit(satp, 31);
     }
 
     fn get_levels(&self) -> BusType {
@@ -271,6 +277,6 @@ impl Mmu for Sv39Mmu {
     }
 
     fn is_active(&self) -> bool {
-        self.mppn != 0
+        self.enabled
     }
 }

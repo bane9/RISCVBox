@@ -1,6 +1,7 @@
 use crate::backend::target::core::BackendCoreImpl;
 use crate::backend::{BackendCore, ReturnStatus, ReturnableHandler, ReturnableImpl};
-use crate::bus::BusType;
+use crate::bus::mmu::AccessType;
+use crate::bus::{self, BusType};
 use crate::cpu::trap;
 use crate::cpu::{self, CpuReg};
 pub use crate::frontend::parse_core::*;
@@ -19,11 +20,15 @@ impl ExecCore {
     fn get_jit_ptr(&mut self) -> *mut u8 {
         let cpu = cpu::get_cpu();
 
-        let mut insn_data = cpu.insn_map.get_by_guest_idx(cpu.next_pc);
+        let next_phys_pc = bus::get_bus()
+            .translate(cpu.next_pc, &cpu.mmu, AccessType::Fetch)
+            .unwrap();
+
+        let mut insn_data = cpu.insn_map.get_by_guest_idx(next_phys_pc);
         if insn_data.is_none() {
             self.parse_core.parse_gpfn(None).unwrap();
 
-            insn_data = cpu.insn_map.get_by_guest_idx(cpu.next_pc);
+            insn_data = cpu.insn_map.get_by_guest_idx(next_phys_pc);
         }
 
         cpu.current_gpfn = cpu.next_pc >> RV_PAGE_SHIFT as CpuReg;
@@ -70,12 +75,12 @@ impl ExecCore {
         cpu.c_exception_pc |= (cpu.current_gpfn as usize) << RV_PAGE_SHIFT;
 
         println!(
-            "ret_status: {:#x?} with pc 0x{:x} cpu.next_pc {:x}",
-            cpu.exception, cpu.c_exception_pc, cpu.next_pc
+            "ret_status: {:#x?} with pc 0x{:x} cpu.next_pc {:x} gp {}",
+            cpu.exception, cpu.c_exception_pc, cpu.next_pc, cpu.regs[3]
         );
 
         match cpu.exception {
-            cpu::Exception::BlockExit => {
+            cpu::Exception::MmuStateUpdate | cpu::Exception::BlockExit => {
                 cpu.next_pc = cpu.c_exception_pc as CpuReg + INSN_SIZE as CpuReg;
             }
             cpu::Exception::ForwardJumpFault(pc) => {

@@ -818,6 +818,14 @@ impl BackendCore for BackendCoreImpl {
         insn
     }
 
+    fn emit_nop() -> HostEncodedInsn {
+        let mut insn = HostEncodedInsn::new();
+
+        emit_nop!(insn);
+
+        insn
+    }
+
     fn emit_ret_with_exception(exception: Exception) -> HostEncodedInsn {
         let mut insn = HostEncodedInsn::new();
 

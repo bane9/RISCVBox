@@ -1,5 +1,6 @@
 use cpu::Exception;
 
+use crate::bus::mmu::AccessType;
 use crate::bus::{bus, BusType};
 use crate::cpu::{cpu, CpuReg};
 use crate::frontend::exec_core::{INSN_SIZE, RV_PAGE_OFFSET_MASK, RV_PAGE_SHIFT};
@@ -285,7 +286,7 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize) -> usize {
 
     let bus = bus::get_bus();
 
-    let jmp_addr = bus.translate(jmp_addr as BusType, &cpu.mmu);
+    let jmp_addr = bus.translate(jmp_addr as BusType, &cpu.mmu, AccessType::Fetch);
 
     if jmp_addr.is_err() {
         cpu.set_exception(jmp_addr.err().unwrap(), jmp_cond.pc);
@@ -477,6 +478,7 @@ pub trait BackendCore {
     fn fill_with_target_nop(ptr: PtrT, size: usize);
     fn fill_with_target_ret(ptr: PtrT, size: usize);
     fn emit_ret() -> HostEncodedInsn;
+    fn emit_nop() -> HostEncodedInsn;
     fn emit_ret_with_exception(exception: Exception) -> HostEncodedInsn;
     fn emit_void_call(fn_ptr: extern "C" fn()) -> HostEncodedInsn;
     fn emit_usize_call_with_4_args(
@@ -597,4 +599,6 @@ pub trait Csr {
     fn emit_mret() -> DecodeRet;
 
     fn emit_wfi() -> DecodeRet;
+
+    fn emit_sfence_vma() -> DecodeRet;
 }

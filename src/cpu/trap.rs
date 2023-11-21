@@ -1,4 +1,7 @@
-use crate::cpu::{cpu, csr};
+use crate::cpu::{
+    cpu,
+    csr::{self},
+};
 use cpu::{Exception, Interrupt};
 
 use super::{csr::MppMode, CpuReg};
@@ -88,7 +91,7 @@ pub fn handle_interrupt(int_val: Interrupt, pc: CpuReg) {
         };
 
         cpu.next_pc = (stvec_val & !1) + vt_offset;
-
+        // TODO: This is incomplete
         cpu.csr.write(csr::register::SEPC, pc & !1);
         cpu.csr
             .write_bit_sstatus(csr::bits::SPIE, cpu.csr.read_bit_sstatus(csr::bits::SIE));
@@ -135,6 +138,10 @@ pub fn handle_exception() {
 
         cpu.csr.write(csr::register::SEPC, pc & !1);
         cpu.csr
+            .write(csr::register::SCAUSE, cpu.exception.to_cpu_reg());
+        cpu.csr
+            .write(csr::register::STVAL, cpu.c_exception_data as CpuReg);
+        cpu.csr
             .write_bit_sstatus(csr::bits::SPIE, cpu.csr.read_bit_sstatus(csr::bits::SIE));
         cpu.csr.write_bit_sstatus(csr::bits::SIE, false);
         cpu.csr.write_mpp_mode(mode);
@@ -147,7 +154,7 @@ pub fn handle_exception() {
 
         cpu.csr.write(csr::register::MEPC, pc & !1);
         cpu.csr
-            .write(csr::register::MCAUSE, cpu.exception.to_cpu_reg() as CpuReg);
+            .write(csr::register::MCAUSE, cpu.exception.to_cpu_reg());
         cpu.csr
             .write(csr::register::MTVAL, cpu.c_exception_data as CpuReg);
         cpu.csr

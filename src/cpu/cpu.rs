@@ -165,6 +165,7 @@ pub enum Exception {
     Sret = 0x103,
     InvalidateJitBlock(CpuReg) = 0x104,
     DiscardJitBlock(CpuReg) = 0x105,
+    MmuStateUpdate = 0x106,
 }
 
 impl Exception {
@@ -191,6 +192,7 @@ impl Exception {
             0x103 => Exception::Sret,
             0x104 => Exception::InvalidateJitBlock(data),
             0x105 => Exception::DiscardJitBlock(data),
+            0x106 => Exception::MmuStateUpdate,
             _ => Exception::None,
         }
     }
@@ -218,6 +220,7 @@ impl Exception {
             Exception::Sret => 0x103,
             Exception::InvalidateJitBlock(_) => 0x104,
             Exception::DiscardJitBlock(_) => 0x105,
+            Exception::MmuStateUpdate => 0x106,
         }
     }
 
@@ -244,6 +247,7 @@ impl Exception {
             Exception::Sret => 0,
             Exception::InvalidateJitBlock(data) => *data,
             Exception::DiscardJitBlock(data) => *data,
+            Exception::MmuStateUpdate => 0,
         };
 
         data

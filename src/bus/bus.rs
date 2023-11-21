@@ -27,8 +27,13 @@ impl Bus {
         self.devices.push(device);
     }
 
-    pub fn translate(&self, addr: BusType, mmu: &Sv39Mmu) -> Result<BusType, Exception> {
-        return mmu.translate(addr, AccessType::Fetch);
+    pub fn translate(
+        &self,
+        addr: BusType,
+        mmu: &Sv39Mmu,
+        access_type: AccessType,
+    ) -> Result<BusType, Exception> {
+        return mmu.translate(addr, access_type);
     }
 
     pub fn load(
@@ -37,7 +42,9 @@ impl Bus {
         size: BusType,
         mmu: &Sv39Mmu,
     ) -> Result<BusType, Exception> {
-        return self.load_nommu(addr, size);
+        let phys_addr = self.translate(addr, mmu, AccessType::Load)?;
+
+        return self.load_nommu(phys_addr, size);
     }
 
     pub fn fetch(
@@ -46,7 +53,15 @@ impl Bus {
         size: BusType,
         mmu: &Sv39Mmu,
     ) -> Result<BusType, Exception> {
-        return self.load_nommu(addr, size);
+        let phys_addr = self.translate(addr, mmu, AccessType::Fetch)?;
+
+        let res = self.load_nommu(phys_addr, size);
+
+        if res.is_err() {
+            return Err(Exception::InstructionPageFault(addr));
+        }
+
+        res
     }
 
     pub fn store(
@@ -56,7 +71,9 @@ impl Bus {
         size: BusType,
         mmu: &Sv39Mmu,
     ) -> Result<(), Exception> {
-        return self.store_nommu(addr, data, size);
+        let phys_addr = self.translate(addr, mmu, AccessType::Store)?;
+
+        return self.store_nommu(phys_addr, data, size);
     }
 
     pub fn load_nommu(&mut self, addr: BusType, size: BusType) -> Result<BusType, Exception> {

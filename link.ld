@@ -10,4 +10,8 @@ SECTIONS {
     .data : {
         *(.data)
     }
+
+     /DISCARD/ : {
+        *(.riscv.attributes)
+    }
 }

@@ -5,6 +5,7 @@ use crate::backend::common::HostEncodedInsn;
 use crate::backend::target::core::BackendCoreImpl;
 use crate::bus::bus;
 use crate::bus::bus::BusType;
+use crate::bus::mmu::AccessType;
 use crate::cpu;
 use crate::cpu::CpuReg;
 use crate::cpu::Exception;
@@ -90,7 +91,9 @@ impl ParseCore {
             code_page_idx = code_page_idx_;
         }
 
-        let base_addr = bus.translate(gpfn << RV_PAGE_SHIFT, &cpu.mmu).unwrap() as BusType;
+        let base_addr = bus
+            .translate(gpfn << RV_PAGE_SHIFT, &cpu.mmu, AccessType::Fetch)
+            .unwrap() as BusType;
 
         cpu.gpfn_state.add_gpfn(base_addr as CpuReg);
 

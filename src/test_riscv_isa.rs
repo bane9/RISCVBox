@@ -25,7 +25,12 @@ impl bus::BusDevice for ToHost {
         Ok(0)
     }
 
-    fn store(&mut self, _addr: BusType, _data: BusType, _size: BusType) -> Result<(), Exception> {
+    fn store(&mut self, addr: BusType, _data: BusType, _size: BusType) -> Result<(), Exception> {
+        if addr >= TOHOSTADDR + 4 {
+            // Ignore fromhost
+            return Ok(());
+        }
+
         let cpu = cpu::get_cpu();
 
         let a0 = if cpu.regs[cpu::RegName::A0 as usize] == 0 {
@@ -45,7 +50,7 @@ impl bus::BusDevice for ToHost {
     }
 
     fn get_end_addr(&self) -> BusType {
-        TOHOSTADDR + 4
+        TOHOSTADDR + 16
     }
 
     fn tick(&mut self) {}
@@ -80,7 +85,7 @@ fn timeout_thread() {
 }
 
 fn main() {
-    let ram_size = util::size_kib(64);
+    let ram_size: usize = util::size_kib(64);
 
     let argv = std::env::args().collect::<Vec<String>>();
 
@@ -95,7 +100,7 @@ fn main() {
         timeout_thread();
     }
 
-    // let arg = "testbins/rv32ui/bin/add.bin";
+    // let arg = "testbins/rv32si/bin/dirty.bin";
     // let rom = util::read_file(arg).unwrap();
 
     init_backend_csr();
@@ -203,4 +208,14 @@ fn test_rvm() {
 #[test]
 fn test_rva() {
     run_tests_from_directory("testbins/rv32ua/bin/");
+}
+
+#[test]
+fn test_rvmi() {
+    run_tests_from_directory("testbins/rv32mi/bin/");
+}
+
+#[test]
+fn test_rvsi() {
+    run_tests_from_directory("testbins/rv32si/bin/");
 }
