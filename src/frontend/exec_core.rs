@@ -63,6 +63,7 @@ impl ExecCore {
             cpu.c_exception = cpu::Exception::None.to_cpu_reg() as usize;
             cpu.c_exception_data = 0;
             cpu.c_exception_pc = 0;
+            cpu.jump_count = 0;
 
             // unsafe {
             //     BackendCoreImpl::call_jit_ptr(insn_data.unwrap().host_ptr);
@@ -137,6 +138,13 @@ impl ExecCore {
                     }
                 }
 
+                cpu.next_pc = cpu.c_exception_pc as CpuReg + INSN_SIZE as CpuReg;
+            }
+            cpu::Exception::BookkeepingRet => {
+                // There may be a pending exception but that cannot checked unless we exit
+                // the jit block. Epsecially for cases where infinite loops are used,
+                // we need to make sure we periodiaclly exit the jit block to check
+                // for interrupts
                 cpu.next_pc = cpu.c_exception_pc as CpuReg + INSN_SIZE as CpuReg;
             }
             cpu::Exception::Mret | cpu::Exception::Sret => {}

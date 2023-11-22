@@ -167,6 +167,7 @@ pub enum Exception {
     DiscardJitBlock(CpuReg) = 0x105,
     MmuStateUpdate = 0x106,
     Wfi = 0x107,
+    BookkeepingRet = 0x108,
 }
 
 impl Exception {
@@ -195,6 +196,7 @@ impl Exception {
             0x105 => Exception::DiscardJitBlock(data),
             0x106 => Exception::MmuStateUpdate,
             0x107 => Exception::Wfi,
+            0x108 => Exception::BookkeepingRet,
             _ => Exception::None,
         }
     }
@@ -224,6 +226,7 @@ impl Exception {
             Exception::DiscardJitBlock(_) => 0x105,
             Exception::MmuStateUpdate => 0x106,
             Exception::Wfi => 0x107,
+            Exception::BookkeepingRet => 0x108,
         }
     }
 
@@ -252,6 +255,7 @@ impl Exception {
             Exception::DiscardJitBlock(data) => *data,
             Exception::MmuStateUpdate => 0,
             Exception::Wfi => 0,
+            Exception::BookkeepingRet => 0,
         };
 
         data
@@ -269,6 +273,7 @@ pub struct Cpu {
     pub c_exception: usize,
     pub c_exception_data: usize,
     pub c_exception_pc: usize,
+    pub jump_count: usize,
     pub mode: csr::MppMode,
     pub gpfn_state: GpfnState,
     pub atomic_reservations: HashSet<BusType>, // TODO: this probably isn't core local, check later
@@ -289,6 +294,7 @@ impl Cpu {
             c_exception: Exception::None.to_cpu_reg() as usize,
             c_exception_data: 0,
             c_exception_pc: 0,
+            jump_count: 0,
             mode: csr::MppMode::Machine,
             gpfn_state: GpfnState::new(),
             atomic_reservations: HashSet::new(),

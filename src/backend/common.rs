@@ -21,6 +21,7 @@ pub type HostInsnT = u8;
 pub const HOST_INSN_MAX_SIZE: usize = 96;
 pub type HostEncodedInsn = EncodedInsn<HostInsnT, HOST_INSN_MAX_SIZE>;
 pub type DecodeRet = Result<HostEncodedInsn, JitError>;
+pub const JUMP_COUNT_MAX: usize = 0x1000;
 
 pub trait UsizeConversions {
     fn to_usize(&self) -> usize;
@@ -201,6 +202,14 @@ pub type BusAccessVars = CondVars<BusAccessCond>;
 pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize) -> usize {
     let cpu = cpu::get_cpu();
     let jmp_cond = JumpVars::from_usize(jmp_cond);
+
+    cpu.jump_count += 1;
+
+    if cpu.jump_count > JUMP_COUNT_MAX {
+        cpu.set_exception(Exception::BookkeepingRet, jmp_cond.pc);
+
+        ReturnableImpl::throw();
+    }
 
     let (jmp_addr, should_jmp) = match jmp_cond.cond {
         JumpCond::Always => {
