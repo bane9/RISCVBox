@@ -1,3 +1,5 @@
+use chrono::Utc;
+
 use crate::bus::bus::BusType;
 use crate::util::util;
 use std::cell::RefCell;
@@ -81,7 +83,7 @@ pub const SUPERVISOR: usize = 1 << 18;
 pub const USER: usize = 1 << 20;
 pub const NON_STD_PRESENT: usize = 1 << 22;
 
-pub const XLEN_32: usize = 1 << 31;
+pub const XLEN_32: usize = 1 << 30;
 pub const XLEN_64: usize = 2 << 62;
 
 pub mod bits {
@@ -141,6 +143,7 @@ impl Csr {
             register::SSTATUS => self.regs[register::MSTATUS] & SSTATUS as CsrType,
             register::SIE => self.regs[register::SIE] & self.regs[register::MIDELEG],
             register::SIP => self.regs[register::MIP] & self.regs[register::MIDELEG],
+            register::CYCLE => Utc::now().timestamp_millis() as CsrType, // TODO: make it make sense v2
             _ => self.regs[addr],
         }
     }

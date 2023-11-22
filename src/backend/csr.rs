@@ -30,6 +30,31 @@ fn csr_default_handler(csr_reg: usize, csr_val: usize) -> Result<usize, Exceptio
     Ok(csr_val)
 }
 
+fn csr_readonly_handler(_csr_reg: usize, csr_val: usize) -> Result<usize, Exception> {
+    Ok(csr_val)
+}
+
+fn csr_enforced_readonly_handler(csr_reg: usize, csr_val: usize) -> Result<usize, Exception> {
+    let csr = csr::get_csr();
+    let old_csr_val = csr.read(csr_reg);
+
+    if old_csr_val != csr_val as CsrType {
+        return Err(Exception::IllegalInstruction(0));
+    };
+
+    Ok(csr_val)
+}
+
+fn csr_privledged_handler(csr_reg: usize, csr_val: usize) -> Result<usize, Exception> {
+    let cpu = cpu::get_cpu();
+
+    if cpu.mode == MppMode::User {
+        return Err(Exception::IllegalInstruction(0));
+    };
+
+    csr_default_handler(csr_reg, csr_val)
+}
+
 fn csr_satp_handler(csr_reg: usize, csr_val: usize) -> Result<usize, Exception> {
     let cpu = cpu::get_cpu();
 
@@ -50,6 +75,16 @@ static mut CSR_HANDLERS: [CsrHandler; csr::CSR_COUNT] = [csr_default_handler; cs
 pub fn init_backend_csr() {
     unsafe {
         CSR_HANDLERS[csr::register::SATP] = csr_satp_handler;
+
+        CSR_HANDLERS[csr::register::MISA] = csr_readonly_handler;
+        CSR_HANDLERS[csr::register::TDATA1] = csr_readonly_handler;
+        CSR_HANDLERS[csr::register::MARCHID] = csr_readonly_handler;
+        CSR_HANDLERS[csr::register::MHARTID] = csr_readonly_handler;
+        CSR_HANDLERS[csr::register::MIMPID] = csr_readonly_handler;
+        CSR_HANDLERS[csr::register::MVENDORID] = csr_readonly_handler;
+
+        CSR_HANDLERS[csr::register::CYCLE] = csr_enforced_readonly_handler;
+        CSR_HANDLERS[csr::register::MSTATUS] = csr_privledged_handler;
     }
 }
 

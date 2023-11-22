@@ -88,21 +88,21 @@ fn timeout_thread() {
 fn main() {
     let ram_size: usize = util::size_kib(64);
 
-    let argv = std::env::args().collect::<Vec<String>>();
+    // let argv = std::env::args().collect::<Vec<String>>();
 
-    if argv.len() < 2 {
-        println!("Usage: {} <bin> [timeout]", argv[0]);
-        std::process::exit(1);
-    }
+    // if argv.len() < 2 {
+    //     println!("Usage: {} <bin> [timeout]", argv[0]);
+    //     std::process::exit(1);
+    // }
 
-    let rom = util::read_file(&argv[1]).unwrap();
+    // let rom = util::read_file(&argv[1]).unwrap();
 
-    if argv.len() == 3 && argv[2] == "timeout" {
-        timeout_thread();
-    }
+    // if argv.len() == 3 && argv[2] == "timeout" {
+    //     timeout_thread();
+    // }
 
-    // let arg = "testbins/rv32si/bin/wfi.bin";
-    // let rom = util::read_file(arg).unwrap();
+    let arg = "testbins/rv32mi/bin/illegal.bin";
+    let rom = util::read_file(arg).unwrap();
 
     init_backend_csr();
 

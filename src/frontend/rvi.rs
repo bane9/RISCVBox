@@ -30,7 +30,15 @@ pub fn decode_rvi(insn: u32) -> DecodeRet {
 
             match funct3 {
                 0b000 => RviImpl::emit_addi(rd, rs1, imm),
-                0b001 => RviImpl::emit_slli(rd, rs1, (imm & 0b11111) as u8),
+                0b001 => {
+                    let imm = imm & 0b111111;
+
+                    if imm & (1 << 5) != 0 {
+                        return Err(JitError::InvalidInstruction(insn));
+                    }
+
+                    RviImpl::emit_slli(rd, rs1, (imm & 0b11111) as u8)
+                }
                 0b010 => RviImpl::emit_slti(rd, rs1, imm),
                 0b011 => RviImpl::emit_sltiu(rd, rs1, imm),
                 0b100 => RviImpl::emit_xori(rd, rs1, imm),
