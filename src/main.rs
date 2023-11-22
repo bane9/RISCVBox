@@ -20,9 +20,17 @@ fn init_bus(mut rom: Vec<u8>, ram_size: usize) {
 
     bus::bus::get_bus().add_device(Box::new(ram));
 
+    let clint = bus::clint::Clint::new();
+
+    bus::bus::get_bus().add_device(Box::new(clint));
+
     let ns16550 = bus::ns16550::Ns16550::new();
 
     bus::bus::get_bus().add_device(Box::new(ns16550));
+
+    let plic = bus::plic::Plic::new();
+
+    bus::bus::get_bus().add_device(Box::new(plic));
 }
 
 fn main() {

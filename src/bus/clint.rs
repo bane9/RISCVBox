@@ -44,6 +44,12 @@ fn get_clint() -> &'static mut ClintData {
 
 pub struct Clint;
 
+impl Clint {
+    pub fn new() -> Clint {
+        Clint {}
+    }
+}
+
 impl BusDevice for Clint {
     fn load(&mut self, addr: BusType, size: BusType) -> Result<BusType, Exception> {
         let clint = get_clint();
