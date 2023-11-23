@@ -11,7 +11,7 @@ use backend::csr::init_backend_csr;
 use bus::ram::RAM_BEGIN_ADDR;
 use frontend::exec_core::ExecCoreThreadPool;
 
-fn init_bus(mut rom: Vec<u8>, ram_size: usize) {
+fn init_bus(mut rom: Vec<u8>, ram_size: usize, dtb: Option<Vec<u8>>) {
     assert!(ram_size >= rom.len());
 
     rom.resize(ram_size, 0);
@@ -31,15 +31,38 @@ fn init_bus(mut rom: Vec<u8>, ram_size: usize) {
     let plic = bus::plic::Plic::new();
 
     bus::bus::get_bus().add_device(Box::new(plic));
+
+    if let Some(dtb) = dtb {
+        let dtb = bus::dtb::Dtb::new(&dtb);
+
+        bus::bus::get_bus().add_device(Box::new(dtb));
+    }
 }
 
 fn main() {
-    let ram_size = util::size_mib(4);
-    let rom = util::read_file("test.bin").unwrap();
+    let ram_size = util::size_mib(64);
+
+    // let argv = std::env::args().collect::<Vec<String>>();
+
+    // if argv.len() < 2 {
+    //     println!("Usage: {} <bin> [timeout]", argv[0]);
+    //     std::process::exit(1);
+    // }
+
+    // let rom = util::read_file(&argv[1]).unwrap();
+
+    // let dtb = if argv.len() == 3 {
+    //     Some(util::read_file(&argv[2]).unwrap())
+    // } else {
+    //     None
+    // };
+
+    let rom = util::read_file("buildroot/images/fw_jump.bin").unwrap();
+    let dtb = Some(util::read_file("buildroot/dtb.dtb").unwrap());
 
     init_backend_csr();
 
-    init_bus(rom.clone(), ram_size);
+    init_bus(rom.clone(), ram_size, dtb);
 
     let exec_thread_pool = ExecCoreThreadPool::new(RAM_BEGIN_ADDR, 1);
 

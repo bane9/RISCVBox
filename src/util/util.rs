@@ -69,10 +69,10 @@ pub fn align_down(value: usize, align: usize) -> usize {
     return value & !(align - 1);
 }
 
-pub fn size_kib(size: usize) -> usize {
+pub const fn size_kib(size: usize) -> usize {
     return size * 1024;
 }
 
-pub fn size_mib(size: usize) -> usize {
+pub const fn size_mib(size: usize) -> usize {
     return size * 1024 * 1024;
 }

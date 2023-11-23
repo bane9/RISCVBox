@@ -1,9 +1,10 @@
 use crate::backend::target::core::BackendCoreImpl;
 use crate::backend::{BackendCore, ReturnStatus, ReturnableHandler, ReturnableImpl};
+use crate::bus::dtb::DTB_BEGIN_ADDR;
 use crate::bus::mmu::AccessType;
 use crate::bus::{self, BusType};
-use crate::cpu::trap;
 use crate::cpu::{self, CpuReg};
+use crate::cpu::{trap, RegName};
 pub use crate::frontend::parse_core::*;
 
 pub struct ExecCore {
@@ -55,6 +56,9 @@ impl ExecCore {
         let cpu = cpu::get_cpu();
         cpu.core_id = core_id;
         cpu.next_pc = initial_pc;
+
+        cpu.regs[RegName::A0 as usize] = core_id;
+        cpu.regs[RegName::A1 as usize] = DTB_BEGIN_ADDR;
 
         loop {
             let host_ptr = self.get_jit_ptr();
@@ -110,7 +114,7 @@ impl ExecCore {
                     println!("Forward jump forwarding as {:?}", cpu.exception);
                     trap::handle_exception();
                 } else {
-                    cpu.next_pc = cpu.c_exception_pc as CpuReg;
+                    cpu.next_pc = pc;
                 }
             }
             cpu::Exception::InvalidateJitBlock(gpfn) => {
