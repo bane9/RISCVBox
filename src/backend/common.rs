@@ -3,7 +3,7 @@ use cpu::Exception;
 use crate::bus::mmu::AccessType;
 use crate::bus::{bus, BusType};
 use crate::cpu::{cpu, CpuReg};
-use crate::frontend::exec_core::{INSN_SIZE, RV_PAGE_OFFSET_MASK, RV_PAGE_SHIFT};
+use crate::frontend::exec_core::{INSN_SIZE, RV_PAGE_MASK, RV_PAGE_SHIFT};
 use crate::util::EncodedInsn;
 
 use crate::backend::{ReturnableHandler, ReturnableImpl};
@@ -296,6 +296,8 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize) -> usize {
 
     let bus = bus::get_bus();
 
+    let jmp_addr = cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg | jmp_addr;
+
     let jmp_addr = bus.translate(jmp_addr as BusType, &cpu.mmu, AccessType::Fetch);
 
     if jmp_addr.is_err() {
@@ -317,12 +319,12 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize) -> usize {
     if jmp_cond.reg1 != 0
         && (jmp_cond.cond == JumpCond::Always || jmp_cond.cond == JumpCond::AlwaysAbsolute)
     {
-        cpu.regs[jmp_cond.reg1 as usize] = jmp_cond.pc + INSN_SIZE as u32;
+        cpu.regs[jmp_cond.reg1 as usize] =
+            cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg | (jmp_cond.pc + INSN_SIZE as CpuReg);
     }
 
     // If we are jumping to a different page (block boundary won't protect us here)
     // we need to update the current_gpfn.
-    // TODO: block exit on each cross page jump?
     cpu.current_gpfn = jmp_addr >> RV_PAGE_SHIFT as CpuReg;
 
     host_addr.unwrap().host_ptr as usize
@@ -410,7 +412,15 @@ pub extern "C" fn c_bus_resolver_cb(bus_vars: usize) {
     } else {
         let data = cpu.regs[bus_vars.reg1 as usize];
 
-        let res = bus.store(addres, data, size, &cpu.mmu);
+        let phys_addr = bus.translate(addres, &cpu.mmu, AccessType::Store);
+
+        if phys_addr.is_err() {
+            cpu.set_exception(phys_addr.err().unwrap(), bus_vars.pc);
+
+            ReturnableImpl::throw();
+        }
+
+        let res = bus.store_nommu(phys_addr.unwrap(), data, size);
 
         if res.is_err() {
             cpu.set_exception(res.err().unwrap(), bus_vars.pc);
@@ -418,10 +428,13 @@ pub extern "C" fn c_bus_resolver_cb(bus_vars: usize) {
             ReturnableImpl::throw();
         }
 
-        let gpfn = addres & RV_PAGE_OFFSET_MASK as CpuReg;
+        let gpfn = addres & RV_PAGE_MASK as CpuReg;
 
         if cpu.gpfn_state.contains_gpfn(gpfn) {
-            cpu.set_exception(Exception::InvalidateJitBlock(gpfn), bus_vars.pc);
+            cpu.set_exception(
+                Exception::InvalidateJitBlock(gpfn >> RV_PAGE_SHIFT as CpuReg),
+                bus_vars.pc,
+            );
 
             ReturnableImpl::throw();
         }

@@ -1,6 +1,6 @@
 use crate::{bus::bus::*, cpu::Exception};
 
-pub const RAM_BEGIN_ADDR: BusType = 0;
+pub const RAM_BEGIN_ADDR: BusType = 0x80000000;
 
 pub struct Ram {
     pub mem: Vec<u8>,

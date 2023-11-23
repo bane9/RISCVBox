@@ -3,7 +3,7 @@ ENTRY(_start)
 
 MEMORY
 {
-  RAM (rwx)  : ORIGIN = 0x00000000, LENGTH = 64K
+  RAM (rwx)  : ORIGIN = 0x80000000, LENGTH = 64K
   TOHOST (rw) : ORIGIN = 0x01000000, LENGTH = 1k
 }
 

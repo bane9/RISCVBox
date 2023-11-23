@@ -28,8 +28,8 @@ pub const INSN_PAGE_READAHEAD: usize = 1;
 
 pub const RV_PAGE_SHIFT: usize = 12;
 pub const RV_PAGE_SIZE: usize = 1 << RV_PAGE_SHIFT;
-pub const RV_PAGE_MASK: usize = RV_PAGE_SIZE - 1;
-pub const RV_PAGE_OFFSET_MASK: usize = !RV_PAGE_MASK;
+pub const RV_PAGE_OFFSET_MASK: usize = RV_PAGE_SIZE - 1;
+pub const RV_PAGE_MASK: usize = !RV_PAGE_OFFSET_MASK;
 
 pub type DecoderFn = fn(u32) -> JitCommon::DecodeRet;
 
@@ -62,8 +62,6 @@ impl ParseCore {
     }
 
     pub fn parse_gpfn(&mut self, gpfn: Option<BusType>) -> Result<(), JitCommon::JitError> {
-        let mut insn: u32 = 0;
-
         let cpu = cpu::get_cpu();
         let bus = bus::get_bus();
 
@@ -100,17 +98,10 @@ impl ParseCore {
                 INSN_SIZE_BITS as BusType,
             );
 
-            if loaded_insn.is_ok() {
-                unsafe {
-                    std::ptr::copy_nonoverlapping(
-                        &loaded_insn.unwrap() as *const u32 as *const u8,
-                        &mut insn as *mut u32 as *mut u8,
-                        INSN_SIZE,
-                    );
-                }
-            } else {
-                insn = 0;
-            }
+            let insn = match loaded_insn {
+                Ok(insn) => insn,
+                Err(_) => 0,
+            };
 
             let result: Result<(), JitCommon::JitError>;
 
