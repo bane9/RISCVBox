@@ -2,6 +2,7 @@ use std::sync::atomic::{AtomicI32, AtomicU32};
 
 use super::core::amd64_reg;
 use super::{core::BackendCoreImpl, BackendCore};
+use crate::bus::mmu::AccessType;
 use crate::*;
 use crate::{
     backend::common,
@@ -22,7 +23,14 @@ macro_rules! fetch_ptr {
             return 1; // 1 is failure, 0 is success
         }
 
-        let _ptr: Result<*mut u8, Exception> = $bus.get_ptr($addr);
+        let phys_addr = $bus.translate($addr, &cpu::get_cpu().mmu, AccessType::Load);
+
+        if phys_addr.is_err() {
+            $cpu.set_exception(phys_addr.err().unwrap(), $pc as CpuReg);
+            return 1;
+        }
+
+        let _ptr: Result<*mut u8, Exception> = $bus.get_ptr(phys_addr.unwrap());
 
         if _ptr.is_err() {
             $cpu.set_exception(_ptr.err().unwrap(), $pc as CpuReg);

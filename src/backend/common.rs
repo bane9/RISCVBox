@@ -144,7 +144,7 @@ where
         ret |= (self.reg1 as usize & 0x1f) << 3;
         ret |= (self.reg2 as usize & 0x1f) << 8;
         ret |= (twenty_bit_imm as usize & 0x1) << 13;
-        ret |= (self.imm as usize & 0xfffff) << 16;
+        ret |= (self.imm as usize & 0xffffffff) << 16;
 
         ret
     }
@@ -156,8 +156,9 @@ where
         let reg2 = ((val >> 8) & 0x1f) as CpuReg;
         let twenty_bit_imm = ((val >> 13) & 0x1) != 0;
         let imm = if twenty_bit_imm {
-            let imm = (val >> 16) & 0xfffff;
-            sign_extend(imm as i64, 20) as i32
+            let imm = (val >> 16) & 0xffffffff;
+
+            imm as i32
         } else {
             let imm = (val >> 16) & 0xfff;
             sign_extend(imm as i64, 12) as i32
@@ -291,7 +292,7 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize, guest_pc: usize) -> usize 
 
     let bus = bus::get_bus();
 
-    let jmp_addr = if jmp_cond.cond == JumpCond::AlwaysAbsolute {
+    let jmp_addr1 = if jmp_cond.cond == JumpCond::AlwaysAbsolute {
         jmp_addr
     } else {
         let current_pc = cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg;
@@ -300,7 +301,7 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize, guest_pc: usize) -> usize 
         next_pc
     } as CpuReg;
 
-    let jmp_addr_phys = bus.translate(jmp_addr as BusType, &cpu.mmu, AccessType::Fetch);
+    let jmp_addr_phys = bus.translate(jmp_addr1 as BusType, &cpu.mmu, AccessType::Fetch);
 
     if jmp_addr_phys.is_err() {
         cpu.set_exception(jmp_addr_phys.err().unwrap(), guest_pc);
@@ -320,14 +321,14 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize, guest_pc: usize) -> usize 
     }
 
     if host_addr.is_none() {
-        cpu.set_exception(Exception::ForwardJumpFault(jmp_addr), guest_pc);
+        cpu.set_exception(Exception::ForwardJumpFault(jmp_addr1), guest_pc);
 
         ReturnableImpl::throw();
     }
 
     // If we are jumping to a different page (block boundary won't protect us here)
     // we need to update the current_gpfn.
-    cpu.current_gpfn = jmp_addr >> RV_PAGE_SHIFT as CpuReg;
+    cpu.current_gpfn = jmp_addr1 >> RV_PAGE_SHIFT as CpuReg;
 
     host_addr.unwrap().host_ptr as usize
 }

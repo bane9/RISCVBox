@@ -103,8 +103,8 @@ impl ExecCore {
             cpu::Exception::MmuStateUpdate => {
                 cpu.next_pc = cpu.c_exception_pc as CpuReg + INSN_SIZE as CpuReg;
             }
-            cpu::Exception::BlockExit(pc) => {
-                cpu.next_pc = pc;
+            cpu::Exception::BlockExit(_pc) => {
+                cpu.next_pc = cpu.c_exception_pc as CpuReg;
             }
             cpu::Exception::ForwardJumpFault(pc) => {
                 // We'll enter here both on unmapped jumps and missaligned jumps
@@ -162,7 +162,7 @@ impl ExecCore {
             }
         }
 
-        if cpu.exception != cpu::Exception::Wfi && cpu.exception != cpu::Exception::BookkeepingRet {
+        {
             println!(
                 "ret_status: {:#x?} with pc 0x{:x} cpu.next_pc {:x} gp {}",
                 cpu.exception, cpu.c_exception_pc, cpu.next_pc, cpu.regs[3]
