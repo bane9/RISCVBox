@@ -93,16 +93,14 @@ impl ExecCore {
             );
         }
 
-        cpu.c_exception_pc |= (cpu.current_gpfn as usize) << RV_PAGE_SHIFT;
-
-        println!(
-            "ret_status: {:#x?} with pc 0x{:x} cpu.next_pc {:x} gp {}",
-            cpu.exception, cpu.c_exception_pc, cpu.next_pc, cpu.regs[3]
-        );
+        cpu.c_exception_pc += (cpu.current_gpfn as usize) << RV_PAGE_SHIFT;
 
         match cpu.exception {
-            cpu::Exception::MmuStateUpdate | cpu::Exception::BlockExit => {
+            cpu::Exception::MmuStateUpdate => {
                 cpu.next_pc = cpu.c_exception_pc as CpuReg + INSN_SIZE as CpuReg;
+            }
+            cpu::Exception::BlockExit(pc) => {
+                cpu.next_pc = pc;
             }
             cpu::Exception::ForwardJumpFault(pc) => {
                 // We'll enter here both on unmapped jumps and missaligned jumps
@@ -158,6 +156,13 @@ impl ExecCore {
             _ => {
                 trap::handle_exception();
             }
+        }
+
+        if cpu.exception != cpu::Exception::Wfi {
+            // println!(
+            //     "ret_status: {:#x?} with pc 0x{:x} cpu.next_pc {:x} gp {}",
+            //     cpu.exception, cpu.c_exception_pc, cpu.next_pc, cpu.regs[3]
+            // );
         }
     }
 }

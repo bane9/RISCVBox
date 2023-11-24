@@ -47,7 +47,7 @@ impl Bus {
 
         let res = self.load_nommu(phys_addr, size);
 
-        if res.is_err() {
+        if res.is_err() && mmu.is_active() {
             return Err(Exception::LoadPageFault(addr));
         }
 
@@ -65,7 +65,11 @@ impl Bus {
         let res = self.load_nommu(phys_addr, size);
 
         if res.is_err() {
-            return Err(Exception::InstructionPageFault(addr));
+            if !mmu.is_active() {
+                return Err(Exception::InstructionAccessFault(addr));
+            } else {
+                return Err(Exception::InstructionPageFault(addr));
+            }
         }
 
         res
@@ -82,7 +86,7 @@ impl Bus {
 
         let res = self.store_nommu(phys_addr, data, size);
 
-        if res.is_err() {
+        if res.is_err() && mmu.is_active() {
             return Err(Exception::StorePageFault(addr));
         }
 

@@ -54,53 +54,72 @@ impl BusDevice for Clint {
     fn load(&mut self, addr: BusType, size: BusType) -> Result<BusType, Exception> {
         let clint = get_clint();
 
-        let (reg, offset) = match addr {
-            MSIP..=MSIP_END => (clint.msip, addr - MSIP),
-            MTIMECMP..=MTIMECMP_END => (clint.mtimecmp, addr - MTIMECMP),
-            MTIME..=MTIME_END => (clint.mtime, addr - MTIME),
+        let mut out = 0 as BusType;
+
+        match addr {
+            MSIP..=MSIP_END => unsafe {
+                let src = &clint.msip as *const BusType as *const u8;
+                std::ptr::copy_nonoverlapping(
+                    src,
+                    &mut out as *mut u32 as *mut u8,
+                    size as usize / 8,
+                );
+            },
+            MTIMECMP..=MTIMECMP_END => unsafe {
+                let src = &clint.mtimecmp as *const BusType as *const u8;
+                std::ptr::copy_nonoverlapping(
+                    src,
+                    &mut out as *mut u32 as *mut u8,
+                    size as usize / 8,
+                );
+            },
+            MTIME..=MTIME_END => unsafe {
+                let src = &clint.mtime as *const BusType as *const u8;
+                std::ptr::copy_nonoverlapping(
+                    src,
+                    &mut out as *mut u32 as *mut u8,
+                    size as usize / 8,
+                );
+            },
             _ => return Err(Exception::LoadAccessFault(addr)),
         };
 
-        match size {
-            8 => Ok((reg >> (offset * 8)) & 0xff),
-            16 => Ok((reg >> (offset * 8)) & 0xffff),
-            32 => Ok((reg >> (offset * 8)) & 0xffffffff),
-            _ => return Err(Exception::LoadAccessFault(addr)),
-        }
+        Ok(out)
     }
 
     fn store(&mut self, addr: BusType, data: BusType, size: BusType) -> Result<(), Exception> {
         let clint = get_clint();
 
-        let (mut reg, offset) = match addr {
-            MSIP..=MSIP_END => (clint.msip, addr - MSIP),
-            MTIMECMP..=MTIMECMP_END => (clint.mtimecmp, addr - MTIMECMP),
-            MTIME..=MTIME_END => (clint.mtime, addr - MTIME),
+        match addr {
+            MSIP..=MSIP_END => unsafe {
+                clint.msip = 0;
+                let dst = &mut clint.msip as *mut BusType as *mut u8;
+                std::ptr::copy_nonoverlapping(
+                    &data as *const u32 as *const u8,
+                    dst,
+                    size as usize / 8,
+                );
+            },
+            MTIMECMP..=MTIMECMP_END => unsafe {
+                clint.mtimecmp = 0;
+                let dst = &mut clint.mtimecmp as *mut BusType as *mut u8;
+                std::ptr::copy_nonoverlapping(
+                    &data as *const u32 as *const u8,
+                    dst,
+                    size as usize / 8,
+                );
+            },
+            MTIME..=MTIME_END => unsafe {
+                clint.mtime = 0;
+                let dst = &mut clint.mtime as *mut BusType as *mut u8;
+                std::ptr::copy_nonoverlapping(
+                    &data as *const u32 as *const u8,
+                    dst,
+                    size as usize / 8,
+                );
+            },
             _ => return Err(Exception::StoreAccessFault(addr)),
         };
-
-        match size {
-            8 => {
-                reg = reg & (!(0xff << (offset * 8)));
-                reg = reg | ((data & 0xff) << (offset * 8));
-            }
-            16 => {
-                reg = reg & (!(0xffff << (offset * 8)));
-                reg = reg | ((data & 0xffff) << (offset * 8));
-            }
-            32 => {
-                reg = reg & (!(0xffffffff << (offset * 8)));
-                reg = reg | ((data & 0xffffffff) << (offset * 8));
-            }
-            _ => return Err(Exception::StoreAccessFault(addr)),
-        }
-
-        match addr {
-            MSIP..=MSIP_END => clint.msip = reg,
-            MTIMECMP..=MTIMECMP_END => clint.mtimecmp = reg,
-            MTIME..=MTIME_END => clint.mtime = reg,
-            _ => return Err(Exception::StoreAccessFault(addr)),
-        }
 
         Ok(())
     }

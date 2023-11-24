@@ -873,6 +873,35 @@ impl BackendCore for BackendCoreImpl {
         insn
     }
 
+    fn emit_usize_call_with_2_args(
+        fn_ptr: extern "C" fn(usize, usize) -> usize,
+        arg1: usize,
+        arg2: usize,
+    ) -> HostEncodedInsn {
+        let mut insn = HostEncodedInsn::new();
+
+        emit_push_reg!(insn, amd64_reg::RBP);
+        emit_mov_reg_reg1!(insn, amd64_reg::RBP, amd64_reg::RSP);
+        emit_mov_reg_imm!(insn, abi_reg::ARG1, arg1);
+        emit_mov_reg_imm!(insn, abi_reg::ARG2, arg2);
+        emit_mov_reg_imm!(insn, amd64_reg::R11, fn_ptr);
+        emit_call_reg!(insn, amd64_reg::R11);
+        emit_pop_reg!(insn, amd64_reg::RBP);
+
+        insn
+    }
+
+    fn emit_void_call_with_2_args(
+        fn_ptr: extern "C" fn(usize, usize),
+        arg1: usize,
+        arg2: usize,
+    ) -> HostEncodedInsn {
+        let fn_ptr =
+            unsafe { std::mem::transmute::<_, extern "C" fn(usize, usize) -> usize>(fn_ptr) };
+
+        Self::emit_usize_call_with_2_args(fn_ptr, arg1, arg2)
+    }
+
     fn emit_void_call_with_4_args(
         fn_ptr: extern "C" fn(usize, usize, usize, usize),
         arg1: usize,

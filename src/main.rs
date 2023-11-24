@@ -57,7 +57,7 @@ fn main() {
     //     None
     // };
 
-    let rom = util::read_file("buildroot/images/fw_jump.bin").unwrap();
+    let rom = util::read_file("buildroot/images/linux.bin").unwrap();
     let dtb = Some(util::read_file("buildroot/dtb.dtb").unwrap());
 
     init_backend_csr();

@@ -126,7 +126,12 @@ impl ParseCore {
         }
 
         code_page
-            .push(BackendCoreImpl::emit_ret_with_exception(Exception::BlockExit).as_slice())
+            .push(
+                BackendCoreImpl::emit_ret_with_exception(Exception::BlockExit(
+                    base_addr + RV_PAGE_SIZE as CpuReg,
+                ))
+                .as_slice(),
+            )
             .expect("Out of memory");
 
         code_page.mark_rx().unwrap();

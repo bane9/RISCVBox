@@ -2,17 +2,16 @@ use crate::backend::common;
 use crate::backend::target::core::{amd64_reg, BackendCore, BackendCoreImpl};
 use crate::frontend::exec_core::RV_PAGE_SHIFT;
 use crate::*;
-use common::{
-    BusAccessVars, DecodeRet, HostEncodedInsn, JumpCond, JumpVars, PCAccess, UsizeConversions,
-};
+use common::{BusAccessVars, DecodeRet, HostEncodedInsn, JumpCond, JumpVars};
 
 pub struct RviImpl;
 
-fn emit_jmp(mut cond: JumpVars) -> HostEncodedInsn {
-    cond.set_pc(cpu::get_cpu().current_gpfn_offset);
-
-    let mut insn =
-        BackendCoreImpl::emit_usize_call_with_1_arg(common::c_jump_resolver_cb, cond.to_usize());
+fn emit_jmp(cond: JumpVars, twenty_bit_imm: bool) -> HostEncodedInsn {
+    let mut insn = BackendCoreImpl::emit_usize_call_with_2_args(
+        common::c_jump_resolver_cb,
+        cond.to_usize(twenty_bit_imm),
+        cpu::get_cpu().current_gpfn_offset as usize,
+    );
 
     emit_cmp_reg_imm!(insn, amd64_reg::RAX, 0);
 
@@ -25,10 +24,12 @@ fn emit_jmp(mut cond: JumpVars) -> HostEncodedInsn {
     insn
 }
 
-fn emit_bus_access(mut cond: BusAccessVars) -> HostEncodedInsn {
-    cond.set_pc(cpu::get_cpu().current_gpfn_offset);
-
-    BackendCoreImpl::emit_void_call_with_1_arg(common::c_bus_resolver_cb, cond.to_usize())
+fn emit_bus_access(cond: BusAccessVars, twenty_bit_imm: bool) -> HostEncodedInsn {
+    BackendCoreImpl::emit_void_call_with_2_args(
+        common::c_bus_resolver_cb,
+        cond.to_usize(twenty_bit_imm),
+        cpu::get_cpu().current_gpfn_offset as usize,
+    )
 }
 
 impl common::Rvi for RviImpl {
@@ -239,147 +240,145 @@ impl common::Rvi for RviImpl {
     }
 
     fn emit_jal(rd: u8, imm: i32) -> DecodeRet {
-        Ok(emit_jmp(JumpVars::new(
-            JumpCond::Always,
-            imm,
-            rd as u32,
-            0x0u32,
-        )))
+        Ok(emit_jmp(
+            JumpVars::new(JumpCond::Always, imm, rd as u32, 0x0u32),
+            true,
+        ))
     }
 
     fn emit_jalr(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
-        Ok(emit_jmp(JumpVars::new(
-            JumpCond::AlwaysAbsolute,
-            imm,
-            rd as u32,
-            rs1 as u32,
-        )))
+        Ok(emit_jmp(
+            JumpVars::new(JumpCond::AlwaysAbsolute, imm, rd as u32, rs1 as u32),
+            false,
+        ))
     }
 
     fn emit_beq(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_jmp(JumpVars::new(
-            JumpCond::Equal,
-            imm,
-            rs1 as u32,
-            rs2 as u32,
-        )))
+        Ok(emit_jmp(
+            JumpVars::new(JumpCond::Equal, imm, rs1 as u32, rs2 as u32),
+            false,
+        ))
     }
 
     fn emit_bne(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_jmp(JumpVars::new(
-            JumpCond::NotEqual,
-            imm,
-            rs1 as u32,
-            rs2 as u32,
-        )))
+        Ok(emit_jmp(
+            JumpVars::new(JumpCond::NotEqual, imm, rs1 as u32, rs2 as u32),
+            false,
+        ))
     }
 
     fn emit_blt(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_jmp(JumpVars::new(
-            JumpCond::LessThan,
-            imm,
-            rs1 as u32,
-            rs2 as u32,
-        )))
+        Ok(emit_jmp(
+            JumpVars::new(JumpCond::LessThan, imm, rs1 as u32, rs2 as u32),
+            false,
+        ))
     }
 
     fn emit_bge(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_jmp(JumpVars::new(
-            JumpCond::GreaterThanEqual,
-            imm,
-            rs1 as u32,
-            rs2 as u32,
-        )))
+        Ok(emit_jmp(
+            JumpVars::new(JumpCond::GreaterThanEqual, imm, rs1 as u32, rs2 as u32),
+            false,
+        ))
     }
 
     fn emit_bltu(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_jmp(JumpVars::new(
-            JumpCond::LessThanUnsigned,
-            imm,
-            rs1 as u32,
-            rs2 as u32,
-        )))
+        Ok(emit_jmp(
+            JumpVars::new(JumpCond::LessThanUnsigned, imm, rs1 as u32, rs2 as u32),
+            false,
+        ))
     }
 
     fn emit_bgeu(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_jmp(JumpVars::new(
-            JumpCond::GreaterThanEqualUnsigned,
-            imm,
-            rs1 as u32,
-            rs2 as u32,
-        )))
+        Ok(emit_jmp(
+            JumpVars::new(
+                JumpCond::GreaterThanEqualUnsigned,
+                imm,
+                rs1 as u32,
+                rs2 as u32,
+            ),
+            false,
+        ))
     }
 
     fn emit_lb(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access(BusAccessVars::new(
-            backend::BusAccessCond::LoadByte,
-            imm,
-            rd as u32,
-            rs1 as u32,
-        )))
+        Ok(emit_bus_access(
+            BusAccessVars::new(backend::BusAccessCond::LoadByte, imm, rd as u32, rs1 as u32),
+            false,
+        ))
     }
 
     fn emit_lh(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access(BusAccessVars::new(
-            backend::BusAccessCond::LoadHalf,
-            imm,
-            rd as u32,
-            rs1 as u32,
-        )))
+        Ok(emit_bus_access(
+            BusAccessVars::new(backend::BusAccessCond::LoadHalf, imm, rd as u32, rs1 as u32),
+            false,
+        ))
     }
 
     fn emit_lw(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access(BusAccessVars::new(
-            backend::BusAccessCond::LoadWord,
-            imm,
-            rd as u32,
-            rs1 as u32,
-        )))
+        Ok(emit_bus_access(
+            BusAccessVars::new(backend::BusAccessCond::LoadWord, imm, rd as u32, rs1 as u32),
+            false,
+        ))
     }
 
     fn emit_lbu(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access(BusAccessVars::new(
-            backend::BusAccessCond::LoadByteUnsigned,
-            imm,
-            rd as u32,
-            rs1 as u32,
-        )))
+        Ok(emit_bus_access(
+            BusAccessVars::new(
+                backend::BusAccessCond::LoadByteUnsigned,
+                imm,
+                rd as u32,
+                rs1 as u32,
+            ),
+            false,
+        ))
     }
 
     fn emit_lhu(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access(BusAccessVars::new(
-            backend::BusAccessCond::LoadHalfUnsigned,
-            imm,
-            rd as u32,
-            rs1 as u32,
-        )))
+        Ok(emit_bus_access(
+            BusAccessVars::new(
+                backend::BusAccessCond::LoadHalfUnsigned,
+                imm,
+                rd as u32,
+                rs1 as u32,
+            ),
+            false,
+        ))
     }
 
     fn emit_sb(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access(BusAccessVars::new(
-            backend::BusAccessCond::StoreByte,
-            imm,
-            rs2 as u32, // Intentionally flipped
-            rs1 as u32,
-        )))
+        Ok(emit_bus_access(
+            BusAccessVars::new(
+                backend::BusAccessCond::StoreByte,
+                imm,
+                rs2 as u32, // Intentionally flipped
+                rs1 as u32,
+            ),
+            false,
+        ))
     }
 
     fn emit_sh(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access(BusAccessVars::new(
-            backend::BusAccessCond::StoreHalf,
-            imm,
-            rs2 as u32,
-            rs1 as u32,
-        )))
+        Ok(emit_bus_access(
+            BusAccessVars::new(
+                backend::BusAccessCond::StoreHalf,
+                imm,
+                rs2 as u32,
+                rs1 as u32,
+            ),
+            false,
+        ))
     }
 
     fn emit_sw(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access(BusAccessVars::new(
-            backend::BusAccessCond::StoreWord,
-            imm,
-            rs2 as u32,
-            rs1 as u32,
-        )))
+        Ok(emit_bus_access(
+            BusAccessVars::new(
+                backend::BusAccessCond::StoreWord,
+                imm,
+                rs2 as u32,
+                rs1 as u32,
+            ),
+            false,
+        ))
     }
 
     fn emit_fence(_pred: u8, _succ: u8) -> DecodeRet {
