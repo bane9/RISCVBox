@@ -34,9 +34,9 @@ fn emit_bus_access(cond: BusAccessVars, twenty_bit_imm: bool) -> HostEncodedInsn
 
 extern "C" fn temporary_hack_lol(rd: usize, imm: usize, pc: usize, _temp: usize) {
     let cpu = cpu::get_cpu();
-    let pc = pc as i32 as i64;
+    let pc = pc as i64;
     let current_gpfn = (cpu.current_gpfn << RV_PAGE_SHIFT) as i64;
-    cpu.regs[rd] = (current_gpfn | pc).wrapping_add(imm as i64) as u32;
+    cpu.regs[rd] = ((current_gpfn | pc) + (imm as i64)) as u32;
 }
 
 impl common::Rvi for RviImpl {

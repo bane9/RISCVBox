@@ -83,6 +83,8 @@ pub fn has_pending_interrupt() -> Option<Interrupt> {
 pub fn handle_interrupt(int_val: Interrupt) {
     assert!(int_val != Interrupt::None);
 
+    println!("\n\n\nhandle_interrupt");
+
     let cpu = cpu::get_cpu();
 
     let mode = cpu.mode;
@@ -113,7 +115,7 @@ pub fn handle_interrupt(int_val: Interrupt) {
             cpu.exception.to_cpu_reg() | (1 << (CpuReg::BITS - 1)),
         );
         cpu.csr
-            .write(csr::register::STVAL, cpu.c_exception_data as CpuReg);
+            .write(csr::register::STVAL, cpu.exception.get_data());
         cpu.csr
             .write_bit_sstatus(csr::bits::SPIE, cpu.csr.read_bit_sstatus(csr::bits::SIE));
         cpu.csr.write_bit_sstatus(csr::bits::SIE, false);
@@ -136,7 +138,7 @@ pub fn handle_interrupt(int_val: Interrupt) {
             cpu.exception.to_cpu_reg() | (1 << (CpuReg::BITS - 1)),
         );
         cpu.csr
-            .write(csr::register::MTVAL, cpu.c_exception_data as CpuReg);
+            .write(csr::register::MTVAL, cpu.exception.get_data());
         cpu.csr
             .write_bit_mstatus(csr::bits::MPIE, cpu.csr.read_bit_mstatus(csr::bits::MIE));
         cpu.csr.write_bit_mstatus(csr::bits::MIE, false);
@@ -149,7 +151,7 @@ pub fn handle_exception() {
 
     assert!(cpu.exception < Exception::None);
 
-    let pc = (cpu.c_exception_pc) as CpuReg;
+    let pc = cpu.c_exception_pc as CpuReg;
     let mode = cpu.mode;
 
     let exc_val = cpu.exception.to_cpu_reg() as usize;
@@ -167,7 +169,7 @@ pub fn handle_exception() {
         cpu.csr
             .write(csr::register::SCAUSE, cpu.exception.to_cpu_reg());
         cpu.csr
-            .write(csr::register::STVAL, cpu.c_exception_data as CpuReg);
+            .write(csr::register::STVAL, cpu.exception.get_data());
         cpu.csr
             .write_bit_sstatus(csr::bits::SPIE, cpu.csr.read_bit_sstatus(csr::bits::SIE));
         cpu.csr.write_bit_sstatus(csr::bits::SIE, false);
@@ -183,7 +185,7 @@ pub fn handle_exception() {
         cpu.csr
             .write(csr::register::MCAUSE, cpu.exception.to_cpu_reg());
         cpu.csr
-            .write(csr::register::MTVAL, cpu.c_exception_data as CpuReg);
+            .write(csr::register::MTVAL, cpu.exception.get_data());
         cpu.csr
             .write_bit_mstatus(csr::bits::MPIE, cpu.csr.read_bit_mstatus(csr::bits::MIE));
         cpu.csr.write_bit_mstatus(csr::bits::MIE, false);

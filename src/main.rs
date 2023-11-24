@@ -40,7 +40,7 @@ fn init_bus(mut rom: Vec<u8>, ram_size: usize, dtb: Option<Vec<u8>>) {
 }
 
 fn main() {
-    let ram_size = util::size_mib(64);
+    let ram_size = util::size_mib(128);
 
     // let argv = std::env::args().collect::<Vec<String>>();
 
@@ -58,7 +58,7 @@ fn main() {
     // };
 
     let rom = util::read_file("buildroot/images/linux.bin").unwrap();
-    let dtb = Some(util::read_file("buildroot/dtb.dtb").unwrap());
+    let dtb = Some(util::read_file("buildroot/images/dtb.dtb").unwrap());
 
     init_backend_csr();
 

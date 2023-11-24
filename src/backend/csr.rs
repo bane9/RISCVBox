@@ -6,6 +6,7 @@ use crate::bus::mmu::Mmu;
 use crate::bus::BusType;
 use crate::cpu::csr::{self, CsrType, MppMode};
 use crate::cpu::{self, CpuReg, Exception};
+use crate::frontend::exec_core::RV_PAGE_SHIFT;
 
 use super::{ReturnableHandler, ReturnableImpl};
 
@@ -207,19 +208,25 @@ extern "C" fn ecall_cb(pc: usize) {
     match cpu.mode {
         MppMode::Machine => {
             cpu.set_exception(
-                Exception::EnvironmentCallFromMMode(cpu.current_gpfn_offset),
+                Exception::EnvironmentCallFromMMode(
+                    (cpu.current_gpfn << RV_PAGE_SHIFT) | pc as CpuReg,
+                ),
                 pc as CpuReg,
             );
         }
         MppMode::Supervisor => {
             cpu.set_exception(
-                Exception::EnvironmentCallFromSMode(cpu.current_gpfn_offset),
+                Exception::EnvironmentCallFromSMode(
+                    (cpu.current_gpfn << RV_PAGE_SHIFT) | pc as CpuReg,
+                ),
                 pc as CpuReg,
             );
         }
         MppMode::User => {
             cpu.set_exception(
-                Exception::EnvironmentCallFromUMode(cpu.current_gpfn_offset),
+                Exception::EnvironmentCallFromUMode(
+                    (cpu.current_gpfn << RV_PAGE_SHIFT) | pc as CpuReg,
+                ),
                 pc as CpuReg,
             );
         }

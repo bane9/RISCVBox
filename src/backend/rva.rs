@@ -2,7 +2,9 @@ use std::sync::atomic::{AtomicI32, AtomicU32};
 
 use super::core::amd64_reg;
 use super::{core::BackendCoreImpl, BackendCore};
+use crate::backend::{ReturnableHandler, ReturnableImpl};
 use crate::bus::mmu::AccessType;
+use crate::frontend::exec_core::{RV_PAGE_MASK, RV_PAGE_SHIFT};
 use crate::*;
 use crate::{
     backend::common,
@@ -59,6 +61,21 @@ macro_rules! atomic_load {
     }};
 }
 
+macro_rules! check_gpfn_write {
+    ($cpu: expr, $addr: expr, $pc: expr) => {{
+        let gpfn = $addr & RV_PAGE_MASK as CpuReg;
+
+        if $cpu.gpfn_state.contains_gpfn(gpfn) {
+            $cpu.set_exception(
+                Exception::InvalidateJitBlock(gpfn >> RV_PAGE_SHIFT as CpuReg),
+                $pc,
+            );
+
+            ReturnableImpl::throw();
+        }
+    }};
+}
+
 macro_rules! atomic_store {
     ($ptr: expr, $data: expr, $aq_rel: expr) => {{
         unsafe {
@@ -93,10 +110,6 @@ extern "C" fn lr_w_cb(rd: usize, rs1: usize, aq_rel: usize, pc: usize) -> usize 
 }
 
 extern "C" fn sc_w_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> usize {
-    if rd == 0 {
-        return 0;
-    }
-
     let cpu = cpu::get_cpu();
     let bus = bus::get_bus();
 
@@ -116,6 +129,8 @@ extern "C" fn sc_w_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> us
         if rd != 0 {
             cpu.regs[rd] = 0;
         }
+
+        check_gpfn_write!(cpu, addr, pc as CpuReg);
     } else if rd != 0 {
         cpu.regs[rd] = 1;
     }
@@ -132,20 +147,20 @@ extern "C" fn amoswapw_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -
 
     let val = cpu.regs[rs2];
 
-    let addr1: u32;
+    let addr: u32;
 
-    let ptr1: *mut u8;
+    let ptr: *mut u8;
 
-    fetch_ptr!(ptr1, addr1, bus, cpu, rs1, pc);
+    fetch_ptr!(ptr, addr, bus, cpu, rs1, pc);
 
     unsafe {
-        let ptr1 = ptr1 as *mut AtomicU32;
+        let ptr = ptr as *mut AtomicU32;
 
         let data = match aq_rel {
-            0b00 => (*ptr1).swap(val, std::sync::atomic::Ordering::Relaxed),
-            0b01 => (*ptr1).swap(val, std::sync::atomic::Ordering::Acquire),
-            0b10 => (*ptr1).swap(val, std::sync::atomic::Ordering::Release),
-            0b11 => (*ptr1).swap(val, std::sync::atomic::Ordering::AcqRel),
+            0b00 => (*ptr).swap(val, std::sync::atomic::Ordering::Relaxed),
+            0b01 => (*ptr).swap(val, std::sync::atomic::Ordering::Acquire),
+            0b10 => (*ptr).swap(val, std::sync::atomic::Ordering::Release),
+            0b11 => (*ptr).swap(val, std::sync::atomic::Ordering::AcqRel),
             _ => unreachable!(),
         };
 
@@ -153,6 +168,8 @@ extern "C" fn amoswapw_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -
             cpu.regs[rd] = data;
         }
     }
+
+    check_gpfn_write!(cpu, addr, pc as CpuReg);
 
     0
 }
@@ -164,21 +181,21 @@ extern "C" fn amoadd_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> 
     let rs1 = (rs1_rs2 >> 8) & 0x1f;
     let rs2 = rs1_rs2 & 0x1f;
 
-    let addr1: u32;
+    let addr: u32;
 
-    let ptr1: *mut u8;
+    let ptr: *mut u8;
 
-    fetch_ptr!(ptr1, addr1, bus, cpu, rs1, pc);
-    let data2 = cpu.regs[rs2];
+    fetch_ptr!(ptr, addr, bus, cpu, rs1, pc);
+    let data = cpu.regs[rs2];
 
     unsafe {
-        let ptr1 = ptr1 as *mut AtomicU32;
+        let ptr = ptr as *mut AtomicU32;
 
         let data = match aq_rel {
-            0b00 => (*ptr1).fetch_add(data2, std::sync::atomic::Ordering::Relaxed),
-            0b01 => (*ptr1).fetch_add(data2, std::sync::atomic::Ordering::Acquire),
-            0b10 => (*ptr1).fetch_add(data2, std::sync::atomic::Ordering::Release),
-            0b11 => (*ptr1).fetch_add(data2, std::sync::atomic::Ordering::AcqRel),
+            0b00 => (*ptr).fetch_add(data, std::sync::atomic::Ordering::Relaxed),
+            0b01 => (*ptr).fetch_add(data, std::sync::atomic::Ordering::Acquire),
+            0b10 => (*ptr).fetch_add(data, std::sync::atomic::Ordering::Release),
+            0b11 => (*ptr).fetch_add(data, std::sync::atomic::Ordering::AcqRel),
             _ => unreachable!(),
         };
 
@@ -186,6 +203,8 @@ extern "C" fn amoadd_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> 
             cpu.regs[rd] = data;
         }
     }
+
+    check_gpfn_write!(cpu, addr, pc as CpuReg);
 
     0
 }
@@ -197,21 +216,21 @@ extern "C" fn amoxor_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> 
     let rs1 = (rs1_rs2 >> 8) & 0x1f;
     let rs2 = rs1_rs2 & 0x1f;
 
-    let addr1: u32;
+    let addr: u32;
 
-    let ptr1: *mut u8;
+    let ptr: *mut u8;
 
-    fetch_ptr!(ptr1, addr1, bus, cpu, rs1, pc);
-    let data2 = cpu.regs[rs2];
+    fetch_ptr!(ptr, addr, bus, cpu, rs1, pc);
+    let data = cpu.regs[rs2];
 
     unsafe {
-        let ptr1 = ptr1 as *mut AtomicU32;
+        let ptr = ptr as *mut AtomicU32;
 
         let data = match aq_rel {
-            0b00 => (*ptr1).fetch_xor(data2, std::sync::atomic::Ordering::Relaxed),
-            0b01 => (*ptr1).fetch_xor(data2, std::sync::atomic::Ordering::Acquire),
-            0b10 => (*ptr1).fetch_xor(data2, std::sync::atomic::Ordering::Release),
-            0b11 => (*ptr1).fetch_xor(data2, std::sync::atomic::Ordering::AcqRel),
+            0b00 => (*ptr).fetch_xor(data, std::sync::atomic::Ordering::Relaxed),
+            0b01 => (*ptr).fetch_xor(data, std::sync::atomic::Ordering::Acquire),
+            0b10 => (*ptr).fetch_xor(data, std::sync::atomic::Ordering::Release),
+            0b11 => (*ptr).fetch_xor(data, std::sync::atomic::Ordering::AcqRel),
             _ => unreachable!(),
         };
 
@@ -219,6 +238,8 @@ extern "C" fn amoxor_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> 
             cpu.regs[rd] = data;
         }
     }
+
+    check_gpfn_write!(cpu, addr, pc as CpuReg);
 
     0
 }
@@ -230,21 +251,21 @@ extern "C" fn amoor_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> u
     let rs1 = (rs1_rs2 >> 8) & 0x1f;
     let rs2 = rs1_rs2 & 0x1f;
 
-    let addr1: u32;
+    let addr: u32;
 
-    let ptr1: *mut u8;
+    let ptr: *mut u8;
 
-    fetch_ptr!(ptr1, addr1, bus, cpu, rs1, pc);
-    let data2 = cpu.regs[rs2];
+    fetch_ptr!(ptr, addr, bus, cpu, rs1, pc);
+    let data = cpu.regs[rs2];
 
     unsafe {
-        let ptr1 = ptr1 as *mut AtomicU32;
+        let ptr = ptr as *mut AtomicU32;
 
         let data = match aq_rel {
-            0b00 => (*ptr1).fetch_or(data2, std::sync::atomic::Ordering::Relaxed),
-            0b01 => (*ptr1).fetch_or(data2, std::sync::atomic::Ordering::Acquire),
-            0b10 => (*ptr1).fetch_or(data2, std::sync::atomic::Ordering::Release),
-            0b11 => (*ptr1).fetch_or(data2, std::sync::atomic::Ordering::AcqRel),
+            0b00 => (*ptr).fetch_or(data, std::sync::atomic::Ordering::Relaxed),
+            0b01 => (*ptr).fetch_or(data, std::sync::atomic::Ordering::Acquire),
+            0b10 => (*ptr).fetch_or(data, std::sync::atomic::Ordering::Release),
+            0b11 => (*ptr).fetch_or(data, std::sync::atomic::Ordering::AcqRel),
             _ => unreachable!(),
         };
 
@@ -252,6 +273,8 @@ extern "C" fn amoor_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> u
             cpu.regs[rd] = data;
         }
     }
+
+    check_gpfn_write!(cpu, addr, pc as CpuReg);
 
     0
 }
@@ -263,21 +286,21 @@ extern "C" fn amosub_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> 
     let rs1 = (rs1_rs2 >> 8) & 0x1f;
     let rs2 = rs1_rs2 & 0x1f;
 
-    let addr1: u32;
+    let addr: u32;
 
-    let ptr1: *mut u8;
+    let ptr: *mut u8;
 
-    fetch_ptr!(ptr1, addr1, bus, cpu, rs1, pc);
-    let data2 = cpu.regs[rs2];
+    fetch_ptr!(ptr, addr, bus, cpu, rs1, pc);
+    let data = cpu.regs[rs2];
 
     unsafe {
-        let ptr1 = ptr1 as *mut AtomicU32;
+        let ptr = ptr as *mut AtomicU32;
 
         let data = match aq_rel {
-            0b00 => (*ptr1).fetch_sub(data2, std::sync::atomic::Ordering::Relaxed),
-            0b01 => (*ptr1).fetch_sub(data2, std::sync::atomic::Ordering::Acquire),
-            0b10 => (*ptr1).fetch_sub(data2, std::sync::atomic::Ordering::Release),
-            0b11 => (*ptr1).fetch_sub(data2, std::sync::atomic::Ordering::AcqRel),
+            0b00 => (*ptr).fetch_sub(data, std::sync::atomic::Ordering::Relaxed),
+            0b01 => (*ptr).fetch_sub(data, std::sync::atomic::Ordering::Acquire),
+            0b10 => (*ptr).fetch_sub(data, std::sync::atomic::Ordering::Release),
+            0b11 => (*ptr).fetch_sub(data, std::sync::atomic::Ordering::AcqRel),
             _ => unreachable!(),
         };
 
@@ -285,6 +308,8 @@ extern "C" fn amosub_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> 
             cpu.regs[rd] = data;
         }
     }
+
+    check_gpfn_write!(cpu, addr, pc as CpuReg);
 
     0
 }
@@ -296,21 +321,21 @@ extern "C" fn amoand_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> 
     let rs1 = (rs1_rs2 >> 8) & 0x1f;
     let rs2 = rs1_rs2 & 0x1f;
 
-    let addr1: u32;
+    let addr: u32;
 
-    let ptr1: *mut u8;
+    let ptr: *mut u8;
 
-    fetch_ptr!(ptr1, addr1, bus, cpu, rs1, pc);
-    let data2 = cpu.regs[rs2];
+    fetch_ptr!(ptr, addr, bus, cpu, rs1, pc);
+    let data = cpu.regs[rs2];
 
     unsafe {
-        let ptr1 = ptr1 as *mut AtomicU32;
+        let ptr = ptr as *mut AtomicU32;
 
         let data = match aq_rel {
-            0b00 => (*ptr1).fetch_and(data2, std::sync::atomic::Ordering::Relaxed),
-            0b01 => (*ptr1).fetch_and(data2, std::sync::atomic::Ordering::Acquire),
-            0b10 => (*ptr1).fetch_and(data2, std::sync::atomic::Ordering::Release),
-            0b11 => (*ptr1).fetch_and(data2, std::sync::atomic::Ordering::AcqRel),
+            0b00 => (*ptr).fetch_and(data, std::sync::atomic::Ordering::Relaxed),
+            0b01 => (*ptr).fetch_and(data, std::sync::atomic::Ordering::Acquire),
+            0b10 => (*ptr).fetch_and(data, std::sync::atomic::Ordering::Release),
+            0b11 => (*ptr).fetch_and(data, std::sync::atomic::Ordering::AcqRel),
             _ => unreachable!(),
         };
 
@@ -318,6 +343,8 @@ extern "C" fn amoand_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> 
             cpu.regs[rd] = data;
         }
     }
+
+    check_gpfn_write!(cpu, addr, pc as CpuReg);
 
     0
 }
@@ -329,28 +356,30 @@ extern "C" fn amomin_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> 
     let rs1 = (rs1_rs2 >> 8) & 0x1f;
     let rs2 = rs1_rs2 & 0x1f;
 
-    let addr1: u32;
+    let addr: u32;
 
-    let ptr1: *mut u8;
+    let ptr: *mut u8;
 
-    fetch_ptr!(ptr1, addr1, bus, cpu, rs1, pc);
-    let data2 = cpu.regs[rs2];
+    fetch_ptr!(ptr, addr, bus, cpu, rs1, pc);
+    let data = cpu.regs[rs2];
 
     unsafe {
-        let ptr1 = ptr1 as *mut AtomicI32;
+        let ptr = ptr as *mut AtomicI32;
 
         let data = match aq_rel {
-            0b00 => (*ptr1).fetch_min(data2 as i32, std::sync::atomic::Ordering::Relaxed),
-            0b01 => (*ptr1).fetch_min(data2 as i32, std::sync::atomic::Ordering::Acquire),
-            0b10 => (*ptr1).fetch_min(data2 as i32, std::sync::atomic::Ordering::Release),
-            0b11 => (*ptr1).fetch_min(data2 as i32, std::sync::atomic::Ordering::AcqRel),
+            0b00 => (*ptr).fetch_min(data as i32, std::sync::atomic::Ordering::Relaxed),
+            0b01 => (*ptr).fetch_min(data as i32, std::sync::atomic::Ordering::Acquire),
+            0b10 => (*ptr).fetch_min(data as i32, std::sync::atomic::Ordering::Release),
+            0b11 => (*ptr).fetch_min(data as i32, std::sync::atomic::Ordering::AcqRel),
             _ => unreachable!(),
         };
 
         if rd != 0 {
-            cpu.regs[rd] = data as u32;
+            cpu.regs[rd] = data as CpuReg;
         }
     }
+
+    check_gpfn_write!(cpu, addr, pc as CpuReg);
 
     0
 }
@@ -362,28 +391,30 @@ extern "C" fn amomax_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> 
     let rs1 = (rs1_rs2 >> 8) & 0x1f;
     let rs2 = rs1_rs2 & 0x1f;
 
-    let addr1: u32;
+    let addr: u32;
 
-    let ptr1: *mut u8;
+    let ptr: *mut u8;
 
-    fetch_ptr!(ptr1, addr1, bus, cpu, rs1, pc);
-    let data2 = cpu.regs[rs2];
+    fetch_ptr!(ptr, addr, bus, cpu, rs1, pc);
+    let data = cpu.regs[rs2];
 
     unsafe {
-        let ptr1 = ptr1 as *mut AtomicI32;
+        let ptr = ptr as *mut AtomicI32;
 
         let data = match aq_rel {
-            0b00 => (*ptr1).fetch_max(data2 as i32, std::sync::atomic::Ordering::Relaxed),
-            0b01 => (*ptr1).fetch_max(data2 as i32, std::sync::atomic::Ordering::Acquire),
-            0b10 => (*ptr1).fetch_max(data2 as i32, std::sync::atomic::Ordering::Release),
-            0b11 => (*ptr1).fetch_max(data2 as i32, std::sync::atomic::Ordering::AcqRel),
+            0b00 => (*ptr).fetch_max(data as i32, std::sync::atomic::Ordering::Relaxed),
+            0b01 => (*ptr).fetch_max(data as i32, std::sync::atomic::Ordering::Acquire),
+            0b10 => (*ptr).fetch_max(data as i32, std::sync::atomic::Ordering::Release),
+            0b11 => (*ptr).fetch_max(data as i32, std::sync::atomic::Ordering::AcqRel),
             _ => unreachable!(),
         };
 
         if rd != 0 {
-            cpu.regs[rd] = data as u32;
+            cpu.regs[rd] = data as CpuReg;
         }
     }
+
+    check_gpfn_write!(cpu, addr, pc as CpuReg);
 
     0
 }
@@ -395,28 +426,30 @@ extern "C" fn amominu_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) ->
     let rs1 = (rs1_rs2 >> 8) & 0x1f;
     let rs2 = rs1_rs2 & 0x1f;
 
-    let addr1: u32;
+    let addr: u32;
 
-    let ptr1: *mut u8;
+    let ptr: *mut u8;
 
-    fetch_ptr!(ptr1, addr1, bus, cpu, rs1, pc);
-    let data2 = cpu.regs[rs2];
+    fetch_ptr!(ptr, addr, bus, cpu, rs1, pc);
+    let data = cpu.regs[rs2];
 
     unsafe {
-        let ptr1 = ptr1 as *mut AtomicU32;
+        let ptr = ptr as *mut AtomicU32;
 
         let data = match aq_rel {
-            0b00 => (*ptr1).fetch_min(data2, std::sync::atomic::Ordering::Relaxed),
-            0b01 => (*ptr1).fetch_min(data2, std::sync::atomic::Ordering::Acquire),
-            0b10 => (*ptr1).fetch_min(data2, std::sync::atomic::Ordering::Release),
-            0b11 => (*ptr1).fetch_min(data2, std::sync::atomic::Ordering::AcqRel),
+            0b00 => (*ptr).fetch_min(data, std::sync::atomic::Ordering::Relaxed),
+            0b01 => (*ptr).fetch_min(data, std::sync::atomic::Ordering::Acquire),
+            0b10 => (*ptr).fetch_min(data, std::sync::atomic::Ordering::Release),
+            0b11 => (*ptr).fetch_min(data, std::sync::atomic::Ordering::AcqRel),
             _ => unreachable!(),
         };
 
         if rd != 0 {
-            cpu.regs[rd] = data as u32;
+            cpu.regs[rd] = data as CpuReg;
         }
     }
+
+    check_gpfn_write!(cpu, addr, pc as CpuReg);
 
     0
 }
@@ -428,21 +461,21 @@ extern "C" fn amomaxu_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) ->
     let rs1 = (rs1_rs2 >> 8) & 0x1f;
     let rs2 = rs1_rs2 & 0x1f;
 
-    let addr1: u32;
+    let addr: u32;
 
-    let ptr1: *mut u8;
+    let ptr: *mut u8;
 
-    fetch_ptr!(ptr1, addr1, bus, cpu, rs1, pc);
-    let data2 = cpu.regs[rs2];
+    fetch_ptr!(ptr, addr, bus, cpu, rs1, pc);
+    let data = cpu.regs[rs2];
 
     unsafe {
-        let ptr1 = ptr1 as *mut AtomicU32;
+        let ptr = ptr as *mut AtomicU32;
 
         let data = match aq_rel {
-            0b00 => (*ptr1).fetch_max(data2, std::sync::atomic::Ordering::Relaxed),
-            0b01 => (*ptr1).fetch_max(data2, std::sync::atomic::Ordering::Acquire),
-            0b10 => (*ptr1).fetch_max(data2, std::sync::atomic::Ordering::Release),
-            0b11 => (*ptr1).fetch_max(data2, std::sync::atomic::Ordering::AcqRel),
+            0b00 => (*ptr).fetch_max(data, std::sync::atomic::Ordering::Relaxed),
+            0b01 => (*ptr).fetch_max(data, std::sync::atomic::Ordering::Acquire),
+            0b10 => (*ptr).fetch_max(data, std::sync::atomic::Ordering::Release),
+            0b11 => (*ptr).fetch_max(data, std::sync::atomic::Ordering::AcqRel),
             _ => unreachable!(),
         };
 
@@ -450,6 +483,8 @@ extern "C" fn amomaxu_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) ->
             cpu.regs[rd] = data;
         }
     }
+
+    check_gpfn_write!(cpu, addr, pc as CpuReg);
 
     0
 }

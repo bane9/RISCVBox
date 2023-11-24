@@ -103,7 +103,7 @@ impl ExecCore {
             cpu::Exception::MmuStateUpdate => {
                 cpu.next_pc = cpu.c_exception_pc as CpuReg + INSN_SIZE as CpuReg;
             }
-            cpu::Exception::BlockExit(_pc) => {
+            cpu::Exception::BlockExit => {
                 cpu.next_pc = cpu.c_exception_pc as CpuReg;
             }
             cpu::Exception::ForwardJumpFault(pc) => {
@@ -162,17 +162,17 @@ impl ExecCore {
             }
         }
 
-        if !matches!(
-            cpu.exception,
-            cpu::Exception::Wfi
-                | cpu::Exception::BookkeepingRet
-                | cpu::Exception::BlockExit(_)
-                | cpu::Exception::ForwardJumpFault(_)
-        ) {
-            println!(
-                "ret_status: {:#x?} with pc 0x{:x} cpu.next_pc {:x} gp {}",
-                cpu.exception, cpu.c_exception_pc, cpu.next_pc, cpu.regs[3]
-            );
+        // if !matches!(
+        //     cpu.exception,
+        //     cpu::Exception::Wfi
+        //         | cpu::Exception::BookkeepingRet
+        //         | cpu::Exception::ForwardJumpFault(_)
+        // )
+        {
+            // println!(
+            //     "ret_status: {:#x?} with pc 0x{:x} cpu.next_pc {:x} gp {}",
+            //     cpu.exception, cpu.c_exception_pc, cpu.next_pc, cpu.regs[3]
+            // );
         }
     }
 }

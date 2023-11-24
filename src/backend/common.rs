@@ -155,12 +155,10 @@ where
         let reg1 = ((val >> 3) & 0x1f) as CpuReg;
         let reg2 = ((val >> 8) & 0x1f) as CpuReg;
         let twenty_bit_imm = ((val >> 13) & 0x1) != 0;
+        let imm = (val >> 16) & 0xffffffff;
         let imm = if twenty_bit_imm {
-            let imm = (val >> 16) & 0xffffffff;
-
             imm as i32
         } else {
-            let imm = (val >> 16) & 0xfff;
             sign_extend(imm as i64, 12) as i32
         };
 
@@ -196,21 +194,21 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize, guest_pc: usize) -> usize 
     cpu.jump_count += 1;
 
     if cpu.jump_count > JUMP_COUNT_MAX {
-        cpu.set_exception(Exception::BookkeepingRet, guest_pc);
+        // cpu.set_exception(Exception::BookkeepingRet, guest_pc);
 
-        ReturnableImpl::throw();
+        // ReturnableImpl::throw();
     }
 
     let (jmp_addr, should_jmp) = match jmp_cond.cond {
         JumpCond::Always => {
             let pc = guest_pc as i64;
-            let pc = pc.wrapping_add(jmp_cond.imm as i64);
+            let pc = pc + jmp_cond.imm as i64;
 
             (pc, true)
         }
         JumpCond::AlwaysAbsolute => {
             let pc = cpu.regs[jmp_cond.reg2 as usize] as i64;
-            let pc = pc.wrapping_add(jmp_cond.imm as i64);
+            let pc = pc + jmp_cond.imm as i64;
             let pc = pc & !1;
 
             (pc, true)
@@ -218,7 +216,7 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize, guest_pc: usize) -> usize 
         JumpCond::Equal => {
             if cpu.regs[jmp_cond.reg1 as usize] as i32 == cpu.regs[jmp_cond.reg2 as usize] as i32 {
                 let pc = guest_pc as i64;
-                let pc = pc.wrapping_add(jmp_cond.imm as i64);
+                let pc = pc + jmp_cond.imm as i64;
 
                 (pc, true)
             } else {
@@ -228,7 +226,7 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize, guest_pc: usize) -> usize 
         JumpCond::NotEqual => {
             if cpu.regs[jmp_cond.reg1 as usize] as i32 != cpu.regs[jmp_cond.reg2 as usize] as i32 {
                 let pc = guest_pc as i64;
-                let pc = pc.wrapping_add(jmp_cond.imm as i64);
+                let pc = pc + jmp_cond.imm as i64;
 
                 (pc, true)
             } else {
@@ -239,7 +237,7 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize, guest_pc: usize) -> usize 
             if (cpu.regs[jmp_cond.reg1 as usize] as i32) < (cpu.regs[jmp_cond.reg2 as usize] as i32)
             {
                 let pc = guest_pc as i64;
-                let pc = pc.wrapping_add(jmp_cond.imm as i64);
+                let pc = pc + jmp_cond.imm as i64;
 
                 (pc, true)
             } else {
@@ -251,7 +249,7 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize, guest_pc: usize) -> usize 
                 >= (cpu.regs[jmp_cond.reg2 as usize] as i32)
             {
                 let pc = guest_pc as i64;
-                let pc = pc.wrapping_add(jmp_cond.imm as i64);
+                let pc = pc + jmp_cond.imm as i64;
 
                 (pc, true)
             } else {
@@ -261,7 +259,7 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize, guest_pc: usize) -> usize 
         JumpCond::LessThanUnsigned => {
             if cpu.regs[jmp_cond.reg1 as usize] < cpu.regs[jmp_cond.reg2 as usize] {
                 let pc = guest_pc as i64;
-                let pc = pc.wrapping_add(jmp_cond.imm as i64);
+                let pc = pc + jmp_cond.imm as i64;
 
                 (pc, true)
             } else {
@@ -271,7 +269,7 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize, guest_pc: usize) -> usize 
         JumpCond::GreaterThanEqualUnsigned => {
             if cpu.regs[jmp_cond.reg1 as usize] >= cpu.regs[jmp_cond.reg2 as usize] {
                 let pc = guest_pc as i64;
-                let pc = pc.wrapping_add(jmp_cond.imm as i64);
+                let pc = pc + jmp_cond.imm as i64;
 
                 (pc, true)
             } else {
@@ -281,7 +279,10 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize, guest_pc: usize) -> usize 
     };
 
     if jmp_addr % INSN_SIZE as i64 != 0 {
-        cpu.set_exception(Exception::ForwardJumpFault(jmp_addr as u32), guest_pc);
+        cpu.set_exception(
+            Exception::InstructionAddressMisaligned(jmp_addr as u32),
+            guest_pc,
+        );
 
         ReturnableImpl::throw();
     }
@@ -296,7 +297,7 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize, guest_pc: usize) -> usize 
         jmp_addr
     } else {
         let current_pc = cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg;
-        let next_pc = (current_pc as i64).wrapping_add(jmp_addr);
+        let next_pc = (current_pc as i64) + jmp_addr;
 
         next_pc
     } as CpuReg;
@@ -340,49 +341,49 @@ pub extern "C" fn c_bus_resolver_cb(bus_vars: usize, guest_pc: usize) {
     let (addres, size, is_load, is_unsigned) = match bus_vars.cond {
         BusAccessCond::LoadByte => {
             let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
-            let addr = addr.wrapping_add(bus_vars.imm as i64);
+            let addr = addr + bus_vars.imm as i64;
 
             (addr as u32, 8, true, false)
         }
         BusAccessCond::LoadHalf => {
             let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
-            let addr = addr.wrapping_add(bus_vars.imm as i64);
+            let addr = addr + bus_vars.imm as i64;
 
             (addr as u32, 16, true, false)
         }
         BusAccessCond::LoadWord => {
             let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
-            let addr = addr.wrapping_add(bus_vars.imm as i64);
+            let addr = addr + bus_vars.imm as i64;
 
             (addr as u32, 32, true, false)
         }
         BusAccessCond::LoadByteUnsigned => {
             let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
-            let addr = addr.wrapping_add(bus_vars.imm as i64);
+            let addr = addr + bus_vars.imm as i64;
 
             (addr as u32, 8, true, true)
         }
         BusAccessCond::LoadHalfUnsigned => {
             let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
-            let addr = addr.wrapping_add(bus_vars.imm as i64);
+            let addr = addr + bus_vars.imm as i64;
 
             (addr as u32, 16, true, true)
         }
         BusAccessCond::StoreByte => {
             let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
-            let addr = addr.wrapping_add(bus_vars.imm as i64);
+            let addr = addr + bus_vars.imm as i64;
 
             (addr as u32, 8, false, false)
         }
         BusAccessCond::StoreHalf => {
             let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
-            let addr = addr.wrapping_add(bus_vars.imm as i64);
+            let addr = addr + bus_vars.imm as i64;
 
             (addr as u32, 16, false, false)
         }
         BusAccessCond::StoreWord => {
             let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
-            let addr = addr.wrapping_add(bus_vars.imm as i64);
+            let addr = addr + bus_vars.imm as i64;
 
             (addr as u32, 32, false, false)
         }

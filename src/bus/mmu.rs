@@ -73,7 +73,7 @@ pub trait Mmu {
 }
 
 pub struct Sv32Mmu {
-    mppn: BusType,
+    ppn: BusType,
     enabled: bool,
 }
 
@@ -82,7 +82,7 @@ impl Mmu for Sv32Mmu {
 
     fn new() -> Self {
         Sv32Mmu {
-            mppn: 0,
+            ppn: 0,
             enabled: false,
         }
     }
@@ -179,7 +179,7 @@ impl Mmu for Sv32Mmu {
         let pte_size = self.get_pte_size();
         let vpn = self.get_vpn(addr, levels);
 
-        let mut a = self.mppn;
+        let mut a = self.ppn;
         let mut i: i32 = (levels - 1) as i32;
 
         let mut pte = Pte::default();
@@ -246,7 +246,7 @@ impl Mmu for Sv32Mmu {
     }
 
     fn update(&mut self, satp: CsrType) {
-        self.mppn = (satp & 0x3fffff) * RV_PAGE_SIZE as CpuReg;
+        self.ppn = (satp & 0x3fffff) * RV_PAGE_SIZE as CpuReg;
 
         self.enabled = read_bit(satp, 31);
     }

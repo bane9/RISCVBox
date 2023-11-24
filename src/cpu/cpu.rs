@@ -1,6 +1,6 @@
 use crate::bus::bus::BusType;
 use crate::bus::mmu::{Mmu, Sv32Mmu};
-use crate::cpu::cpu;
+use crate::cpu;
 use crate::cpu::csr;
 use crate::frontend::gpfn_state::GpfnState;
 use crate::frontend::insn_lookup::InsnData;
@@ -160,7 +160,7 @@ pub enum Exception {
     None = 0xff,
 
     ForwardJumpFault(CpuReg) = 0x100,
-    BlockExit(CpuReg) = 0x101,
+    BlockExit = 0x101,
     Mret = 0x102,
     Sret = 0x103,
     InvalidateJitBlock(CpuReg) = 0x104,
@@ -189,7 +189,7 @@ impl Exception {
             15 => Exception::StorePageFault(data),
             0xff => Exception::None,
             0x100 => Exception::ForwardJumpFault(data),
-            0x101 => Exception::BlockExit(data),
+            0x101 => Exception::BlockExit,
             0x102 => Exception::Mret,
             0x103 => Exception::Sret,
             0x104 => Exception::InvalidateJitBlock(data),
@@ -219,7 +219,7 @@ impl Exception {
             Exception::StorePageFault(_) => 15,
             Exception::None => 0xff,
             Exception::ForwardJumpFault(_) => 0x100,
-            Exception::BlockExit(_) => 0x101,
+            Exception::BlockExit => 0x101,
             Exception::Mret => 0x102,
             Exception::Sret => 0x103,
             Exception::InvalidateJitBlock(_) => 0x104,
@@ -235,7 +235,7 @@ impl Exception {
             Exception::InstructionAddressMisaligned(data) => *data,
             Exception::InstructionAccessFault(data) => *data,
             Exception::IllegalInstruction(data) => *data,
-            Exception::Breakpoint => cpu::get_cpu().c_exception_pc as CpuReg,
+            Exception::Breakpoint => 0,
             Exception::LoadAddressMisaligned(data) => *data,
             Exception::LoadAccessFault(data) => *data,
             Exception::StoreAddressMisaligned(data) => *data,
@@ -248,7 +248,7 @@ impl Exception {
             Exception::StorePageFault(data) => *data,
             Exception::None => 0,
             Exception::ForwardJumpFault(data) => *data,
-            Exception::BlockExit(data) => *data,
+            Exception::BlockExit => 0,
             Exception::Mret => 0,
             Exception::Sret => 0,
             Exception::InvalidateJitBlock(data) => *data,
