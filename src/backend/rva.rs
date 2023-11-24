@@ -73,6 +73,10 @@ macro_rules! atomic_store {
 }
 
 extern "C" fn lr_w_cb(rd: usize, rs1: usize, aq_rel: usize, pc: usize) -> usize {
+    if rd == 0 {
+        return 0;
+    }
+
     let cpu = cpu::get_cpu();
     let bus = bus::get_bus();
 
@@ -89,6 +93,10 @@ extern "C" fn lr_w_cb(rd: usize, rs1: usize, aq_rel: usize, pc: usize) -> usize 
 }
 
 extern "C" fn sc_w_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> usize {
+    if rd == 0 {
+        return 0;
+    }
+
     let cpu = cpu::get_cpu();
     let bus = bus::get_bus();
 
@@ -105,8 +113,10 @@ extern "C" fn sc_w_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> us
 
         cpu.atomic_reservations.remove(&addr);
 
-        cpu.regs[rd] = 0;
-    } else {
+        if rd != 0 {
+            cpu.regs[rd] = 0;
+        }
+    } else if rd != 0 {
         cpu.regs[rd] = 1;
     }
 
@@ -139,7 +149,9 @@ extern "C" fn amoswapw_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -
             _ => unreachable!(),
         };
 
-        cpu.regs[rd] = data;
+        if rd != 0 {
+            cpu.regs[rd] = data;
+        }
     }
 
     0
@@ -170,7 +182,9 @@ extern "C" fn amoadd_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> 
             _ => unreachable!(),
         };
 
-        cpu.regs[rd] = data;
+        if rd != 0 {
+            cpu.regs[rd] = data;
+        }
     }
 
     0
@@ -201,7 +215,9 @@ extern "C" fn amoxor_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> 
             _ => unreachable!(),
         };
 
-        cpu.regs[rd] = data;
+        if rd != 0 {
+            cpu.regs[rd] = data;
+        }
     }
 
     0
@@ -232,7 +248,9 @@ extern "C" fn amoor_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> u
             _ => unreachable!(),
         };
 
-        cpu.regs[rd] = data;
+        if rd != 0 {
+            cpu.regs[rd] = data;
+        }
     }
 
     0
@@ -263,7 +281,9 @@ extern "C" fn amosub_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> 
             _ => unreachable!(),
         };
 
-        cpu.regs[rd] = data;
+        if rd != 0 {
+            cpu.regs[rd] = data;
+        }
     }
 
     0
@@ -294,7 +314,9 @@ extern "C" fn amoand_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> 
             _ => unreachable!(),
         };
 
-        cpu.regs[rd] = data;
+        if rd != 0 {
+            cpu.regs[rd] = data;
+        }
     }
 
     0
@@ -325,7 +347,9 @@ extern "C" fn amomin_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> 
             _ => unreachable!(),
         };
 
-        cpu.regs[rd] = data as u32;
+        if rd != 0 {
+            cpu.regs[rd] = data as u32;
+        }
     }
 
     0
@@ -356,7 +380,9 @@ extern "C" fn amomax_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) -> 
             _ => unreachable!(),
         };
 
-        cpu.regs[rd] = data as u32;
+        if rd != 0 {
+            cpu.regs[rd] = data as u32;
+        }
     }
 
     0
@@ -387,7 +413,9 @@ extern "C" fn amominu_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) ->
             _ => unreachable!(),
         };
 
-        cpu.regs[rd] = data as u32;
+        if rd != 0 {
+            cpu.regs[rd] = data as u32;
+        }
     }
 
     0
@@ -418,7 +446,9 @@ extern "C" fn amomaxu_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) ->
             _ => unreachable!(),
         };
 
-        cpu.regs[rd] = data;
+        if rd != 0 {
+            cpu.regs[rd] = data;
+        }
     }
 
     0
