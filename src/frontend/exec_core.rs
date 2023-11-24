@@ -29,13 +29,15 @@ impl ExecCore {
             }
         }
 
-        let mut next_phys_pc = bus::get_bus().translate(cpu.next_pc, &cpu.mmu, AccessType::Fetch);
+        let bus = bus::get_bus();
+
+        let mut next_phys_pc = bus.translate(cpu.next_pc, &cpu.mmu, AccessType::Fetch);
 
         if next_phys_pc.is_err() {
             cpu.set_exception(next_phys_pc.err().unwrap(), cpu.next_pc);
             trap::handle_exception();
 
-            next_phys_pc = bus::get_bus().translate(cpu.next_pc, &cpu.mmu, AccessType::Fetch);
+            next_phys_pc = bus.translate(cpu.next_pc, &cpu.mmu, AccessType::Fetch);
         }
 
         let next_phys_pc = next_phys_pc.expect("Failed to translate pc after exception");
@@ -147,7 +149,7 @@ impl ExecCore {
                 // the jit block. Epsecially for cases where infinite loops are used,
                 // we need to make sure we periodiaclly exit the jit block to check
                 // for interrupts
-                cpu.next_pc = cpu.c_exception_pc as CpuReg + INSN_SIZE as CpuReg;
+                cpu.next_pc = cpu.c_exception_pc as CpuReg;
             }
             cpu::Exception::Mret | cpu::Exception::Sret => {}
             cpu::Exception::None => {

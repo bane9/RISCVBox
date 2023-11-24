@@ -332,9 +332,7 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize, guest_pc: usize) -> usize 
 
 pub extern "C" fn c_bus_resolver_cb(bus_vars: usize, guest_pc: usize) {
     let cpu = cpu::get_cpu();
-    let mut bus_vars = BusAccessVars::from_usize(bus_vars);
-
-    bus_vars.imm = sign_extend(bus_vars.imm, 12) as i32;
+    let bus_vars = BusAccessVars::from_usize(bus_vars);
 
     let (addres, size, is_load, is_unsigned) = match bus_vars.cond {
         BusAccessCond::LoadByte => {
