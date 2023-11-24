@@ -187,7 +187,7 @@ extern "C" fn sret_handler_cb(pc: usize) {
 extern "C" fn sfence_vma_cb(pc: usize) {
     let cpu = cpu::get_cpu();
 
-    if cpu.csr.read_bit_mstatus(csr::bits::TVM) || cpu.mode == MppMode::Machine {
+    if cpu.csr.read_bit_mstatus(csr::bits::TVM) || cpu.mode == MppMode::User {
         let sfence_vma: u32 = 0x12000073;
         cpu.set_exception(Exception::IllegalInstruction(sfence_vma), pc as CpuReg);
 

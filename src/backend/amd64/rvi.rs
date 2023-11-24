@@ -32,6 +32,13 @@ fn emit_bus_access(cond: BusAccessVars, twenty_bit_imm: bool) -> HostEncodedInsn
     )
 }
 
+extern "C" fn temporary_hack_lol(rd: usize, imm: usize, pc: usize, _temp: usize) {
+    let cpu = cpu::get_cpu();
+    let pc = pc as i32 as i64;
+    let current_gpfn = (cpu.current_gpfn << RV_PAGE_SHIFT) as i64;
+    cpu.regs[rd] = (current_gpfn | pc).wrapping_add(imm as i64) as u32;
+}
+
 impl common::Rvi for RviImpl {
     fn emit_addi(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
         let mut insn = HostEncodedInsn::new();
@@ -226,15 +233,23 @@ impl common::Rvi for RviImpl {
 
         emit_check_rd!(insn, rd);
 
-        let rd_addr = &cpu.regs[rd as usize] as *const _ as usize;
-
-        emit_mov_reg_imm!(insn, amd64_reg::RBX, rd_addr);
-        emit_mov_dword_ptr_imm!(
-            insn,
-            amd64_reg::RBX,
-            (((cpu.current_gpfn << RV_PAGE_SHIFT) | cpu.current_gpfn_offset) as i64)
-                .wrapping_add(imm as i64)
+        insn = BackendCoreImpl::emit_void_call_with_4_args(
+            temporary_hack_lol,
+            rd as usize,
+            imm as i64 as usize,
+            cpu.current_gpfn_offset as usize,
+            0,
         );
+
+        // let rd_addr = &cpu.regs[rd as usize] as *const _ as usize;
+
+        // emit_mov_reg_imm!(insn, amd64_reg::RBX, rd_addr);
+        // emit_mov_dword_ptr_imm!(
+        //     insn,
+        //     amd64_reg::RBX,
+        //     (((cpu.current_gpfn << RV_PAGE_SHIFT) | cpu.current_gpfn_offset) as i64)
+        //         .wrapping_add(imm as i64)
+        // );
 
         Ok(insn)
     }

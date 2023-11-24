@@ -1,5 +1,5 @@
 use crate::bus::bus::BusType;
-use crate::bus::mmu::{Mmu, Sv39Mmu};
+use crate::bus::mmu::{Mmu, Sv32Mmu};
 use crate::cpu::cpu;
 use crate::cpu::csr;
 use crate::frontend::gpfn_state::GpfnState;
@@ -277,7 +277,7 @@ pub struct Cpu {
     pub mode: csr::MppMode,
     pub gpfn_state: GpfnState,
     pub atomic_reservations: HashSet<BusType>, // TODO: this probably isn't core local, check later
-    pub mmu: Sv39Mmu,
+    pub mmu: Sv32Mmu,
     pub csr: &'static mut csr::Csr,
 }
 
@@ -298,7 +298,7 @@ impl Cpu {
             mode: csr::MppMode::Machine,
             gpfn_state: GpfnState::new(),
             atomic_reservations: HashSet::new(),
-            mmu: Sv39Mmu::new(),
+            mmu: Sv32Mmu::new(),
             csr: csr::get_csr(),
         }
     }

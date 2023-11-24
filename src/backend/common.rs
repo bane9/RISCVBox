@@ -279,6 +279,12 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize, guest_pc: usize) -> usize 
         }
     };
 
+    if jmp_addr % INSN_SIZE as i64 != 0 {
+        cpu.set_exception(Exception::ForwardJumpFault(jmp_addr as u32), guest_pc);
+
+        ReturnableImpl::throw();
+    }
+
     if !should_jmp {
         return 0;
     }
@@ -314,11 +320,7 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize, guest_pc: usize) -> usize 
     }
 
     if host_addr.is_none() {
-        cpu.set_exception(Exception::ForwardJumpFault(jmp_addr_phys), guest_pc);
-
-        if jmp_addr_phys == 0x80006068 {
-            print!("");
-        }
+        cpu.set_exception(Exception::ForwardJumpFault(jmp_addr), guest_pc);
 
         ReturnableImpl::throw();
     }

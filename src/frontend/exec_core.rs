@@ -31,16 +31,18 @@ impl ExecCore {
 
         let bus = bus::get_bus();
 
-        let mut next_phys_pc = bus.translate(cpu.next_pc, &cpu.mmu, AccessType::Fetch);
+        let next_phys_pc = bus.translate(cpu.next_pc, &cpu.mmu, AccessType::Fetch);
 
-        if next_phys_pc.is_err() {
-            cpu.set_exception(next_phys_pc.err().unwrap(), cpu.next_pc);
+        let next_phys_pc = if next_phys_pc.is_err() {
+            cpu.exception = next_phys_pc.err().unwrap();
+            cpu.c_exception_pc = cpu.next_pc as usize;
             trap::handle_exception();
 
-            next_phys_pc = bus.translate(cpu.next_pc, &cpu.mmu, AccessType::Fetch);
-        }
-
-        let next_phys_pc = next_phys_pc.expect("Failed to translate pc after exception");
+            bus.translate(cpu.next_pc, &cpu.mmu, AccessType::Fetch)
+                .expect("Failed to translate pc after exception")
+        } else {
+            next_phys_pc.unwrap()
+        };
 
         let mut insn_data = cpu.insn_map.get_by_guest_idx(next_phys_pc);
         if insn_data.is_none() {
@@ -160,11 +162,11 @@ impl ExecCore {
             }
         }
 
-        if cpu.exception != cpu::Exception::Wfi {
-            // println!(
-            //     "ret_status: {:#x?} with pc 0x{:x} cpu.next_pc {:x} gp {}",
-            //     cpu.exception, cpu.c_exception_pc, cpu.next_pc, cpu.regs[3]
-            // );
+        if cpu.exception != cpu::Exception::Wfi && cpu.exception != cpu::Exception::BookkeepingRet {
+            println!(
+                "ret_status: {:#x?} with pc 0x{:x} cpu.next_pc {:x} gp {}",
+                cpu.exception, cpu.c_exception_pc, cpu.next_pc, cpu.regs[3]
+            );
         }
     }
 }

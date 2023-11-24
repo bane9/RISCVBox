@@ -1,5 +1,5 @@
 use crate::cpu::*;
-use crate::util::read_bits;
+use crate::frontend::exec_core::{RV_PAGE_OFFSET_MASK, RV_PAGE_SIZE};
 use crate::{cpu::csr::*, util::read_bit};
 
 use super::{bus, BusType};
@@ -72,16 +72,16 @@ pub trait Mmu {
     }
 }
 
-pub struct Sv39Mmu {
+pub struct Sv32Mmu {
     mppn: BusType,
     enabled: bool,
 }
 
-impl Mmu for Sv39Mmu {
+impl Mmu for Sv32Mmu {
     type PnArr = [BusType; 2];
 
     fn new() -> Self {
-        Sv39Mmu {
+        Sv32Mmu {
             mppn: 0,
             enabled: false,
         }
@@ -169,7 +169,7 @@ impl Mmu for Sv39Mmu {
             }
         }
 
-        Ok(pte.phys_base | (addr & 0xfff))
+        Ok(pte.phys_base | (addr & RV_PAGE_OFFSET_MASK as BusType))
     }
 
     fn get_pte(&self, addr: BusType, access_type: AccessType) -> Result<Pte, Exception> {
@@ -202,11 +202,12 @@ impl Mmu for Sv39Mmu {
 
             let read = PteBitTest!(pte.pte, PteBitVal::Read);
             let write = PteBitTest!(pte.pte, PteBitVal::Write);
-            let execute = PteBitTest!(pte.pte, PteBitVal::Execute);
 
             if !read && write {
                 return Err(Self::create_exeption(addr, access_type).err().unwrap());
             }
+
+            let execute = PteBitTest!(pte.pte, PteBitVal::Execute);
 
             if read || execute {
                 break;
@@ -229,21 +230,23 @@ impl Mmu for Sv39Mmu {
             }
         }
 
-        for j in 0..i {
-            pte.phys_base |= vpn[j as usize] << (12 + (j * 9));
-        }
-
-        for j in (i as u32)..levels {
-            pte.phys_base |= ppn[j as usize] << (12 + (j * 9));
+        match i {
+            0 => {
+                pte.phys_base = ppn[0] << 12;
+            }
+            1 => {
+                pte.phys_base = (ppn[1] << 22) | (vpn[0] << 12);
+            }
+            _ => {
+                unreachable!()
+            }
         }
 
         Ok(pte)
     }
 
     fn update(&mut self, satp: CsrType) {
-        let ppn = read_bits(satp, 0, 22);
-
-        self.mppn = (ppn << 12) as BusType;
+        self.mppn = (satp & 0x3fffff) * RV_PAGE_SIZE as CpuReg;
 
         self.enabled = read_bit(satp, 31);
     }
@@ -252,22 +255,20 @@ impl Mmu for Sv39Mmu {
         return 2;
     }
 
-    fn get_vpn(&self, addr: BusType, level: BusType) -> Self::PnArr {
+    fn get_vpn(&self, addr: BusType, _level: BusType) -> Self::PnArr {
         let mut ret: Self::PnArr = Self::PnArr::default();
 
-        for i in 0..level {
-            ret[i as usize] = (addr >> (12 + i * 9)) & 0x1ff;
-        }
+        ret[0] = (addr >> 12) & 0x3ff;
+        ret[1] = (addr >> 22) & 0x3ff;
 
         ret
     }
 
-    fn get_ppn(&self, pte: BusType, level: BusType) -> Self::PnArr {
+    fn get_ppn(&self, pte: BusType, _level: BusType) -> Self::PnArr {
         let mut ret: Self::PnArr = Self::PnArr::default();
 
-        for i in 0..level {
-            ret[i as usize] = (pte >> (10 + i * 9)) & 0x1ff;
-        }
+        ret[0] = (pte >> 10) & 0x3ff;
+        ret[1] = (pte >> 20) & 0xfff;
 
         ret
     }

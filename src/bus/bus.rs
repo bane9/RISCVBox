@@ -31,7 +31,7 @@ impl Bus {
     pub fn translate(
         &self,
         addr: BusType,
-        mmu: &Sv39Mmu,
+        mmu: &Sv32Mmu,
         access_type: AccessType,
     ) -> Result<BusType, Exception> {
         return mmu.translate(addr, access_type);
@@ -41,7 +41,7 @@ impl Bus {
         &mut self,
         addr: BusType,
         size: BusType,
-        mmu: &Sv39Mmu,
+        mmu: &Sv32Mmu,
     ) -> Result<BusType, Exception> {
         let phys_addr = self.translate(addr, mmu, AccessType::Load)?;
 
@@ -58,7 +58,7 @@ impl Bus {
         &mut self,
         addr: BusType,
         size: BusType,
-        mmu: &Sv39Mmu,
+        mmu: &Sv32Mmu,
     ) -> Result<BusType, Exception> {
         let phys_addr = self.translate(addr, mmu, AccessType::Fetch)?;
 
@@ -80,7 +80,7 @@ impl Bus {
         addr: BusType,
         data: BusType,
         size: BusType,
-        mmu: &Sv39Mmu,
+        mmu: &Sv32Mmu,
     ) -> Result<(), Exception> {
         let phys_addr = self.translate(addr, mmu, AccessType::Store)?;
 
