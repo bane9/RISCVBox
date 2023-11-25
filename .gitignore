@@ -22,3 +22,7 @@ testbins/
 logs/
 
 temp
+
+buildroot/images/
+
+buildroot/
