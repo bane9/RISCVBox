@@ -2,14 +2,14 @@ mod page_common;
 
 pub use page_common::*;
 
-#[cfg(target_os = "windows")]
+#[cfg(all(windows, not(feature = "nojit")))]
 mod page_win32;
 
-#[cfg(unix)]
+#[cfg(all(unix, not(feature = "nojit")))]
 mod page_posix;
 
-#[cfg(target_os = "windows")]
+#[cfg(all(windows, not(feature = "nojit")))]
 pub use crate::xmem::page_win32::Win32Allocator as CodePageImpl;
 
-#[cfg(unix)]
+#[cfg(all(unix, not(feature = "nojit")))]
 pub use crate::xmem::page_posix::PosixAllocator as CodePageImpl;

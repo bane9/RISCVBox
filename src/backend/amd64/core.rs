@@ -1,14 +1,17 @@
-pub use crate::backend::{
-    common::{BackendCore, PtrT},
-    HostEncodedInsn,
+pub use crate::{
+    backend::{BackendCore, JitError},
+    cpu::*,
+    util::EncodedInsn,
 };
-use crate::cpu::*;
 
 use std::arch::asm;
 
-const MAX_WALK_BACK: usize = 100;
+pub type PtrT = *mut u8;
+pub type HostInsnT = u8;
+pub const HOST_INSN_MAX_SIZE: usize = 96;
+pub type HostEncodedInsn = EncodedInsn<HostInsnT, HOST_INSN_MAX_SIZE>;
+pub type DecodeRet = Result<HostEncodedInsn, JitError>;
 
-// Callee needs to `use std::arch::asm;`
 #[macro_export]
 macro_rules! host_get_return_addr {
     () => {{
@@ -45,7 +48,7 @@ pub mod amd64_reg {
     pub const R15: u8 = 15;
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(windows)]
 pub mod abi_reg {
     pub use super::amd64_reg;
 

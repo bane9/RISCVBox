@@ -6,7 +6,11 @@ use crate::cpu::*;
 
 use std::arch::asm;
 
-const MAX_WALK_BACK: usize = 100;
+pub type PtrT = *mut u8;
+pub type HostInsnT = u8;
+pub const HOST_INSN_MAX_SIZE: usize = 96;
+pub type HostEncodedInsn = EncodedInsn<HostInsnT, HOST_INSN_MAX_SIZE>;
+pub type DecodeRet = Result<HostEncodedInsn, JitError>;
 
 // Callee needs to `use std::arch::asm;`
 #[macro_export]
@@ -84,7 +88,7 @@ pub mod aarch64_abi {
     pub const RET1: u32 = aarch64_reg::X1;
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(windows)]
 pub mod aarch64_abi {
     pub use super::aarch64_reg;
 

@@ -393,14 +393,6 @@ pub extern "C" fn c_bus_resolver_cb(bus_vars: usize, guest_pc: usize) {
 
     let guest_pc = guest_pc as CpuReg;
 
-    let lol = cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg;
-    let lol = lol | (guest_pc);
-
-    if lol == 0xc0021464 {
-        println!("Load from {:x}", addres);
-        print!("");
-    }
-
     if is_load {
         let data = bus.load(addres, size, &cpu.mmu);
 

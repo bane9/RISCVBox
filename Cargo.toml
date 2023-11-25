@@ -19,5 +19,9 @@ path = "src/main.rs"
 name = "test_riscv_isa"
 path = "src/test_riscv_isa.rs"
 
+[features]
+jit = []
+nojit = []
+
 [dependencies]
 chrono = "0.4.31"

@@ -1,5 +1,3 @@
-// This is absolutely horrible but at least it works on windows unlike setjmp
-
 pub use crate::backend::returnable::*;
 
 use microseh;
