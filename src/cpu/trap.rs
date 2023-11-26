@@ -83,8 +83,6 @@ pub fn has_pending_interrupt() -> Option<Interrupt> {
 pub fn handle_interrupt(int_val: Interrupt) {
     assert!(int_val != Interrupt::None);
 
-    println!("\n\n\nhandle_interrupt");
-
     let cpu = cpu::get_cpu();
 
     let mode = cpu.mode;

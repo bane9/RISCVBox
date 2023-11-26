@@ -194,9 +194,9 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize, guest_pc: usize) -> usize 
     cpu.jump_count += 1;
 
     if cpu.jump_count > JUMP_COUNT_MAX {
-        // cpu.set_exception(Exception::BookkeepingRet, guest_pc);
+        cpu.set_exception(Exception::BookkeepingRet, guest_pc);
 
-        // ReturnableImpl::throw();
+        ReturnableImpl::throw();
     }
 
     let (jmp_addr, should_jmp) = match jmp_cond.cond {
@@ -278,15 +278,6 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize, guest_pc: usize) -> usize 
         }
     };
 
-    if jmp_addr % INSN_SIZE as i64 != 0 {
-        cpu.set_exception(
-            Exception::InstructionAddressMisaligned(jmp_addr as u32),
-            guest_pc,
-        );
-
-        ReturnableImpl::throw();
-    }
-
     if !should_jmp {
         return 0;
     }
@@ -301,6 +292,15 @@ pub extern "C" fn c_jump_resolver_cb(jmp_cond: usize, guest_pc: usize) -> usize 
 
         next_pc
     } as CpuReg;
+
+    if jmp_addr1 % INSN_SIZE as CpuReg != 0 {
+        cpu.set_exception(
+            Exception::InstructionAddressMisaligned(jmp_addr1 as u32),
+            guest_pc,
+        );
+
+        ReturnableImpl::throw();
+    }
 
     let jmp_addr_phys = bus.translate(jmp_addr1 as BusType, &cpu.mmu, AccessType::Fetch);
 
