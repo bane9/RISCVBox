@@ -1,8 +1,6 @@
-use crate::backend::{
-    common::{BackendCore, PtrT},
-    HostEncodedInsn,
-};
-use crate::cpu::*;
+use crate::backend::common::BackendCore;
+use crate::backend::JitError;
+use crate::util::EncodedInsn;
 
 use std::arch::asm;
 
@@ -271,7 +269,7 @@ macro_rules! emit_movk {
 #[macro_export]
 macro_rules! emit_move_reg_imm {
     ($enc:expr, $reg:expr, $imm:expr) => {{
-        let imm: u64 = $imm as u64; // Avoid compiler warnings
+        let imm: u64 = $imm as u64;
 
         emit_movz!($enc, $reg, $imm, 0);
         if imm > 0xFFFF {
@@ -314,6 +312,15 @@ macro_rules! emit_ret {
     }};
 }
 
+#[macro_export]
+macro_rules! emit_atomic_access {
+    ($insn: expr) => {{
+        let mut insn = $insn;
+        emit_nop!(insn);
+        Ok(insn)
+    }};
+}
+
 impl BackendCore for BackendCoreImpl {
     fn fill_with_target_nop(ptr: PtrT, size: usize) {
         static NOP: [u8; 4] = [0x1f, 0x20, 0x03, 0xd5];
@@ -343,26 +350,6 @@ impl BackendCore for BackendCoreImpl {
         }
     }
 
-    fn emit_ret_with_status(state: crate::cpu::RunState) -> HostEncodedInsn {
-        let mut insn = HostEncodedInsn::new();
-
-        emit_move_reg_imm!(insn, aarch64_reg::X9, state as u32);
-        emit_move_reg_imm!(
-            insn,
-            aarch64_reg::X10,
-            &cpu::get_cpu().ret_status as *const _ as usize
-        );
-        emit_str_reg!(
-            insn,
-            store_size::DOUBLEWORD,
-            aarch64_reg::X10,
-            aarch64_reg::X9
-        );
-        emit_ret!(insn);
-
-        insn
-    }
-
     fn emit_void_call(fn_ptr: extern "C" fn()) -> HostEncodedInsn {
         let mut insn = HostEncodedInsn::new();
 
@@ -376,20 +363,6 @@ impl BackendCore for BackendCoreImpl {
         emit_ldr_reg_imm!(insn, aarch64_reg::RA, aarch64_reg::SP, 8);
         emit_add_reg_imm!(insn, aarch64_reg::SP, aarch64_reg::SP, 16);
         insn
-    }
-
-    fn find_guest_pc_from_host_stack_frame(caller_ret_addr: *mut u8) -> Option<u32> {
-        let cpu = cpu::get_cpu();
-
-        for i in 0..MAX_WALK_BACK {
-            let addr = caller_ret_addr.wrapping_sub(i);
-
-            if let Some(guest_pc) = cpu.insn_map.get_by_key(addr) {
-                return Some(*guest_pc);
-            }
-        }
-
-        None
     }
 
     fn emit_usize_call_with_4_args(
@@ -452,5 +425,117 @@ impl BackendCore for BackendCoreImpl {
 
         in(reg) jit_ptr,
         );
+    }
+
+    fn emit_ret() -> crate::backend::HostEncodedInsn {
+        let mut insn = HostEncodedInsn::new();
+
+        emit_ret!(insn);
+
+        insn
+    }
+
+    fn emit_nop() -> crate::backend::HostEncodedInsn {
+        let mut insn = HostEncodedInsn::new();
+
+        emit_nop!(insn);
+
+        insn
+    }
+
+    fn emit_ret_with_exception(
+        exception: crate::cpu::Exception,
+    ) -> crate::backend::HostEncodedInsn {
+        todo!()
+    }
+
+    fn emit_void_call_with_4_args(
+        fn_ptr: extern "C" fn(usize, usize, usize, usize),
+        arg1: usize,
+        arg2: usize,
+        arg3: usize,
+        arg4: usize,
+    ) -> crate::backend::HostEncodedInsn {
+        let mut insn = HostEncodedInsn::new();
+
+        emit_sub_reg_imm!(insn, aarch64_reg::SP, aarch64_reg::SP, 16);
+        emit_str_reg_imm!(insn, aarch64_reg::FP, aarch64_reg::SP, 0);
+        emit_str_reg_imm!(insn, aarch64_reg::RA, aarch64_reg::SP, 8);
+        emit_mov_reg_sp!(insn, aarch64_reg::FP, aarch64_reg::SP);
+        emit_move_reg_imm!(insn, aarch64_abi::ARG0, arg1);
+        emit_move_reg_imm!(insn, aarch64_abi::ARG1, arg2);
+        emit_move_reg_imm!(insn, aarch64_abi::ARG2, arg3);
+        emit_move_reg_imm!(insn, aarch64_abi::ARG3, arg4);
+        emit_move_reg_imm!(insn, aarch64_reg::X9, fn_ptr as usize);
+        emit_call_reg!(insn, aarch64_reg::X9);
+        emit_ldr_reg_imm!(insn, aarch64_reg::FP, aarch64_reg::SP, 0);
+        emit_ldr_reg_imm!(insn, aarch64_reg::RA, aarch64_reg::SP, 8);
+        emit_add_reg_imm!(insn, aarch64_reg::SP, aarch64_reg::SP, 16);
+
+        insn
+    }
+
+    fn emit_usize_call_with_2_args(
+        fn_ptr: extern "C" fn(usize, usize) -> usize,
+        arg1: usize,
+        arg2: usize,
+    ) -> crate::backend::HostEncodedInsn {
+        let mut insn = HostEncodedInsn::new();
+
+        emit_sub_reg_imm!(insn, aarch64_reg::SP, aarch64_reg::SP, 16);
+        emit_str_reg_imm!(insn, aarch64_reg::FP, aarch64_reg::SP, 0);
+        emit_str_reg_imm!(insn, aarch64_reg::RA, aarch64_reg::SP, 8);
+        emit_mov_reg_sp!(insn, aarch64_reg::FP, aarch64_reg::SP);
+        emit_move_reg_imm!(insn, aarch64_abi::ARG0, arg1);
+        emit_move_reg_imm!(insn, aarch64_abi::ARG1, arg2);
+        emit_move_reg_imm!(insn, aarch64_reg::X9, fn_ptr as usize);
+        emit_call_reg!(insn, aarch64_reg::X9);
+        emit_ldr_reg_imm!(insn, aarch64_reg::FP, aarch64_reg::SP, 0);
+        emit_ldr_reg_imm!(insn, aarch64_reg::RA, aarch64_reg::SP, 8);
+        emit_add_reg_imm!(insn, aarch64_reg::SP, aarch64_reg::SP, 16);
+
+        insn
+    }
+
+    fn emit_void_call_with_2_args(
+        fn_ptr: extern "C" fn(usize, usize),
+        arg1: usize,
+        arg2: usize,
+    ) -> crate::backend::HostEncodedInsn {
+        let mut insn = HostEncodedInsn::new();
+
+        emit_sub_reg_imm!(insn, aarch64_reg::SP, aarch64_reg::SP, 16);
+        emit_str_reg_imm!(insn, aarch64_reg::FP, aarch64_reg::SP, 0);
+        emit_str_reg_imm!(insn, aarch64_reg::RA, aarch64_reg::SP, 8);
+        emit_mov_reg_sp!(insn, aarch64_reg::FP, aarch64_reg::SP);
+        emit_move_reg_imm!(insn, aarch64_abi::ARG0, arg1);
+        emit_move_reg_imm!(insn, aarch64_abi::ARG1, arg2);
+        emit_move_reg_imm!(insn, aarch64_reg::X9, fn_ptr as usize);
+        emit_call_reg!(insn, aarch64_reg::X9);
+        emit_ldr_reg_imm!(insn, aarch64_reg::FP, aarch64_reg::SP, 0);
+        emit_ldr_reg_imm!(insn, aarch64_reg::RA, aarch64_reg::SP, 8);
+        emit_add_reg_imm!(insn, aarch64_reg::SP, aarch64_reg::SP, 16);
+
+        insn
+    }
+
+    fn emit_usize_call_with_1_arg(
+        fn_ptr: extern "C" fn(usize) -> usize,
+        arg1: usize,
+    ) -> crate::backend::HostEncodedInsn {
+        let mut insn = HostEncodedInsn::new();
+
+        emit_sub_reg_imm!(insn, aarch64_reg::SP, aarch64_reg::SP, 16);
+        emit_str_reg_imm!(insn, aarch64_reg::FP, aarch64_reg::SP, 0);
+        emit_str_reg_imm!(insn, aarch64_reg::RA, aarch64_reg::SP, 8);
+        emit_mov_reg_sp!(insn, aarch64_reg::FP, aarch64_reg::SP);
+        emit_move_reg_imm!(insn, aarch64_abi::ARG0, arg1);
+        emit_move_reg_imm!(insn, aarch64_reg::X9, fn_ptr as usize);
+        emit_call_reg!(insn, aarch64_reg::X9);
+        emit_ldr_reg_imm!(insn, aarch64_reg::FP, aarch64_reg::SP, 0);
+        emit_ldr_reg_imm!(insn, aarch64_reg::RA, aarch64_reg::SP, 8);
+        emit_add_reg_imm!(insn, aarch64_reg::SP, aarch64_reg::SP, 16);
+
+        insn
     }
 }

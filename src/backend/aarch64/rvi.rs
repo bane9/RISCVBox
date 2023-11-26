@@ -128,14 +128,6 @@ impl common::Rvi for RviImpl {
         todo!()
     }
 
-    fn emit_ecall() -> DecodeRet {
-        todo!()
-    }
-
-    fn emit_ebreak() -> DecodeRet {
-        todo!()
-    }
-
     fn emit_xor(rd: u8, rs1: u8, rs2: u8) -> DecodeRet {
         todo!()
     }

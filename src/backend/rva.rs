@@ -1,6 +1,5 @@
 use std::sync::atomic::{AtomicI32, AtomicU32};
 
-use super::core::amd64_reg;
 use super::{core::BackendCoreImpl, BackendCore};
 use crate::backend::{ReturnableHandler, ReturnableImpl};
 use crate::bus::mmu::AccessType;

@@ -1,12 +1,22 @@
-use crate::xmem::page_common::{AllocationError, PageAllocator};
+use crate::{
+    util,
+    xmem::page_common::{AllocationError, CodePage},
+};
 use libc::{
     mmap, mprotect, munmap, MAP_ANON, MAP_PRIVATE, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE,
 };
 use std::ptr;
 
+use super::PageState;
+
 const PAGE_SIZE: usize = 4096;
 
-pub struct PosixAllocator;
+pub struct PosixAllocator {
+    ptr: *mut u8,
+    npages: usize,
+    offset: usize,
+    state: PageState,
+}
 
 fn posix_mark_page(ptr: *mut u8, npages: usize, protect: i32) -> Result<(), AllocationError> {
     let size = npages * PAGE_SIZE;
@@ -19,74 +29,118 @@ fn posix_mark_page(ptr: *mut u8, npages: usize, protect: i32) -> Result<(), Allo
     }
 }
 
-impl PageAllocator for PosixAllocator {
-    fn alloc(npages: usize) -> Result<*mut u8, AllocationError> {
-        let size = npages * PAGE_SIZE;
-        let addr = unsafe {
+impl CodePage for PosixAllocator {
+    fn new() -> Self {
+        let ptr = unsafe {
             mmap(
                 ptr::null_mut(),
-                size,
+                32 * PAGE_SIZE,
                 PROT_READ | PROT_WRITE,
-                MAP_ANON | MAP_PRIVATE,
+                MAP_PRIVATE | MAP_ANON,
                 -1,
                 0,
             )
         };
 
-        if addr.is_null() {
-            Err(AllocationError::OutOfMemory)
-        } else {
-            Ok(addr as *mut u8)
+        assert!(ptr != ptr::null_mut());
+
+        PosixAllocator {
+            ptr: ptr as *mut u8,
+            npages: 32,
+            offset: 0,
+            state: PageState::ReadWrite,
         }
     }
 
-    fn realloc(
-        old_ptr: *mut u8,
-        old_npages: usize,
-        new_npages: usize,
-    ) -> Result<*mut u8, AllocationError> {
-        if old_ptr.is_null() {
-            return Self::alloc(new_npages);
+    fn push(&mut self, data: &[u8]) -> Result<(), AllocationError> {
+        if self.offset + data.len() > self.npages * PAGE_SIZE {
+            unsafe {
+                let npages = std::cmp::max(
+                    util::align_up(self.offset + data.len(), PAGE_SIZE) / PAGE_SIZE,
+                    self.npages * 2, // A logarithmic growth strategy may be better
+                );
+
+                let ptr = mmap(
+                    ptr::null_mut(),
+                    npages * PAGE_SIZE,
+                    PROT_READ | PROT_WRITE,
+                    MAP_PRIVATE | MAP_ANON,
+                    -1,
+                    0,
+                );
+
+                assert!(ptr != ptr::null_mut());
+
+                ptr::copy_nonoverlapping(self.ptr, ptr as *mut u8, self.npages * PAGE_SIZE);
+                munmap(self.ptr as *mut _, self.npages * PAGE_SIZE);
+
+                self.ptr = ptr as *mut u8;
+                self.npages = npages;
+            }
         }
-
-        let new_ptr = Self::alloc(new_npages)?;
-
-        if new_ptr.is_null() {
-            return Err(AllocationError::OutOfMemory);
-        }
-
-        let old_size = old_npages * PAGE_SIZE;
-        let new_size = new_npages * PAGE_SIZE;
-        let bytes_to_copy = std::cmp::min(old_size, new_size);
 
         unsafe {
-            ptr::copy_nonoverlapping(old_ptr, new_ptr, bytes_to_copy);
+            ptr::copy_nonoverlapping(data.as_ptr(), self.ptr.add(self.offset), data.len());
         }
 
-        Self::dealloc(old_ptr, old_size / PAGE_SIZE);
-
-        Ok(new_ptr)
+        Ok(())
     }
 
-    fn mark_rw(ptr: *mut u8, npages: usize) -> Result<(), AllocationError> {
-        posix_mark_page(ptr, npages, PROT_READ | PROT_WRITE)
+    fn mark_rw(&mut self) -> Result<(), AllocationError> {
+        if self.state == PageState::ReadWrite {
+            return Ok(());
+        }
+
+        posix_mark_page(self.ptr, self.npages, PROT_READ | PROT_WRITE)?;
+
+        self.state = PageState::ReadWrite;
+
+        Ok(())
     }
 
-    fn mark_rx(ptr: *mut u8, npages: usize) -> Result<(), AllocationError> {
-        posix_mark_page(ptr, npages, PROT_READ | PROT_EXEC)
+    fn mark_rx(&mut self) -> Result<(), AllocationError> {
+        if self.state == PageState::ReadExecute {
+            return Ok(());
+        }
+
+        posix_mark_page(self.ptr, self.npages, PROT_READ | PROT_EXEC)?;
+
+        self.state = PageState::ReadExecute;
+
+        Ok(())
     }
 
-    fn mark_invalid(ptr: *mut u8, npages: usize) -> Result<(), AllocationError> {
-        posix_mark_page(ptr, npages, PROT_NONE)
+    fn mark_invalid(&mut self) -> Result<(), AllocationError> {
+        if self.state == PageState::Invalid {
+            return Ok(());
+        }
+
+        posix_mark_page(self.ptr, self.npages, PROT_NONE)?;
+
+        self.state = PageState::Invalid;
+
+        Ok(())
     }
 
-    fn dealloc(ptr: *mut u8, npages: usize) {
+    fn dealloc(&mut self) {
         unsafe {
-            munmap(ptr as *mut _, npages * PAGE_SIZE);
+            munmap(self.ptr as *mut _, self.npages * PAGE_SIZE);
         }
     }
 
-    fn page_size() -> usize {
-        PAGE_SIZE
+    fn as_ptr(&self) -> *mut u8 {
+        self.ptr
+    }
+
+    fn size(&self) -> usize {
+        self.npages * PAGE_SIZE
+    }
+
+    fn npages(&self) -> usize {
+        self.npages
+    }
+
+    fn state(&self) -> super::PageState {
+        self.state
     }
 }

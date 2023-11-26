@@ -1,5 +1,3 @@
-// Insanely UB, use with care
-
 pub use crate::backend::returnable::*;
 use std::cell::RefCell;
 use std::ffi::{c_int, c_void};
@@ -30,26 +28,16 @@ impl ReturnableHandler for ReturnableImpl {
 
         match i {
             1 => ReturnStatus::ReturnOk,
-            2 => ReturnStatus::ReturnNotify,
             _ => panic!("unknown return status"),
         }
     }
 
-    fn return_ok() -> ! {
+    #[allow(unreachable_code)]
+    fn throw() -> ! {
         let jmp_buf = JUMP_BUF.with(|buf| (*buf.borrow()).as_ptr());
 
         unsafe {
             longjmp(jmp_buf as *mut c_void, 1);
-        }
-
-        unreachable!();
-    }
-
-    fn return_notify() -> ! {
-        let jmp_buf = JUMP_BUF.with(|buf| (*buf.borrow()).as_ptr());
-
-        unsafe {
-            longjmp(jmp_buf as *mut c_void, 2);
         }
 
         unreachable!();

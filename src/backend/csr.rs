@@ -1,14 +1,14 @@
 use common::DecodeRet;
 
 use crate::backend::common;
-use crate::backend::target::core::{BackendCore, BackendCoreImpl};
+use crate::backend::target::core::BackendCoreImpl;
 use crate::bus::mmu::Mmu;
 use crate::bus::BusType;
 use crate::cpu::csr::{self, CsrType, MppMode};
 use crate::cpu::{self, CpuReg, Exception};
 use crate::frontend::exec_core::RV_PAGE_SHIFT;
 
-use super::{ReturnableHandler, ReturnableImpl};
+use super::{BackendCore, ReturnableHandler, ReturnableImpl};
 
 pub struct CsrImpl;
 
