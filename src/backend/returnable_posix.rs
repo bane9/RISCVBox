@@ -26,10 +26,7 @@ impl ReturnableHandler for ReturnableImpl {
             closure();
         }
 
-        match i {
-            1 => ReturnStatus::ReturnOk,
-            _ => panic!("unknown return status"),
-        }
+        ReturnStatus::ReturnOk
     }
 
     #[allow(unreachable_code)]

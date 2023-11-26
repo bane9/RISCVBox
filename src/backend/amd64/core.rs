@@ -765,52 +765,17 @@ macro_rules! emit_imul_reg_reg {
     }};
 }
 
-/////////// RVA
+pub struct BackendCoreImpl;
 
-#[macro_export]
-macro_rules! emit_atomic_access {
-    ($insn: expr) => {{
-        let mut insn = $insn;
-
-        let ret_insn = BackendCoreImpl::emit_ret();
+impl BackendCore for BackendCoreImpl {
+    fn emit_atomic_access(mut insn: crate::backend::HostEncodedInsn) -> HostEncodedInsn {
+        let ret_insn = Self::emit_ret();
 
         emit_cmp_reg_imm!(insn, amd64_reg::RAX, 0);
         emit_jz_imm!(insn, ret_insn.size());
         insn.push_slice(ret_insn.as_slice());
 
-        return Ok(insn);
-    }};
-}
-
-pub struct BackendCoreImpl;
-
-impl BackendCore for BackendCoreImpl {
-    fn fill_with_target_nop(ptr: PtrT, size: usize) {
-        static NOP: [u8; 1] = [0x90];
-
-        for i in 0..(size / NOP.len()) {
-            unsafe {
-                std::ptr::copy_nonoverlapping(
-                    NOP.as_ptr(),
-                    (ptr.wrapping_add(i * NOP.len())) as *mut u8,
-                    NOP.len(),
-                );
-            }
-        }
-    }
-
-    fn fill_with_target_ret(ptr: PtrT, size: usize) {
-        static RET: [u8; 1] = [0xc3];
-
-        for i in 0..(size / RET.len()) {
-            unsafe {
-                std::ptr::copy_nonoverlapping(
-                    RET.as_ptr(),
-                    (ptr.wrapping_add(i * RET.len())) as *mut u8,
-                    RET.len(),
-                );
-            }
-        }
+        insn
     }
 
     fn emit_ret() -> HostEncodedInsn {
@@ -942,7 +907,6 @@ impl BackendCore for BackendCoreImpl {
     }
 
     #[inline(never)]
-    #[cfg(windows)]
     unsafe fn call_jit_ptr(jit_ptr: *mut u8) {
         asm!(
             "push rbp",
@@ -962,30 +926,6 @@ impl BackendCore for BackendCoreImpl {
             "pop rdi",
             "pop rbx",
             "pop rbp",
-
-            in(reg) jit_ptr,
-        );
-    }
-
-    #[inline(never)]
-    #[cfg(unix)]
-    unsafe fn call_jit_ptr(jit_ptr: *mut u8) {
-        asm!(
-            "sub rsp, 8 * 6",
-            "push rbx",
-            "push rbp",
-            "push r12",
-            "push r13",
-            "push r14",
-            "push r15",
-            "call {0}",
-            "pop r15",
-            "pop r14",
-            "pop r13",
-            "pop r12",
-            "pop rbp",
-            "pop rbx",
-            "add rsp, 8 * 6",
 
             in(reg) jit_ptr,
         );

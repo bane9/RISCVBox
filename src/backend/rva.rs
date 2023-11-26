@@ -4,7 +4,6 @@ use super::{core::BackendCoreImpl, BackendCore};
 use crate::backend::{ReturnableHandler, ReturnableImpl};
 use crate::bus::mmu::AccessType;
 use crate::frontend::exec_core::{RV_PAGE_MASK, RV_PAGE_SHIFT};
-use crate::*;
 use crate::{
     backend::common,
     bus,
@@ -490,112 +489,134 @@ extern "C" fn amomaxu_cb(rd: usize, rs1_rs2: usize, aq_rel: usize, pc: usize) ->
 
 impl common::Rva for RvaImpl {
     fn emit_lr_w(rd: u8, rs1: u8, aq: bool, rl: bool) -> DecodeRet {
-        emit_atomic_access!(BackendCoreImpl::emit_usize_call_with_4_args(
-            lr_w_cb,
-            rd as usize,
-            rs1 as usize,
-            (aq as usize) << 1 | rl as usize,
-            cpu::get_cpu().current_gpfn_offset as usize,
+        Ok(BackendCoreImpl::emit_atomic_access(
+            BackendCoreImpl::emit_usize_call_with_4_args(
+                lr_w_cb,
+                rd as usize,
+                rs1 as usize,
+                (aq as usize) << 1 | rl as usize,
+                cpu::get_cpu().current_gpfn_offset as usize,
+            ),
         ))
     }
 
     fn emit_sc_w(rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet {
-        emit_atomic_access!(BackendCoreImpl::emit_usize_call_with_4_args(
-            sc_w_cb,
-            rd as usize,
-            (rs1 as usize) << 8 | rs2 as usize,
-            (aq as usize) << 1 | rl as usize,
-            cpu::get_cpu().current_gpfn_offset as usize,
+        Ok(BackendCoreImpl::emit_atomic_access(
+            BackendCoreImpl::emit_usize_call_with_4_args(
+                sc_w_cb,
+                rd as usize,
+                (rs1 as usize) << 8 | rs2 as usize,
+                (aq as usize) << 1 | rl as usize,
+                cpu::get_cpu().current_gpfn_offset as usize,
+            ),
         ))
     }
 
     fn emit_amoswap_w(rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet {
-        emit_atomic_access!(BackendCoreImpl::emit_usize_call_with_4_args(
-            amoswapw_cb,
-            rd as usize,
-            (rs1 as usize) << 8 | rs2 as usize,
-            (aq as usize) << 1 | rl as usize,
-            cpu::get_cpu().current_gpfn_offset as usize,
+        Ok(BackendCoreImpl::emit_atomic_access(
+            BackendCoreImpl::emit_usize_call_with_4_args(
+                amoswapw_cb,
+                rd as usize,
+                (rs1 as usize) << 8 | rs2 as usize,
+                (aq as usize) << 1 | rl as usize,
+                cpu::get_cpu().current_gpfn_offset as usize,
+            ),
         ))
     }
 
     fn emit_amoadd_w(rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet {
-        emit_atomic_access!(BackendCoreImpl::emit_usize_call_with_4_args(
-            amoadd_cb,
-            rd as usize,
-            (rs1 as usize) << 8 | rs2 as usize,
-            (aq as usize) << 1 | rl as usize,
-            cpu::get_cpu().current_gpfn_offset as usize,
+        Ok(BackendCoreImpl::emit_atomic_access(
+            BackendCoreImpl::emit_usize_call_with_4_args(
+                amoadd_cb,
+                rd as usize,
+                (rs1 as usize) << 8 | rs2 as usize,
+                (aq as usize) << 1 | rl as usize,
+                cpu::get_cpu().current_gpfn_offset as usize,
+            ),
         ))
     }
 
     fn emit_amoxor_w(rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet {
-        emit_atomic_access!(BackendCoreImpl::emit_usize_call_with_4_args(
-            amoxor_cb,
-            rd as usize,
-            (rs1 as usize) << 8 | rs2 as usize,
-            (aq as usize) << 1 | rl as usize,
-            cpu::get_cpu().current_gpfn_offset as usize,
+        Ok(BackendCoreImpl::emit_atomic_access(
+            BackendCoreImpl::emit_usize_call_with_4_args(
+                amoxor_cb,
+                rd as usize,
+                (rs1 as usize) << 8 | rs2 as usize,
+                (aq as usize) << 1 | rl as usize,
+                cpu::get_cpu().current_gpfn_offset as usize,
+            ),
         ))
     }
 
     fn emit_amoor_w(rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet {
-        emit_atomic_access!(BackendCoreImpl::emit_usize_call_with_4_args(
-            amoor_cb,
-            rd as usize,
-            (rs1 as usize) << 8 | rs2 as usize,
-            (aq as usize) << 1 | rl as usize,
-            cpu::get_cpu().current_gpfn_offset as usize,
+        Ok(BackendCoreImpl::emit_atomic_access(
+            BackendCoreImpl::emit_usize_call_with_4_args(
+                amoor_cb,
+                rd as usize,
+                (rs1 as usize) << 8 | rs2 as usize,
+                (aq as usize) << 1 | rl as usize,
+                cpu::get_cpu().current_gpfn_offset as usize,
+            ),
         ))
     }
 
     fn emit_amoand_w(rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet {
-        emit_atomic_access!(BackendCoreImpl::emit_usize_call_with_4_args(
-            amoand_cb,
-            rd as usize,
-            (rs1 as usize) << 8 | rs2 as usize,
-            (aq as usize) << 1 | rl as usize,
-            cpu::get_cpu().current_gpfn_offset as usize,
+        Ok(BackendCoreImpl::emit_atomic_access(
+            BackendCoreImpl::emit_usize_call_with_4_args(
+                amoand_cb,
+                rd as usize,
+                (rs1 as usize) << 8 | rs2 as usize,
+                (aq as usize) << 1 | rl as usize,
+                cpu::get_cpu().current_gpfn_offset as usize,
+            ),
         ))
     }
 
     fn emit_amomin_w(rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet {
-        emit_atomic_access!(BackendCoreImpl::emit_usize_call_with_4_args(
-            amomin_cb,
-            rd as usize,
-            (rs1 as usize) << 8 | rs2 as usize,
-            (aq as usize) << 1 | rl as usize,
-            cpu::get_cpu().current_gpfn_offset as usize,
+        Ok(BackendCoreImpl::emit_atomic_access(
+            BackendCoreImpl::emit_usize_call_with_4_args(
+                amomin_cb,
+                rd as usize,
+                (rs1 as usize) << 8 | rs2 as usize,
+                (aq as usize) << 1 | rl as usize,
+                cpu::get_cpu().current_gpfn_offset as usize,
+            ),
         ))
     }
 
     fn emit_amomax_w(rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet {
-        emit_atomic_access!(BackendCoreImpl::emit_usize_call_with_4_args(
-            amomax_cb,
-            rd as usize,
-            (rs1 as usize) << 8 | rs2 as usize,
-            (aq as usize) << 1 | rl as usize,
-            cpu::get_cpu().current_gpfn_offset as usize,
+        Ok(BackendCoreImpl::emit_atomic_access(
+            BackendCoreImpl::emit_usize_call_with_4_args(
+                amomax_cb,
+                rd as usize,
+                (rs1 as usize) << 8 | rs2 as usize,
+                (aq as usize) << 1 | rl as usize,
+                cpu::get_cpu().current_gpfn_offset as usize,
+            ),
         ))
     }
 
     fn emit_amominu_w(rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet {
-        emit_atomic_access!(BackendCoreImpl::emit_usize_call_with_4_args(
-            amominu_cb,
-            rd as usize,
-            (rs1 as usize) << 8 | rs2 as usize,
-            (aq as usize) << 1 | rl as usize,
-            cpu::get_cpu().current_gpfn_offset as usize,
+        Ok(BackendCoreImpl::emit_atomic_access(
+            BackendCoreImpl::emit_usize_call_with_4_args(
+                amominu_cb,
+                rd as usize,
+                (rs1 as usize) << 8 | rs2 as usize,
+                (aq as usize) << 1 | rl as usize,
+                cpu::get_cpu().current_gpfn_offset as usize,
+            ),
         ))
     }
 
     fn emit_amomaxu_w(rd: u8, rs1: u8, rs2: u8, aq: bool, rl: bool) -> DecodeRet {
-        emit_atomic_access!(BackendCoreImpl::emit_usize_call_with_4_args(
-            amomaxu_cb,
-            rd as usize,
-            (rs1 as usize) << 8 | rs2 as usize,
-            (aq as usize) << 1 | rl as usize,
-            cpu::get_cpu().current_gpfn_offset as usize,
+        Ok(BackendCoreImpl::emit_atomic_access(
+            BackendCoreImpl::emit_usize_call_with_4_args(
+                amomaxu_cb,
+                rd as usize,
+                (rs1 as usize) << 8 | rs2 as usize,
+                (aq as usize) << 1 | rl as usize,
+                cpu::get_cpu().current_gpfn_offset as usize,
+            ),
         ))
     }
 }

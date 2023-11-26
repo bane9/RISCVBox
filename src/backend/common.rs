@@ -502,8 +502,7 @@ macro_rules! test_encoded_insn {
 }
 
 pub trait BackendCore {
-    fn fill_with_target_nop(ptr: PtrT, size: usize);
-    fn fill_with_target_ret(ptr: PtrT, size: usize);
+    fn emit_atomic_access(insn: HostEncodedInsn) -> HostEncodedInsn;
     fn emit_ret() -> HostEncodedInsn;
     fn emit_nop() -> HostEncodedInsn;
     fn emit_ret_with_exception(exception: Exception) -> HostEncodedInsn;

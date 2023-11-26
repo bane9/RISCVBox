@@ -79,9 +79,13 @@ impl CodePage for PosixAllocator {
             }
         }
 
+        self.mark_rw()?;
+
         unsafe {
             ptr::copy_nonoverlapping(data.as_ptr(), self.ptr.add(self.offset), data.len());
         }
+
+        self.offset += data.len();
 
         Ok(())
     }
@@ -133,14 +137,14 @@ impl CodePage for PosixAllocator {
     }
 
     fn size(&self) -> usize {
-        self.npages * PAGE_SIZE
+        self.offset
     }
 
     fn npages(&self) -> usize {
         self.npages
     }
 
-    fn state(&self) -> super::PageState {
+    fn state(&self) -> PageState {
         self.state
     }
 }

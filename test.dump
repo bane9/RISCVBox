@@ -1,9 +1,0 @@
-
-test.elf:     file format elf32-littleriscv
-
-
-Disassembly of section .text:
-
-00000000 <_start>:
-   0:	80000537          	lui	a0,0x80000
-   4:	ffdff06f          	jal	zero,0 <_start>
