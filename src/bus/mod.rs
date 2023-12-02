@@ -5,5 +5,6 @@ pub mod mmu;
 pub mod ns16550;
 pub mod plic;
 pub mod ram;
+pub mod ramfb;
 
 pub use bus::*;

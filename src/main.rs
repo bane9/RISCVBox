@@ -5,20 +5,39 @@ mod bus;
 mod cpu;
 mod frontend;
 mod util;
+mod window;
 mod xmem;
 
 use backend::csr::init_backend_csr;
 use bus::ram::RAM_BEGIN_ADDR;
 use frontend::exec_core::ExecCoreThreadPool;
+use window::WindowCommon;
 
-fn init_bus(mut rom: Vec<u8>, ram_size: usize, dtb: Option<Vec<u8>>) {
+struct InitData {
+    fb_ptr: *mut u8,
+}
+
+fn init_bus(
+    mut rom: Vec<u8>,
+    ram_size: usize,
+    dtb: Option<Vec<u8>>,
+    fb_width: usize,
+    fb_height: usize,
+    fb_bpp: usize,
+) -> InitData {
     assert!(ram_size >= rom.len());
+    // There are roughly sorted by expected frequency of access
 
     rom.resize(ram_size, 0);
 
     let ram = bus::ram::Ram::new(rom);
 
     bus::bus::get_bus().add_device(Box::new(ram));
+
+    let mut ramfb = bus::ramfb::RamFB::new(fb_width, fb_height, fb_bpp);
+    let fb_ptr = ramfb.get_fb_ptr();
+
+    bus::bus::get_bus().add_device(Box::new(ramfb));
 
     let clint = bus::clint::Clint::new();
 
@@ -37,6 +56,8 @@ fn init_bus(mut rom: Vec<u8>, ram_size: usize, dtb: Option<Vec<u8>>) {
 
         bus::bus::get_bus().add_device(Box::new(dtb));
     }
+
+    InitData { fb_ptr }
 }
 
 fn main() {
@@ -62,9 +83,24 @@ fn main() {
 
     init_backend_csr();
 
-    init_bus(rom.clone(), ram_size, dtb);
+    let width = 800;
+    let height = 600;
+    let bpp = 32;
+
+    let init_data = init_bus(rom.clone(), ram_size, dtb, width, height, bpp);
 
     let exec_thread_pool = ExecCoreThreadPool::new(RAM_BEGIN_ADDR, 1);
+
+    let mut window = window::window_impl::new(
+        width,
+        height,
+        bpp,
+        "Rust RISC-V Emulator",
+        init_data.fb_ptr,
+        false,
+    );
+
+    window.event_loop();
 
     exec_thread_pool.join();
 }
