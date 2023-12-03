@@ -29,6 +29,8 @@ impl ExecCore {
             }
         }
 
+        cpu.current_gpfn = cpu.next_pc >> RV_PAGE_SHIFT as CpuReg;
+
         let bus = bus::get_bus();
 
         let next_phys_pc = bus.translate(cpu.next_pc, &cpu.mmu, AccessType::Fetch);
@@ -37,6 +39,8 @@ impl ExecCore {
             cpu.exception = next_phys_pc.err().unwrap();
             cpu.c_exception_pc = cpu.next_pc as usize;
             trap::handle_exception();
+
+            cpu.current_gpfn = cpu.next_pc >> RV_PAGE_SHIFT as CpuReg;
 
             bus.translate(cpu.next_pc, &cpu.mmu, AccessType::Fetch)
                 .expect("Failed to translate pc after exception")
@@ -50,8 +54,6 @@ impl ExecCore {
 
             insn_data = cpu.insn_map.get_by_guest_idx(next_phys_pc);
         }
-
-        cpu.current_gpfn = cpu.next_pc >> RV_PAGE_SHIFT as CpuReg;
 
         insn_data.unwrap().host_ptr
     }
@@ -72,10 +74,7 @@ impl ExecCore {
             cpu.c_exception_data = 0;
             cpu.c_exception_pc = 0;
             cpu.jump_count = 0;
-
-            // unsafe {
-            //     BackendCoreImpl::call_jit_ptr(insn_data.unwrap().host_ptr);
-            // }
+            cpu.next_pc = 0;
 
             let ret = ReturnableImpl::handle(|| unsafe {
                 BackendCoreImpl::call_jit_ptr(host_ptr);
@@ -159,27 +158,14 @@ impl ExecCore {
             }
             _ => {
                 trap::handle_exception();
+                if matches!(cpu.exception, cpu::Exception::EnvironmentCallFromSMode(_)) {
+                } else {
+                    println!(
+                        "ret_status: {:#x?} with pc 0x{:x} cpu.next_pc {:x} gp {}",
+                        cpu.exception, cpu.c_exception_pc, cpu.next_pc, cpu.regs[3]
+                    );
+                }
             }
-        }
-
-        if !matches!(
-            cpu.exception,
-            cpu::Exception::Wfi
-                | cpu::Exception::BookkeepingRet
-                | cpu::Exception::ForwardJumpFault(_)
-                | cpu::Exception::Mret
-                | cpu::Exception::Sret
-                | cpu::Exception::MmuStateUpdate
-                | cpu::Exception::BlockExit
-                | cpu::Exception::InvalidateJitBlock(_)
-                | cpu::Exception::EnvironmentCallFromSMode(_)
-        ) {
-            println!(
-                "ret_status: {:#x?} with pc 0x{:x} cpu.next_pc {:x} gp {}",
-                cpu.exception, cpu.c_exception_pc, cpu.next_pc, cpu.regs[3]
-            );
-
-            print!("");
         }
     }
 }

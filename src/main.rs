@@ -78,7 +78,7 @@ fn main() {
     //     None
     // };
 
-    let rom = util::read_file("buildroot/images/linux.bin").unwrap();
+    let rom = util::read_file("buildroot/doomgeneric.bin").unwrap();
     let dtb = Some(util::read_file("buildroot/images/dtb.dtb").unwrap());
 
     init_backend_csr();
@@ -91,14 +91,8 @@ fn main() {
 
     let exec_thread_pool = ExecCoreThreadPool::new(RAM_BEGIN_ADDR, 1);
 
-    let mut window = window::window_impl::new(
-        width,
-        height,
-        bpp,
-        "Rust RISC-V Emulator",
-        init_data.fb_ptr,
-        false,
-    );
+    let mut window =
+        window::window_impl::new(width, height, bpp, "RISCVBox", init_data.fb_ptr, false);
 
     window.event_loop();
 

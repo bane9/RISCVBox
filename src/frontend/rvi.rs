@@ -158,7 +158,8 @@ pub fn decode_rvi(insn: u32) -> DecodeRet {
             let rd = ((insn >> 7) & 0b11111) as u8;
             let funct3 = ((insn >> 12) & 0b111) as u8;
             let rs1 = ((insn >> 15) & 0b11111) as u8;
-            let imm = ((insn >> 20) & 0b111111111111) as i32;
+            let imm = (insn >> 20) as i32;
+            let imm = sign_extend(imm, 12) as i32;
 
             match funct3 {
                 0b000 => RviImpl::emit_lb(rd, rs1, imm),
@@ -173,7 +174,8 @@ pub fn decode_rvi(insn: u32) -> DecodeRet {
             let funct3 = ((insn >> 12) & 0b111) as u8;
             let rs1 = ((insn >> 15) & 0b11111) as u8;
             let rs2 = ((insn >> 20) & 0b11111) as u8;
-            let imm = (((insn >> 7) & 0b11111) | ((insn >> 25) & 0b1111111) << 5) as i32;
+            let imm = (((insn >> 7) & 0x1f) | ((insn & 0xfe000000) >> 20)) as i32;
+            let imm = sign_extend(imm, 12) as i32;
 
             match funct3 {
                 0b000 => RviImpl::emit_sb(rs1, rs2, imm),

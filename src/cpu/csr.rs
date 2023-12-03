@@ -143,7 +143,7 @@ impl Csr {
             register::SSTATUS => self.regs[register::MSTATUS] & SSTATUS as CsrType,
             register::SIE => self.regs[register::SIE] & self.regs[register::MIDELEG],
             register::SIP => self.regs[register::MIP] & self.regs[register::MIDELEG],
-            register::CYCLE => Utc::now().timestamp_millis() as CsrType, // TODO: make it make sense v2
+            register::CYCLE | register::TIME => Utc::now().timestamp_millis() as CsrType,
             _ => self.regs[addr],
         }
     }

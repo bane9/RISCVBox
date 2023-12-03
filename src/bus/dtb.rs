@@ -1,7 +1,7 @@
 use crate::{bus::bus::*, cpu::Exception, util};
 
 pub const DTB_SIZE: usize = util::size_mib(2);
-pub const DTB_BEGIN_ADDR: BusType = 0x10000;
+pub const DTB_BEGIN_ADDR: BusType = 0x1000;
 pub const DTB_END: BusType = DTB_BEGIN_ADDR + DTB_SIZE as BusType;
 
 pub struct Dtb {

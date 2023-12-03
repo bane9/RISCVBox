@@ -136,7 +136,6 @@ impl BusDevice for Clint {
         let cpu = get_cpu();
         let clint = get_clint();
 
-        // TODO: Make it make sense
         clint.mtime = (Utc::now().timestamp_millis() - clint.start_time) as BusType;
 
         if (clint.msip & 1) != 0 {
