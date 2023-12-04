@@ -344,12 +344,10 @@ impl common::Csr for CsrImpl {
     }
 
     fn emit_ebreak() -> DecodeRet {
-        // let mut insn = BackendCoreImpl::emit_ret_with_exception(Exception::Breakpoint);
-        // let ret = BackendCoreImpl::emit_ret();
+        let mut insn = BackendCoreImpl::emit_ret_with_exception(Exception::Breakpoint);
+        let ret = BackendCoreImpl::emit_ret();
 
-        // insn.push_slice(ret.iter().as_slice());
-
-        let insn = BackendCoreImpl::emit_nop();
+        insn.push_slice(ret.iter().as_slice());
 
         Ok(insn)
     }
@@ -379,10 +377,7 @@ impl common::Csr for CsrImpl {
     }
 
     fn emit_wfi() -> DecodeRet {
-        let mut insn = BackendCoreImpl::emit_ret_with_exception(Exception::Wfi);
-        let ret = BackendCoreImpl::emit_ret();
-
-        insn.push_slice(ret.iter().as_slice());
+        let insn = BackendCoreImpl::emit_ret_with_exception(Exception::Wfi);
 
         Ok(insn)
     }

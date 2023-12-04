@@ -1,5 +1,7 @@
+use lazy_static::lazy_static;
 use std::fs::File;
 use std::io::{self, Read};
+use std::time::SystemTime;
 
 pub fn read_file(path: &str) -> io::Result<Vec<u8>> {
     let mut file = File::open(path)?;
@@ -74,4 +76,17 @@ pub const fn size_kib(size: usize) -> usize {
 
 pub const fn size_mib(size: usize) -> usize {
     return size * 1024 * 1024;
+}
+
+lazy_static! {
+    static ref START_TIME: SystemTime = SystemTime::now();
+}
+
+pub fn ms_since_program_start() -> u64 {
+    let _ = *START_TIME;
+    let now = SystemTime::now();
+    let duration_since_start = now
+        .duration_since(*START_TIME)
+        .expect("Time went backwards");
+    duration_since_start.as_millis() as u64
 }

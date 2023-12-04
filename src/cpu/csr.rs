@@ -1,5 +1,3 @@
-use chrono::Utc;
-
 use crate::bus::bus::BusType;
 use crate::util::util;
 use std::cell::RefCell;
@@ -143,7 +141,7 @@ impl Csr {
             register::SSTATUS => self.regs[register::MSTATUS] & SSTATUS as CsrType,
             register::SIE => self.regs[register::SIE] & self.regs[register::MIDELEG],
             register::SIP => self.regs[register::MIP] & self.regs[register::MIDELEG],
-            register::CYCLE | register::TIME => Utc::now().timestamp_millis() as CsrType,
+            register::CYCLE | register::TIME => util::ms_since_program_start() as CsrType,
             _ => self.regs[addr],
         }
     }

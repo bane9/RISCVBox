@@ -1,5 +1,6 @@
 use crate::backend::target::core::BackendCoreImpl;
 use crate::backend::{BackendCore, ReturnStatus, ReturnableHandler, ReturnableImpl};
+use crate::bus::clint::Clint;
 use crate::bus::dtb::DTB_BEGIN_ADDR;
 use crate::bus::mmu::AccessType;
 use crate::bus::{self, BusType};
@@ -127,11 +128,14 @@ impl ExecCore {
                 unimplemented!()
             }
             cpu::Exception::Wfi => {
+                // I hate this from the bottom of my heart but the altrenative is making
+                // all csr accesses atomic which is probably worse more so this will have to do
                 if trap::are_interrupts_enabled() {
                     let bus = bus::get_bus();
+                    std::thread::sleep(std::time::Duration::from_millis(
+                        Clint::get_remaining_time_ms(),
+                    ));
 
-                    // I hate this from the bottom of my heart but the altrenative is making
-                    // all csr accesses atomic which I hate even more so this will have to do
                     loop {
                         bus.tick_core_local();
 
@@ -139,7 +143,7 @@ impl ExecCore {
                             break;
                         }
 
-                        std::thread::sleep(std::time::Duration::from_millis(100));
+                        std::thread::sleep(std::time::Duration::from_millis(50));
                     }
                 }
 

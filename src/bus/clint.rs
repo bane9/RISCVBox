@@ -1,7 +1,7 @@
 use crate::bus::*;
 use crate::cpu::*;
 use crate::frontend::exec_core::INSN_SIZE;
-use chrono::Utc;
+use crate::util;
 use std::cell::RefCell;
 
 pub const CLINT_ADDR: BusType = 0x2000000;
@@ -19,8 +19,6 @@ const MTIME_END: BusType = MTIME + INSN_SIZE as BusType;
 pub struct ClintData {
     pub msip: BusType,
     pub mtimecmp: BusType,
-    pub mtime: BusType,
-    pub start_time: i64,
 }
 
 impl ClintData {
@@ -28,8 +26,6 @@ impl ClintData {
         ClintData {
             msip: 0,
             mtimecmp: 0,
-            mtime: 0,
-            start_time: Utc::now().timestamp_millis(),
         }
     }
 }
@@ -47,6 +43,16 @@ pub struct Clint;
 impl Clint {
     pub fn new() -> Clint {
         Clint {}
+    }
+
+    pub fn get_remaining_time_ms() -> u64 {
+        let clint = get_clint();
+
+        let mtime = util::ms_since_program_start() as BusType;
+
+        let diff = clint.mtimecmp as i64 - mtime as i64;
+
+        return if diff < 0 { 0 } else { diff as u64 };
     }
 }
 
@@ -74,7 +80,8 @@ impl BusDevice for Clint {
                 );
             },
             MTIME..=MTIME_END => unsafe {
-                let src = &clint.mtime as *const BusType as *const u8;
+                let mtime = util::ms_since_program_start() as BusType;
+                let src = &mtime as *const BusType as *const u8;
                 std::ptr::copy_nonoverlapping(
                     src,
                     &mut out as *mut u32 as *mut u8,
@@ -109,15 +116,7 @@ impl BusDevice for Clint {
                     size as usize / 8,
                 );
             },
-            MTIME..=MTIME_END => unsafe {
-                clint.mtime = 0;
-                let dst = &mut clint.mtime as *mut BusType as *mut u8;
-                std::ptr::copy_nonoverlapping(
-                    &data as *const u32 as *const u8,
-                    dst,
-                    size as usize / 8,
-                );
-            },
+            MTIME..=MTIME_END => {}
             _ => return Err(Exception::StoreAccessFault(addr)),
         };
 
@@ -136,14 +135,14 @@ impl BusDevice for Clint {
         let cpu = get_cpu();
         let clint = get_clint();
 
-        clint.mtime = (Utc::now().timestamp_millis() - clint.start_time) as BusType;
+        let mtime = util::ms_since_program_start() as BusType;
 
         if (clint.msip & 1) != 0 {
             cpu.csr
                 .write_bit(csr::register::MIP, csr::bits::MSIP_BIT, true);
         }
 
-        if clint.mtime >= clint.mtimecmp {
+        if mtime >= clint.mtimecmp {
             cpu.csr
                 .write_bit(csr::register::MIP, csr::bits::MTIP_BIT, true);
         } else {
