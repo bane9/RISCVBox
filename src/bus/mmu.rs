@@ -88,10 +88,6 @@ impl Mmu for Sv32Mmu {
     }
 
     fn translate(&self, addr: BusType, access_type: AccessType) -> Result<BusType, Exception> {
-        if !self.enabled {
-            return Ok(addr);
-        }
-
         let cpu_instance = cpu::get_cpu();
 
         let mut mode = cpu_instance.mode;

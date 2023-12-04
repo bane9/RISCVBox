@@ -43,6 +43,10 @@ impl Bus {
         size: BusType,
         mmu: &Sv32Mmu,
     ) -> Result<BusType, Exception> {
+        if !mmu.is_active() {
+            return self.load_nommu(addr, size);
+        }
+
         let phys_addr = self.translate(addr, mmu, AccessType::Load)?;
 
         let res = self.load_nommu(phys_addr, size);
@@ -60,6 +64,10 @@ impl Bus {
         size: BusType,
         mmu: &Sv32Mmu,
     ) -> Result<BusType, Exception> {
+        if !mmu.is_active() {
+            return self.fetch_nommu(addr, size);
+        }
+
         let phys_addr = self.translate(addr, mmu, AccessType::Fetch)?;
 
         let res = self.load_nommu(phys_addr, size);
@@ -82,6 +90,10 @@ impl Bus {
         size: BusType,
         mmu: &Sv32Mmu,
     ) -> Result<(), Exception> {
+        if !mmu.is_active() {
+            return self.store_nommu(addr, data, size);
+        }
+
         let phys_addr = self.translate(addr, mmu, AccessType::Store)?;
 
         let res = self.store_nommu(phys_addr, data, size);
@@ -104,7 +116,13 @@ impl Bus {
     }
 
     pub fn fetch_nommu(&mut self, addr: BusType, size: BusType) -> Result<BusType, Exception> {
-        self.load_nommu(addr, size)
+        let res = self.load_nommu(addr, size);
+
+        if res.is_err() {
+            return Err(Exception::InstructionAccessFault(addr));
+        }
+
+        res
     }
 
     pub fn store_nommu(

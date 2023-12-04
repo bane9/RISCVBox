@@ -176,7 +176,7 @@ pub extern "C" fn c_jump_resolver_cb(
 
     let guest_pc = guest_pc as CpuReg;
 
-    cpu.jump_count += 1;
+    //cpu.jump_count += 1;
 
     let jmp_cond_imm = imm as i32;
 
@@ -279,16 +279,6 @@ pub extern "C" fn c_jump_resolver_cb(
 
         next_pc
     } as CpuReg;
-
-    let idk = cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg | (guest_pc + INSN_SIZE as CpuReg);
-
-    if idk == 0x4905b4 {
-        println!("jmp_addr1: {:x}", jmp_addr1);
-    }
-
-    if jmp_addr1 == 0x4905b4 {
-        println!("jmp_addr1: {:x}", jmp_addr1);
-    }
 
     if jmp_addr1 % INSN_SIZE as CpuReg != 0 {
         cpu.set_exception(
