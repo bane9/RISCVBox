@@ -1,7 +1,7 @@
 use cpu::Exception;
 
+use crate::bus::bus::{self, BusType};
 use crate::bus::mmu::AccessType;
-use crate::bus::{bus, BusType};
 use crate::cpu::{cpu, CpuReg};
 use crate::frontend::exec_core::{INSN_SIZE, RV_PAGE_MASK, RV_PAGE_SHIFT};
 use crate::util::EncodedInsn;
@@ -125,315 +125,252 @@ impl UsizeConversions for BusAccessCond {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub struct CondVars<T> {
-    pub cond: T,
-    pub reg1: CpuReg,
-    pub reg2: CpuReg,
-}
-
-impl<T> CondVars<T>
-where
-    T: UsizeConversions,
-{
-    pub fn to_usize(&self) -> usize {
-        let mut ret = 0;
-
-        ret |= (self.cond.to_usize() & 0x7) << 0;
-        ret |= (self.reg1 as usize & 0x1f) << 3;
-        ret |= (self.reg2 as usize & 0x1f) << 8;
-
-        ret
-    }
-
-    pub fn from_usize(val: usize) -> Self {
-        let cond = T::from_usize((val >> 0) & 0x7);
-
-        let reg1 = ((val >> 3) & 0x1f) as CpuReg;
-        let reg2 = ((val >> 8) & 0x1f) as CpuReg;
-
-        Self { cond, reg1, reg2 }
-    }
-}
-
-impl<T> CondVars<T> {
-    pub fn new(cond: T, reg1: CpuReg, reg2: CpuReg) -> Self {
-        Self { cond, reg1, reg2 }
-    }
-}
-
-pub type JumpVars = CondVars<JumpCond>;
-pub type BusAccessVars = CondVars<BusAccessCond>;
-
-pub extern "C" fn c_jump_resolver_cb(
-    jmp_cond: usize,
-    guest_pc: usize,
-    imm: usize,
-    _: usize,
-) -> usize {
+#[inline(always)]
+fn do_jump(guest_address: CpuReg, current_guest_pc: CpuReg, rd: usize) -> usize {
     let cpu = cpu::get_cpu();
-    let jmp_cond = JumpVars::from_usize(jmp_cond);
 
-    let guest_pc = guest_pc as CpuReg;
-
-    //cpu.jump_count += 1;
-
-    let jmp_cond_imm = imm as i32;
-
-    // if cpu.jump_count > JUMP_COUNT_MAX {
-    //     cpu.set_exception(Exception::BookkeepingRet, guest_pc);
-
-    //     ReturnableImpl::throw();
-    // }
-
-    let (jmp_addr, should_jmp) = match jmp_cond.cond {
-        JumpCond::Always => {
-            let pc = guest_pc as i64;
-            let pc = pc + jmp_cond_imm as i64;
-
-            (pc, true)
-        }
-        JumpCond::AlwaysAbsolute => {
-            let pc = cpu.regs[jmp_cond.reg2 as usize] as i64;
-            let pc = pc + jmp_cond_imm as i64;
-            let pc = pc & !1;
-
-            (pc, true)
-        }
-        JumpCond::Equal => {
-            if cpu.regs[jmp_cond.reg1 as usize] as i32 == cpu.regs[jmp_cond.reg2 as usize] as i32 {
-                let pc = guest_pc as i64;
-                let pc = pc + jmp_cond_imm as i64;
-
-                (pc, true)
-            } else {
-                (0, false)
-            }
-        }
-        JumpCond::NotEqual => {
-            if cpu.regs[jmp_cond.reg1 as usize] as i32 != cpu.regs[jmp_cond.reg2 as usize] as i32 {
-                let pc = guest_pc as i64;
-                let pc = pc + jmp_cond_imm as i64;
-
-                (pc, true)
-            } else {
-                (0, false)
-            }
-        }
-        JumpCond::LessThan => {
-            if (cpu.regs[jmp_cond.reg1 as usize] as i32) < (cpu.regs[jmp_cond.reg2 as usize] as i32)
-            {
-                let pc = guest_pc as i64;
-                let pc = pc + jmp_cond_imm as i64;
-
-                (pc, true)
-            } else {
-                (0, false)
-            }
-        }
-        JumpCond::GreaterThanEqual => {
-            if (cpu.regs[jmp_cond.reg1 as usize] as i32)
-                >= (cpu.regs[jmp_cond.reg2 as usize] as i32)
-            {
-                let pc = guest_pc as i64;
-                let pc = pc + jmp_cond_imm as i64;
-
-                (pc, true)
-            } else {
-                (0, false)
-            }
-        }
-        JumpCond::LessThanUnsigned => {
-            if cpu.regs[jmp_cond.reg1 as usize] < cpu.regs[jmp_cond.reg2 as usize] {
-                let pc = guest_pc as i64;
-                let pc = pc + jmp_cond_imm as i64;
-
-                (pc, true)
-            } else {
-                (0, false)
-            }
-        }
-        JumpCond::GreaterThanEqualUnsigned => {
-            if cpu.regs[jmp_cond.reg1 as usize] >= cpu.regs[jmp_cond.reg2 as usize] {
-                let pc = guest_pc as i64;
-                let pc = pc + jmp_cond_imm as i64;
-
-                (pc, true)
-            } else {
-                (0, false)
-            }
-        }
-    };
-
-    if !should_jmp {
-        return 0;
+    if rd != 0 {
+        cpu.regs[rd] = (cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg)
+            + (current_guest_pc + INSN_SIZE as CpuReg);
     }
 
     let bus = bus::get_bus();
 
-    let jmp_addr1 = if jmp_cond.cond == JumpCond::AlwaysAbsolute {
-        jmp_addr
-    } else {
-        let current_pc = cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg;
-        let next_pc = (current_pc as i64) + jmp_addr;
+    let guest_address_phys = bus.translate(guest_address, &cpu.mmu, AccessType::Fetch);
 
-        next_pc
-    } as CpuReg;
-
-    if jmp_addr1 % INSN_SIZE as CpuReg != 0 {
-        cpu.set_exception(
-            Exception::InstructionAddressMisaligned(jmp_addr1 as u32),
-            guest_pc,
-        );
+    if guest_address_phys.is_err() {
+        cpu.set_exception(guest_address_phys.err().unwrap(), current_guest_pc);
 
         ReturnableImpl::throw();
     }
 
-    let jmp_addr_phys = bus.translate(jmp_addr1 as BusType, &cpu.mmu, AccessType::Fetch);
+    let guest_address_phys = guest_address_phys.unwrap();
 
-    if jmp_addr_phys.is_err() {
-        cpu.set_exception(jmp_addr_phys.err().unwrap(), guest_pc);
-
-        ReturnableImpl::throw();
-    }
-
-    let jmp_addr_phys = jmp_addr_phys.unwrap();
-
-    let host_addr = cpu.insn_map.get_by_guest_idx(jmp_addr_phys);
-
-    if jmp_cond.reg1 != 0
-        && (jmp_cond.cond == JumpCond::Always || jmp_cond.cond == JumpCond::AlwaysAbsolute)
-    {
-        let new_addr =
-            (cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg) + (guest_pc + INSN_SIZE as CpuReg);
-
-        cpu.regs[jmp_cond.reg1 as usize] = new_addr;
-    }
+    let host_addr = cpu.insn_map.get_by_guest_idx(guest_address_phys);
 
     if host_addr.is_none() {
-        cpu.set_exception(Exception::ForwardJumpFault(jmp_addr1), guest_pc);
+        cpu.set_exception(Exception::ForwardJumpFault(guest_address), current_guest_pc);
 
         ReturnableImpl::throw();
     }
 
     // If we are jumping to a different page (block boundary won't protect us here)
     // we need to update the current_gpfn.
-    cpu.current_gpfn = jmp_addr1 >> RV_PAGE_SHIFT as CpuReg;
+    cpu.current_gpfn = guest_address >> RV_PAGE_SHIFT as CpuReg;
 
     host_addr.unwrap().host_ptr as usize
 }
 
-pub extern "C" fn c_bus_resolver_cb(bus_vars: usize, guest_pc: usize, imm: usize, _: usize) {
+pub extern "C" fn c_jal_cb(rd: usize, _: usize, imm: usize, guest_pc: usize) -> usize {
     let cpu = cpu::get_cpu();
-    let bus_vars = BusAccessVars::from_usize(bus_vars);
 
-    let bus_vars_imm = imm as i32;
+    let pc = guest_pc as i64;
+    let pc = pc + imm as i64;
 
-    let (addres, size, is_load, is_unsigned) = match bus_vars.cond {
-        BusAccessCond::LoadByte => {
-            let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
-            let addr = addr + bus_vars_imm as i64;
+    let pc = (cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg) as i64 + pc;
 
-            (addr as u32, 8, true, false)
-        }
-        BusAccessCond::LoadHalf => {
-            let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
-            let addr = addr + bus_vars_imm as i64;
+    do_jump(pc as CpuReg, guest_pc as CpuReg, rd)
+}
 
-            (addr as u32, 16, true, false)
-        }
-        BusAccessCond::LoadWord => {
-            let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
-            let addr = addr + bus_vars_imm as i64;
+pub extern "C" fn c_jalr_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) -> usize {
+    let cpu = cpu::get_cpu();
 
-            (addr as u32, 32, true, true)
-        }
-        BusAccessCond::LoadByteUnsigned => {
-            let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
-            let addr = addr + bus_vars_imm as i64;
+    let pc = cpu.regs[rs1] as i64;
+    let pc = pc + imm as i64;
+    let pc = pc & !1;
 
-            (addr as u32, 8, true, true)
-        }
-        BusAccessCond::LoadHalfUnsigned => {
-            let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
-            let addr = addr + bus_vars_imm as i64;
+    do_jump(pc as CpuReg, guest_pc as CpuReg, rd)
+}
 
-            (addr as u32, 16, true, true)
-        }
-        BusAccessCond::StoreByte => {
-            let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
-            let addr = addr + bus_vars_imm as i64;
+pub extern "C" fn c_beq_cb(rs1: usize, rs2: usize, imm: usize, guest_pc: usize) -> usize {
+    let cpu = cpu::get_cpu();
 
-            (addr as u32, 8, false, false)
-        }
-        BusAccessCond::StoreHalf => {
-            let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
-            let addr = addr + bus_vars_imm as i64;
+    if cpu.regs[rs1] == cpu.regs[rs2] {
+        let pc = guest_pc as i64;
+        let pc = pc + imm as i64;
 
-            (addr as u32, 16, false, false)
-        }
-        BusAccessCond::StoreWord => {
-            let addr = cpu.regs[bus_vars.reg2 as usize] as i64;
-            let addr = addr + bus_vars_imm as i64;
+        let pc = (cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg) as i64 + pc;
 
-            (addr as u32, 32, false, true)
-        }
-    };
+        do_jump(pc as CpuReg, guest_pc as CpuReg, 0)
+    } else {
+        0
+    }
+}
+
+pub extern "C" fn c_bne_cb(rs1: usize, rs2: usize, imm: usize, guest_pc: usize) -> usize {
+    let cpu = cpu::get_cpu();
+
+    if cpu.regs[rs1] != cpu.regs[rs2] {
+        let pc = guest_pc as i64;
+        let pc = pc + imm as i64;
+
+        let pc = (cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg) as i64 + pc;
+
+        do_jump(pc as CpuReg, guest_pc as CpuReg, 0)
+    } else {
+        0
+    }
+}
+
+pub extern "C" fn c_blt_cb(rs1: usize, rs2: usize, imm: usize, guest_pc: usize) -> usize {
+    let cpu = cpu::get_cpu();
+
+    if (cpu.regs[rs1] as i32) < (cpu.regs[rs2] as i32) {
+        let pc = guest_pc as i64;
+        let pc = pc + imm as i64;
+
+        let pc = (cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg) as i64 + pc;
+
+        do_jump(pc as CpuReg, guest_pc as CpuReg, 0)
+    } else {
+        0
+    }
+}
+
+pub extern "C" fn c_bge_cb(rs1: usize, rs2: usize, imm: usize, guest_pc: usize) -> usize {
+    let cpu = cpu::get_cpu();
+
+    if (cpu.regs[rs1] as i32) >= (cpu.regs[rs2] as i32) {
+        let pc = guest_pc as i64;
+        let pc = pc + imm as i64;
+
+        let pc = (cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg) as i64 + pc;
+
+        do_jump(pc as CpuReg, guest_pc as CpuReg, 0)
+    } else {
+        0
+    }
+}
+
+pub extern "C" fn c_bltu_cb(rs1: usize, rs2: usize, imm: usize, guest_pc: usize) -> usize {
+    let cpu = cpu::get_cpu();
+
+    if cpu.regs[rs1] < cpu.regs[rs2] {
+        let pc = guest_pc as i64;
+        let pc = pc + imm as i64;
+
+        let pc = (cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg) as i64 + pc;
+
+        do_jump(pc as CpuReg, guest_pc as CpuReg, 0)
+    } else {
+        0
+    }
+}
+
+pub extern "C" fn c_bgeu_cb(rs1: usize, rs2: usize, imm: usize, guest_pc: usize) -> usize {
+    let cpu = cpu::get_cpu();
+
+    if cpu.regs[rs1] >= cpu.regs[rs2] {
+        let pc = guest_pc as i64;
+        let pc = pc + imm as i64;
+
+        let pc = (cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg) as i64 + pc;
+
+        do_jump(pc as CpuReg, guest_pc as CpuReg, 0)
+    } else {
+        0
+    }
+}
+
+#[inline(always)]
+fn do_load(rd: usize, rs1: usize, imm: i32, guest_pc: CpuReg, load_size: u8, is_unsigned: bool) {
+    let cpu = cpu::get_cpu();
+
+    let addr = cpu.regs[rs1] as i64;
+    let addr = addr + imm as i64;
+
+    let addr = addr as CpuReg;
 
     let bus = bus::get_bus();
 
     let guest_pc = guest_pc as CpuReg;
 
-    if is_load {
-        let data = bus.load(addres, size, &cpu.mmu);
+    let data = bus.load(addr, load_size as BusType, &cpu.mmu);
 
-        if data.is_err() {
-            cpu.set_exception(data.err().unwrap(), guest_pc);
+    if data.is_err() {
+        cpu.set_exception(data.err().unwrap(), guest_pc);
 
-            ReturnableImpl::throw();
-        }
+        ReturnableImpl::throw();
+    }
 
-        let data_val = data.unwrap();
+    let data_val = data.unwrap();
 
-        let data_val = if !is_unsigned {
-            sign_extend(data_val, size as usize) as u32
-        } else {
-            data_val
-        };
-
-        if bus_vars.reg1 != 0 {
-            cpu.regs[bus_vars.reg1 as usize] = data_val;
-        }
+    let data_val = if is_unsigned {
+        data_val
     } else {
-        let data = cpu.regs[bus_vars.reg1 as usize];
-
-        let phys_addr = bus.translate(addres, &cpu.mmu, AccessType::Store);
-
-        if phys_addr.is_err() {
-            cpu.set_exception(phys_addr.err().unwrap(), guest_pc);
-
-            ReturnableImpl::throw();
-        }
-
-        let res = bus.store_nommu(phys_addr.unwrap(), data, size);
-
-        if res.is_err() {
-            cpu.set_exception(res.err().unwrap(), guest_pc);
-
-            ReturnableImpl::throw();
-        }
-
-        let gpfn = addres & RV_PAGE_MASK as CpuReg;
-
-        if cpu.gpfn_state.contains_gpfn(gpfn) {
-            cpu.set_exception(
-                Exception::InvalidateJitBlock(gpfn >> RV_PAGE_SHIFT as CpuReg),
-                guest_pc,
-            );
-
-            ReturnableImpl::throw();
-        }
+        sign_extend(data_val, load_size as usize) as u32
     };
+
+    if rd != 0 {
+        cpu.regs[rd] = data_val;
+    }
+}
+
+pub extern "C" fn c_lb_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) {
+    do_load(rd, rs1, imm as i32, guest_pc as CpuReg, 8, false);
+}
+
+pub extern "C" fn c_lh_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) {
+    do_load(rd, rs1, imm as i32, guest_pc as CpuReg, 16, false);
+}
+
+pub extern "C" fn c_lw_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) {
+    do_load(rd, rs1, imm as i32, guest_pc as CpuReg, 32, false);
+}
+
+pub extern "C" fn c_lbu_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) {
+    do_load(rd, rs1, imm as i32, guest_pc as CpuReg, 8, true);
+}
+
+pub extern "C" fn c_lhu_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) {
+    do_load(rd, rs1, imm as i32, guest_pc as CpuReg, 16, true);
+}
+
+#[inline(always)]
+fn do_store(rs1: usize, rs2: usize, imm: i32, guest_pc: CpuReg, store_size: u8) {
+    let cpu = cpu::get_cpu();
+
+    let addr = cpu.regs[rs1] as i64;
+    let addr = addr + imm as i64;
+
+    let addr = addr as CpuReg;
+
+    let bus = bus::get_bus();
+
+    let guest_pc = guest_pc as CpuReg;
+
+    let data = cpu.regs[rs2];
+
+    let result = bus.store(addr, data, store_size as BusType, &cpu.mmu);
+
+    if result.is_err() {
+        cpu.set_exception(result.err().unwrap(), guest_pc);
+
+        ReturnableImpl::throw();
+    }
+
+    let gpfn = addr & RV_PAGE_MASK as CpuReg;
+
+    if cpu.gpfn_state.contains_gpfn(gpfn) {
+        cpu.set_exception(
+            Exception::InvalidateJitBlock(gpfn >> RV_PAGE_SHIFT as CpuReg),
+            guest_pc,
+        );
+
+        ReturnableImpl::throw();
+    }
+}
+
+pub extern "C" fn c_sb_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) {
+    do_store(rd, rs1, imm as i32, guest_pc as CpuReg, 8);
+}
+
+pub extern "C" fn c_sh_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) {
+    do_store(rd, rs1, imm as i32, guest_pc as CpuReg, 16);
+}
+
+pub extern "C" fn c_sw_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) {
+    do_store(rd, rs1, imm as i32, guest_pc as CpuReg, 32);
 }
 
 pub fn test_asm_common(enc: &HostEncodedInsn, expected: &[u8], insn_name: &str) {

@@ -1,18 +1,24 @@
 use crate::backend::common;
 use crate::backend::target::core::{amd64_reg, BackendCore, BackendCoreImpl};
+use crate::cpu::CpuReg;
 use crate::frontend::exec_core::RV_PAGE_SHIFT;
 use crate::*;
-use common::{BusAccessVars, DecodeRet, HostEncodedInsn, JumpCond, JumpVars};
+use common::*;
 
 pub struct RviImpl;
 
-fn emit_jmp(cond: JumpVars, imm: i32) -> HostEncodedInsn {
+fn emit_jmp(
+    jmp_fn: extern "C" fn(usize, usize, usize, usize) -> usize,
+    reg1: CpuReg,
+    reg2: CpuReg,
+    imm: i32,
+) -> HostEncodedInsn {
     let mut insn = BackendCoreImpl::emit_usize_call_with_4_args(
-        common::c_jump_resolver_cb,
-        cond.to_usize(),
-        cpu::get_cpu().current_gpfn_offset as usize,
+        jmp_fn,
+        reg1 as usize,
+        reg2 as usize,
         imm as i64 as usize,
-        0,
+        cpu::get_cpu().current_gpfn_offset as usize,
     );
 
     emit_cmp_reg_imm!(insn, amd64_reg::RAX, 0);
@@ -26,21 +32,19 @@ fn emit_jmp(cond: JumpVars, imm: i32) -> HostEncodedInsn {
     insn
 }
 
-fn emit_bus_access(cond: BusAccessVars, imm: i32) -> HostEncodedInsn {
+fn emit_bus_access(
+    bus_fn: extern "C" fn(usize, usize, usize, usize),
+    reg1: u8,
+    reg2: u8,
+    imm: i32,
+) -> HostEncodedInsn {
     BackendCoreImpl::emit_void_call_with_4_args(
-        common::c_bus_resolver_cb,
-        cond.to_usize(),
-        cpu::get_cpu().current_gpfn_offset as usize,
+        bus_fn,
+        reg1 as usize,
+        reg2 as usize,
         imm as i64 as usize,
-        0,
+        cpu::get_cpu().current_gpfn_offset as usize,
     )
-}
-
-extern "C" fn temporary_hack_lol(rd: usize, imm: usize, pc: usize, _temp: usize) {
-    let cpu = cpu::get_cpu();
-    let pc = pc as i64;
-    let current_gpfn = (cpu.current_gpfn << RV_PAGE_SHIFT) as i64;
-    cpu.regs[rd] = ((current_gpfn | pc) + (imm as i32 as i64)) as u32;
 }
 
 impl common::Rvi for RviImpl {
@@ -237,149 +241,86 @@ impl common::Rvi for RviImpl {
 
         emit_check_rd!(insn, rd);
 
-        insn = BackendCoreImpl::emit_void_call_with_4_args(
-            temporary_hack_lol,
-            rd as usize,
-            imm as i64 as usize,
-            cpu.current_gpfn_offset as usize,
-            0,
-        );
+        let current_gpfn = &cpu.current_gpfn as *const _ as usize;
 
-        // let rd_addr = &cpu.regs[rd as usize] as *const _ as usize;
+        emit_mov_reg_imm!(insn, amd64_reg::RAX, current_gpfn);
+        emit_mov_ptr_reg_dword_ptr!(insn, amd64_reg::RAX, amd64_reg::RAX);
 
-        // emit_mov_reg_imm!(insn, amd64_reg::RBX, rd_addr);
-        // emit_mov_dword_ptr_imm!(
-        //     insn,
-        //     amd64_reg::RBX,
-        //     (((cpu.current_gpfn << RV_PAGE_SHIFT) | cpu.current_gpfn_offset) as i64)
-        //         .wrapping_add(imm as i64)
-        // );
+        emit_shl_reg_imm!(insn, amd64_reg::RAX, RV_PAGE_SHIFT as u8);
+
+        emit_or_reg_imm!(insn, amd64_reg::RAX, cpu.current_gpfn_offset);
+        emit_add_reg_imm!(insn, amd64_reg::RAX, imm);
+
+        let rd_addr = &cpu.regs[rd as usize] as *const _ as usize;
+
+        emit_mov_reg_imm!(insn, amd64_reg::RBX, rd_addr);
+        emit_mov_dword_ptr_reg!(insn, amd64_reg::RBX, amd64_reg::RAX);
 
         Ok(insn)
     }
 
     fn emit_jal(rd: u8, imm: i32) -> DecodeRet {
-        Ok(emit_jmp(
-            JumpVars::new(JumpCond::Always, rd as u32, 0x0u32),
-            imm,
-        ))
+        Ok(emit_jmp(c_jal_cb, rd as u32, 0, imm))
     }
 
     fn emit_jalr(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
-        Ok(emit_jmp(
-            JumpVars::new(JumpCond::AlwaysAbsolute, rd as u32, rs1 as u32),
-            imm,
-        ))
+        Ok(emit_jmp(c_jalr_cb, rd as u32, rs1 as u32, imm))
     }
 
     fn emit_beq(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_jmp(
-            JumpVars::new(JumpCond::Equal, rs1 as u32, rs2 as u32),
-            imm,
-        ))
+        Ok(emit_jmp(c_beq_cb, rs1 as u32, rs2 as u32, imm))
     }
 
     fn emit_bne(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_jmp(
-            JumpVars::new(JumpCond::NotEqual, rs1 as u32, rs2 as u32),
-            imm,
-        ))
+        Ok(emit_jmp(c_bne_cb, rs1 as u32, rs2 as u32, imm))
     }
 
     fn emit_blt(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_jmp(
-            JumpVars::new(JumpCond::LessThan, rs1 as u32, rs2 as u32),
-            imm,
-        ))
+        Ok(emit_jmp(c_blt_cb, rs1 as u32, rs2 as u32, imm))
     }
 
     fn emit_bge(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_jmp(
-            JumpVars::new(JumpCond::GreaterThanEqual, rs1 as u32, rs2 as u32),
-            imm,
-        ))
+        Ok(emit_jmp(c_bge_cb, rs1 as u32, rs2 as u32, imm))
     }
 
     fn emit_bltu(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_jmp(
-            JumpVars::new(JumpCond::LessThanUnsigned, rs1 as u32, rs2 as u32),
-            imm,
-        ))
+        Ok(emit_jmp(c_bltu_cb, rs1 as u32, rs2 as u32, imm))
     }
 
     fn emit_bgeu(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_jmp(
-            JumpVars::new(JumpCond::GreaterThanEqualUnsigned, rs1 as u32, rs2 as u32),
-            imm,
-        ))
+        Ok(emit_jmp(c_bgeu_cb, rs1 as u32, rs2 as u32, imm))
     }
 
     fn emit_lb(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access(
-            BusAccessVars::new(backend::BusAccessCond::LoadByte, rd as u32, rs1 as u32),
-            imm,
-        ))
+        Ok(emit_bus_access(c_lb_cb, rd, rs1, imm))
     }
 
     fn emit_lh(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access(
-            BusAccessVars::new(backend::BusAccessCond::LoadHalf, rd as u32, rs1 as u32),
-            imm,
-        ))
+        Ok(emit_bus_access(c_lh_cb, rd, rs1, imm))
     }
 
     fn emit_lw(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access(
-            BusAccessVars::new(backend::BusAccessCond::LoadWord, rd as u32, rs1 as u32),
-            imm,
-        ))
+        Ok(emit_bus_access(c_lw_cb, rd, rs1, imm))
     }
 
     fn emit_lbu(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access(
-            BusAccessVars::new(
-                backend::BusAccessCond::LoadByteUnsigned,
-                rd as u32,
-                rs1 as u32,
-            ),
-            imm,
-        ))
+        Ok(emit_bus_access(c_lbu_cb, rd, rs1, imm))
     }
 
     fn emit_lhu(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access(
-            BusAccessVars::new(
-                backend::BusAccessCond::LoadHalfUnsigned,
-                rd as u32,
-                rs1 as u32,
-            ),
-            imm,
-        ))
+        Ok(emit_bus_access(c_lhu_cb, rd, rs1, imm))
     }
 
     fn emit_sb(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access(
-            BusAccessVars::new(
-                backend::BusAccessCond::StoreByte,
-                rs2 as u32, // Intentionally flipped
-                rs1 as u32,
-            ),
-            imm,
-        ))
+        Ok(emit_bus_access(c_sb_cb, rs1, rs2, imm))
     }
 
     fn emit_sh(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access(
-            BusAccessVars::new(backend::BusAccessCond::StoreHalf, rs2 as u32, rs1 as u32),
-            imm,
-        ))
+        Ok(emit_bus_access(c_sh_cb, rs1, rs2, imm))
     }
 
     fn emit_sw(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access(
-            BusAccessVars::new(backend::BusAccessCond::StoreWord, rs2 as u32, rs1 as u32),
-            imm,
-        ))
+        Ok(emit_bus_access(c_sw_cb, rs1, rs2, imm))
     }
 
     fn emit_fence(_pred: u8, _succ: u8) -> DecodeRet {
