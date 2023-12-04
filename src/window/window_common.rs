@@ -1,5 +1,4 @@
-pub type Ps2Key = u16;
-pub type Ps2Mouse = u16;
+pub type Ps2Key = [u8; 3];
 
 pub trait WindowCommon {
     fn new(
@@ -12,5 +11,4 @@ pub trait WindowCommon {
     ) -> Self;
     fn event_loop(&mut self);
     fn get_key() -> Option<Ps2Key>;
-    fn get_mouse() -> Option<Ps2Mouse>;
 }

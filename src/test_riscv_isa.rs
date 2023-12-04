@@ -5,6 +5,7 @@ mod bus;
 mod cpu;
 mod frontend;
 mod util;
+mod window;
 mod xmem;
 
 use std::thread;

@@ -11,16 +11,12 @@ use sdl2::event::*;
 use sdl2::render::*;
 use sdl2::video::*;
 
-const PS2_QUEUE_SIZE: u64 = 1024;
+const PS2_QUEUE_SIZE: u64 = 32;
 
 const LOGIC_UPDATE_HZ: u32 = 60;
 
 lazy_static! {
     static ref KEYBOARD: Mutex<(BroadcastSender<Ps2Key>, BroadcastReceiver<Ps2Key>)> = {
-        let (sender, receiver) = broadcast_queue::<Ps2Key>(PS2_QUEUE_SIZE);
-        Mutex::new((sender, receiver))
-    };
-    static ref MOUSE: Mutex<(BroadcastSender<Ps2Key>, BroadcastReceiver<Ps2Key>)> = {
         let (sender, receiver) = broadcast_queue::<Ps2Key>(PS2_QUEUE_SIZE);
         Mutex::new((sender, receiver))
     };
@@ -64,7 +60,7 @@ impl Sdl2Window {
         self.canvas.present();
     }
 
-    fn sdl2key_to_ps2key(key: Keycode) -> Option<Ps2Key> {
+    fn sdl2key_to_ps2key(key: Keycode) -> Option<u16> {
         match key {
             Keycode::A => Some(0x1c),
             Keycode::B => Some(0x32),
@@ -227,12 +223,57 @@ impl WindowCommon for Sdl2Window {
                         keycode,
                         scancode: _,
                         keymod: _,
-                        repeat: _,
+                        repeat,
                     } => {
+                        if repeat {
+                            continue;
+                        }
+
                         let ps2key = Sdl2Window::sdl2key_to_ps2key(keycode.unwrap());
 
                         if let Some(ps2key) = ps2key {
-                            KEYBOARD.lock().unwrap().0.try_send(ps2key).unwrap();
+                            let queue = &KEYBOARD.lock().unwrap().0;
+
+                            let mut key = Ps2Key::default();
+                            let mut idx = 0usize;
+
+                            if ps2key > 0xff {
+                                key[idx] = ((ps2key >> 8) & 0xff) as u8;
+                                idx += 1;
+                            }
+                            key[idx] = (ps2key & 0xff) as u8;
+
+                            queue.try_send(key).unwrap();
+                        }
+                    }
+                    Event::KeyUp {
+                        timestamp: _,
+                        window_id: _,
+                        keycode,
+                        scancode: _,
+                        keymod: _,
+                        repeat,
+                    } => {
+                        if repeat {
+                            continue;
+                        }
+
+                        let ps2key = Sdl2Window::sdl2key_to_ps2key(keycode.unwrap());
+
+                        if let Some(ps2key) = ps2key {
+                            let queue = &KEYBOARD.lock().unwrap().0;
+
+                            let mut key = Ps2Key::default();
+                            let mut idx = 0usize;
+
+                            if ps2key > 0xff {
+                                key[idx] = ((ps2key >> 8) & 0xff) as u8;
+                                idx += 1;
+                            }
+                            key[idx] = (ps2key & 0xff) as u8;
+                            key[idx + 1] = 0xf0;
+
+                            queue.try_send(key).unwrap();
                         }
                     }
                     Event::Quit { .. } => std::process::exit(0),
@@ -252,18 +293,9 @@ impl WindowCommon for Sdl2Window {
     }
 
     fn get_key() -> Option<Ps2Key> {
-        let receiver = KEYBOARD.lock().unwrap().1.add_stream();
+        let receiver = KEYBOARD.lock().unwrap().1.try_recv();
 
-        match receiver.try_recv() {
-            Ok(key) => Some(key),
-            Err(_) => None,
-        }
-    }
-
-    fn get_mouse() -> Option<Ps2Mouse> {
-        let receiver = MOUSE.lock().unwrap().1.add_stream();
-
-        match receiver.try_recv() {
+        match receiver {
             Ok(key) => Some(key),
             Err(_) => None,
         }
