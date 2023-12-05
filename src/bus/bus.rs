@@ -67,21 +67,6 @@ impl Bus {
         mmu: &Sv32Mmu,
     ) -> Result<BusType, Exception> {
         if !mmu.is_active() {
-            if addr >= RAM_BEGIN_ADDR && addr < self.ram_end_addr as u32 {
-                let adj_addr = (addr as usize) - (RAM_BEGIN_ADDR as usize);
-
-                let data = unsafe {
-                    match size {
-                        8 => *(self.ram_ptr.add(adj_addr) as *const u8) as BusType,
-                        16 => *(self.ram_ptr.add(adj_addr) as *const u16) as BusType,
-                        32 => *(self.ram_ptr.add(adj_addr) as *const u32) as BusType,
-                        _ => panic!("Invalid size"),
-                    }
-                };
-
-                return Ok(data);
-            }
-
             return self.load_nommu(addr, size);
         }
 
@@ -103,21 +88,6 @@ impl Bus {
         mmu: &Sv32Mmu,
     ) -> Result<BusType, Exception> {
         if !mmu.is_active() {
-            if addr >= RAM_BEGIN_ADDR && addr < self.ram_end_addr as u32 {
-                let adj_addr = (addr as usize) - (RAM_BEGIN_ADDR as usize);
-
-                let data = unsafe {
-                    match size {
-                        8 => *(self.ram_ptr.add(adj_addr) as *const u8) as BusType,
-                        16 => *(self.ram_ptr.add(adj_addr) as *const u16) as BusType,
-                        32 => *(self.ram_ptr.add(adj_addr) as *const u32) as BusType,
-                        _ => panic!("Invalid size"),
-                    }
-                };
-
-                return Ok(data);
-            }
-
             return self.fetch_nommu(addr, size);
         }
 
@@ -144,34 +114,6 @@ impl Bus {
         mmu: &Sv32Mmu,
     ) -> Result<(), Exception> {
         if !mmu.is_active() {
-            if addr >= RAM_BEGIN_ADDR && addr < self.ram_end_addr as u32 {
-                let adj_addr = (addr as usize) - (RAM_BEGIN_ADDR as usize);
-
-                unsafe {
-                    match size {
-                        8 => *(self.ram_ptr.add(adj_addr) as *mut u8) = data as u8,
-                        16 => *(self.ram_ptr.add(adj_addr) as *mut u16) = data as u16,
-                        32 => *(self.ram_ptr.add(adj_addr) as *mut u32) = data as u32,
-                        _ => panic!("Invalid size"),
-                    }
-                };
-
-                return Ok(());
-            } else if addr >= RAMFB_BEGIN_ADDR as u32 && addr < self.fb_end_addr as u32 {
-                let adj_addr = (addr as usize) - (RAMFB_BEGIN_ADDR as usize);
-
-                unsafe {
-                    match size {
-                        8 => *(self.fb_ptr.add(adj_addr) as *mut u8) = data as u8,
-                        16 => *(self.fb_ptr.add(adj_addr) as *mut u16) = data as u16,
-                        32 => *(self.fb_ptr.add(adj_addr) as *mut u32) = data as u32,
-                        _ => panic!("Invalid size"),
-                    }
-                };
-
-                return Ok(());
-            }
-
             return self.store_nommu(addr, data, size);
         }
 
@@ -187,6 +129,21 @@ impl Bus {
     }
 
     pub fn load_nommu(&mut self, addr: BusType, size: BusType) -> Result<BusType, Exception> {
+        if addr >= RAM_BEGIN_ADDR && addr < self.ram_end_addr as u32 {
+            let adj_addr = (addr as usize) - (RAM_BEGIN_ADDR as usize);
+
+            let data = unsafe {
+                match size {
+                    8 => *(self.ram_ptr.add(adj_addr) as *const u8) as BusType,
+                    16 => *(self.ram_ptr.add(adj_addr) as *const u16) as BusType,
+                    32 => *(self.ram_ptr.add(adj_addr) as *const u32) as BusType,
+                    _ => panic!("Invalid size"),
+                }
+            };
+
+            return Ok(data);
+        }
+
         for device in &mut self.devices {
             if addr >= device.get_begin_addr() && addr < device.get_end_addr() {
                 return device.load(addr, size);
@@ -197,6 +154,21 @@ impl Bus {
     }
 
     pub fn fetch_nommu(&mut self, addr: BusType, size: BusType) -> Result<BusType, Exception> {
+        if addr >= RAM_BEGIN_ADDR && addr < self.ram_end_addr as u32 {
+            let adj_addr = (addr as usize) - (RAM_BEGIN_ADDR as usize);
+
+            let data = unsafe {
+                match size {
+                    8 => *(self.ram_ptr.add(adj_addr) as *const u8) as BusType,
+                    16 => *(self.ram_ptr.add(adj_addr) as *const u16) as BusType,
+                    32 => *(self.ram_ptr.add(adj_addr) as *const u32) as BusType,
+                    _ => panic!("Invalid size"),
+                }
+            };
+
+            return Ok(data);
+        }
+
         let res = self.load_nommu(addr, size);
 
         if res.is_err() {
@@ -212,6 +184,34 @@ impl Bus {
         data: BusType,
         size: BusType,
     ) -> Result<(), Exception> {
+        if addr >= RAM_BEGIN_ADDR && addr < self.ram_end_addr as u32 {
+            let adj_addr = (addr as usize) - (RAM_BEGIN_ADDR as usize);
+
+            unsafe {
+                match size {
+                    8 => *(self.ram_ptr.add(adj_addr) as *mut u8) = data as u8,
+                    16 => *(self.ram_ptr.add(adj_addr) as *mut u16) = data as u16,
+                    32 => *(self.ram_ptr.add(adj_addr) as *mut u32) = data as u32,
+                    _ => panic!("Invalid size"),
+                }
+            };
+
+            return Ok(());
+        } else if addr >= RAMFB_BEGIN_ADDR as u32 && addr < self.fb_end_addr as u32 {
+            let adj_addr = (addr as usize) - (RAMFB_BEGIN_ADDR as usize);
+
+            unsafe {
+                match size {
+                    8 => *(self.fb_ptr.add(adj_addr) as *mut u8) = data as u8,
+                    16 => *(self.fb_ptr.add(adj_addr) as *mut u16) = data as u16,
+                    32 => *(self.fb_ptr.add(adj_addr) as *mut u32) = data as u32,
+                    _ => panic!("Invalid size"),
+                }
+            };
+
+            return Ok(());
+        }
+
         for device in &mut self.devices {
             if addr >= device.get_begin_addr() && addr < device.get_end_addr() {
                 return device.store(addr, data, size);

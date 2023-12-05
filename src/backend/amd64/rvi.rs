@@ -13,12 +13,14 @@ fn emit_jmp(
     reg2: CpuReg,
     imm: i32,
 ) -> HostEncodedInsn {
+    let cpu = cpu::get_cpu();
+
     let mut insn = BackendCoreImpl::emit_usize_call_with_4_args(
         jmp_fn,
-        reg1 as usize,
-        reg2 as usize,
+        &cpu.regs[reg1 as usize] as *const CpuReg as usize,
+        &cpu.regs[reg2 as usize] as *const CpuReg as usize,
         imm as i64 as usize,
-        cpu::get_cpu().current_gpfn_offset as usize,
+        cpu.current_gpfn_offset as usize,
     );
 
     emit_cmp_reg_imm!(insn, amd64_reg::RAX, 0);

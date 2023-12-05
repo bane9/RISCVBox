@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+#![feature(thread_local)]
 
 mod backend;
 mod bus;

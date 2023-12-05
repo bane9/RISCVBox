@@ -1,6 +1,5 @@
-use std::collections::HashMap;
-
 use crate::bus::BusType;
+use hashbrown::HashMap;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct InsnMappingData {

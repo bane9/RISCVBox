@@ -4,7 +4,6 @@ use crate::cpu;
 use crate::cpu::csr;
 use crate::frontend::gpfn_state::GpfnState;
 use crate::frontend::insn_lookup::InsnData;
-use std::cell::RefCell;
 use std::collections::HashSet;
 
 pub type CpuReg = BusType;
@@ -311,10 +310,15 @@ impl Cpu {
     }
 }
 
-thread_local! {
-    static CPU: RefCell<Cpu> = RefCell::new(Cpu::new());
+#[thread_local]
+static mut CPU: *mut Cpu = std::ptr::null_mut();
+
+pub fn init_cpu() {
+    unsafe {
+        CPU = Box::into_raw(Box::new(Cpu::new()));
+    }
 }
 
 pub fn get_cpu() -> &'static mut Cpu {
-    CPU.with(|cpu| unsafe { &mut *cpu.as_ptr() })
+    unsafe { &mut *CPU }
 }

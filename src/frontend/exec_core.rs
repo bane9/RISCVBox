@@ -175,6 +175,8 @@ impl ExecCore {
 }
 
 pub fn exec_core_thread(cpu_core_idx: usize, initial_pc: CpuReg) {
+    cpu::init_cpu();
+
     let mut exec_core = ExecCore::new();
 
     exec_core.exec_loop(cpu_core_idx as CpuReg, initial_pc);

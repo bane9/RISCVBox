@@ -1,9 +1,9 @@
 use cpu::Exception;
 
 use crate::bus::bus::{self, BusType};
-use crate::bus::mmu::AccessType;
+use crate::bus::mmu::{AccessType, Mmu};
 use crate::cpu::{cpu, CpuReg};
-use crate::frontend::exec_core::{INSN_SIZE, RV_PAGE_MASK, RV_PAGE_SHIFT};
+use crate::frontend::exec_core::{INSN_SIZE, RV_PAGE_SHIFT};
 use crate::util::EncodedInsn;
 
 use crate::backend::{ReturnableHandler, ReturnableImpl};
@@ -126,25 +126,31 @@ impl UsizeConversions for BusAccessCond {
 }
 
 #[inline(always)]
-fn do_jump(guest_address: CpuReg, current_guest_pc: CpuReg, rd: usize) -> usize {
+fn do_jump(guest_address: CpuReg, current_guest_pc: CpuReg, rd: *mut CpuReg) -> usize {
     let cpu = cpu::get_cpu();
 
-    if rd != 0 {
-        cpu.regs[rd] = (cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg)
-            + (current_guest_pc + INSN_SIZE as CpuReg);
+    if !rd.is_null() {
+        unsafe {
+            *rd = (cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg)
+                + (current_guest_pc + INSN_SIZE as CpuReg);
+        }
     }
 
-    let bus = bus::get_bus();
+    let guest_address_phys = if cpu.mmu.is_active() {
+        let bus = bus::get_bus();
 
-    let guest_address_phys = bus.translate(guest_address, &cpu.mmu, AccessType::Fetch);
+        let guest_address_phys = bus.translate(guest_address, &cpu.mmu, AccessType::Fetch);
 
-    if guest_address_phys.is_err() {
-        cpu.set_exception(guest_address_phys.err().unwrap(), current_guest_pc);
+        if guest_address_phys.is_err() {
+            cpu.set_exception(guest_address_phys.err().unwrap(), current_guest_pc);
 
-        ReturnableImpl::throw();
-    }
+            ReturnableImpl::throw();
+        }
 
-    let guest_address_phys = guest_address_phys.unwrap();
+        guest_address_phys.unwrap()
+    } else {
+        guest_address
+    };
 
     let host_addr = cpu.insn_map.get_by_guest_idx(guest_address_phys);
 
@@ -165,9 +171,15 @@ pub extern "C" fn c_jal_cb(rd: usize, _: usize, imm: usize, guest_pc: usize) -> 
     let cpu = cpu::get_cpu();
 
     let pc = guest_pc as i64;
-    let pc = pc + imm as i64;
+    let pc = pc.wrapping_add(imm as i64);
 
     let pc = (cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg) as i64 + pc;
+
+    let rd = if rd == &cpu.regs[0] as *const CpuReg as usize {
+        std::ptr::null_mut()
+    } else {
+        rd as *mut CpuReg
+    };
 
     do_jump(pc as CpuReg, guest_pc as CpuReg, rd)
 }
@@ -175,127 +187,172 @@ pub extern "C" fn c_jal_cb(rd: usize, _: usize, imm: usize, guest_pc: usize) -> 
 pub extern "C" fn c_jalr_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) -> usize {
     let cpu = cpu::get_cpu();
 
-    let pc = cpu.regs[rs1] as i64;
+    let pc = unsafe { *(rs1 as *mut CpuReg) as i64 };
     let pc = pc + imm as i64;
     let pc = pc & !1;
+
+    let rd = if rd == &cpu.regs[0] as *const CpuReg as usize {
+        std::ptr::null_mut()
+    } else {
+        rd as *mut CpuReg
+    };
 
     do_jump(pc as CpuReg, guest_pc as CpuReg, rd)
 }
 
 pub extern "C" fn c_beq_cb(rs1: usize, rs2: usize, imm: usize, guest_pc: usize) -> usize {
-    let cpu = cpu::get_cpu();
+    let result = unsafe {
+        let rs1 = *(rs1 as *mut CpuReg);
+        let rs2 = *(rs2 as *mut CpuReg);
 
-    if cpu.regs[rs1] == cpu.regs[rs2] {
+        rs1 == rs2
+    };
+
+    if result {
+        let cpu = cpu::get_cpu();
+
         let pc = guest_pc as i64;
-        let pc = pc + imm as i64;
+        let pc = pc.wrapping_add(imm as i64);
 
         let pc = (cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg) as i64 + pc;
 
-        do_jump(pc as CpuReg, guest_pc as CpuReg, 0)
+        do_jump(pc as CpuReg, guest_pc as CpuReg, std::ptr::null_mut())
     } else {
         0
     }
 }
 
 pub extern "C" fn c_bne_cb(rs1: usize, rs2: usize, imm: usize, guest_pc: usize) -> usize {
-    let cpu = cpu::get_cpu();
+    let result = unsafe {
+        let rs1 = *(rs1 as *mut CpuReg);
+        let rs2 = *(rs2 as *mut CpuReg);
 
-    if cpu.regs[rs1] != cpu.regs[rs2] {
+        rs1 != rs2
+    };
+
+    if result {
+        let cpu = cpu::get_cpu();
+
         let pc = guest_pc as i64;
-        let pc = pc + imm as i64;
+        let pc = pc.wrapping_add(imm as i64);
 
         let pc = (cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg) as i64 + pc;
 
-        do_jump(pc as CpuReg, guest_pc as CpuReg, 0)
+        do_jump(pc as CpuReg, guest_pc as CpuReg, std::ptr::null_mut())
     } else {
         0
     }
 }
 
 pub extern "C" fn c_blt_cb(rs1: usize, rs2: usize, imm: usize, guest_pc: usize) -> usize {
-    let cpu = cpu::get_cpu();
+    let result = unsafe {
+        let rs1 = *(rs1 as *mut CpuReg) as i32;
+        let rs2 = *(rs2 as *mut CpuReg) as i32;
 
-    if (cpu.regs[rs1] as i32) < (cpu.regs[rs2] as i32) {
+        rs1 < rs2
+    };
+
+    if result {
+        let cpu = cpu::get_cpu();
+
         let pc = guest_pc as i64;
-        let pc = pc + imm as i64;
+        let pc = pc.wrapping_add(imm as i64);
 
         let pc = (cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg) as i64 + pc;
 
-        do_jump(pc as CpuReg, guest_pc as CpuReg, 0)
+        do_jump(pc as CpuReg, guest_pc as CpuReg, std::ptr::null_mut())
     } else {
         0
     }
 }
 
 pub extern "C" fn c_bge_cb(rs1: usize, rs2: usize, imm: usize, guest_pc: usize) -> usize {
-    let cpu = cpu::get_cpu();
+    let result = unsafe {
+        let rs1 = *(rs1 as *mut CpuReg) as i32;
+        let rs2 = *(rs2 as *mut CpuReg) as i32;
 
-    if (cpu.regs[rs1] as i32) >= (cpu.regs[rs2] as i32) {
+        rs1 >= rs2
+    };
+
+    if result {
+        let cpu = cpu::get_cpu();
+
         let pc = guest_pc as i64;
-        let pc = pc + imm as i64;
+        let pc = pc.wrapping_add(imm as i64);
 
         let pc = (cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg) as i64 + pc;
 
-        do_jump(pc as CpuReg, guest_pc as CpuReg, 0)
+        do_jump(pc as CpuReg, guest_pc as CpuReg, std::ptr::null_mut())
     } else {
         0
     }
 }
 
 pub extern "C" fn c_bltu_cb(rs1: usize, rs2: usize, imm: usize, guest_pc: usize) -> usize {
-    let cpu = cpu::get_cpu();
+    let result = unsafe {
+        let rs1 = *(rs1 as *mut CpuReg);
+        let rs2 = *(rs2 as *mut CpuReg);
 
-    if cpu.regs[rs1] < cpu.regs[rs2] {
+        rs1 < rs2
+    };
+
+    if result {
+        let cpu = cpu::get_cpu();
+
         let pc = guest_pc as i64;
-        let pc = pc + imm as i64;
+        let pc = pc.wrapping_add(imm as i64);
 
         let pc = (cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg) as i64 + pc;
 
-        do_jump(pc as CpuReg, guest_pc as CpuReg, 0)
+        do_jump(pc as CpuReg, guest_pc as CpuReg, std::ptr::null_mut())
     } else {
         0
     }
 }
 
 pub extern "C" fn c_bgeu_cb(rs1: usize, rs2: usize, imm: usize, guest_pc: usize) -> usize {
-    let cpu = cpu::get_cpu();
+    let result = unsafe {
+        let rs1 = *(rs1 as *mut CpuReg);
+        let rs2 = *(rs2 as *mut CpuReg);
 
-    if cpu.regs[rs1] >= cpu.regs[rs2] {
+        rs1 >= rs2
+    };
+
+    if result {
+        let cpu = cpu::get_cpu();
+
         let pc = guest_pc as i64;
-        let pc = pc + imm as i64;
+        let pc = pc.wrapping_add(imm as i64);
 
         let pc = (cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg) as i64 + pc;
 
-        do_jump(pc as CpuReg, guest_pc as CpuReg, 0)
+        do_jump(pc as CpuReg, guest_pc as CpuReg, std::ptr::null_mut())
     } else {
         0
     }
 }
 
-#[inline(always)]
-fn do_load(rs1: *mut CpuReg, imm: i32, guest_pc: CpuReg, load_size: u8) -> CpuReg {
-    let cpu = cpu::get_cpu();
+macro_rules! do_load {
+    ($rs1:expr, $imm:expr, $guest_pc:expr, $load_size:expr) => {{
+        let cpu = cpu::get_cpu();
 
-    let addr = unsafe { *rs1 } as i64;
-    let addr = addr + imm as i64;
+        let addr = unsafe { *$rs1 } as i64;
+        let addr = (addr + $imm as i64) as CpuReg;
 
-    let addr = addr as CpuReg;
+        let data = bus::get_bus().load(addr, $load_size as BusType, &cpu.mmu);
 
-    let bus = bus::get_bus();
+        // if data.is_err() {
+        //     cpu.set_exception(data.err().unwrap(), $guest_pc as CpuReg);
 
-    let data = bus.load(addr, load_size as BusType, &cpu.mmu);
+        //     ReturnableImpl::throw();
+        // }
 
-    if data.is_err() {
-        cpu.set_exception(data.err().unwrap(), guest_pc as CpuReg);
-
-        ReturnableImpl::throw();
-    }
-
-    data.unwrap()
+        data.unwrap()
+    }};
 }
 
 pub extern "C" fn c_lb_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) {
-    let val = do_load(rs1 as *mut CpuReg, imm as i32, guest_pc as CpuReg, 8);
+    let val = do_load!(rs1 as *mut CpuReg, imm as i32, guest_pc as CpuReg, 8);
 
     unsafe {
         *(rd as *mut CpuReg) = sign_extend(val, 8) as CpuReg;
@@ -303,7 +360,7 @@ pub extern "C" fn c_lb_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) {
 }
 
 pub extern "C" fn c_lh_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) {
-    let val = do_load(rs1 as *mut CpuReg, imm as i32, guest_pc as CpuReg, 16);
+    let val = do_load!(rs1 as *mut CpuReg, imm as i32, guest_pc as CpuReg, 16);
 
     unsafe {
         *(rd as *mut CpuReg) = sign_extend(val, 16) as CpuReg;
@@ -311,7 +368,7 @@ pub extern "C" fn c_lh_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) {
 }
 
 pub extern "C" fn c_lw_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) {
-    let val = do_load(rs1 as *mut CpuReg, imm as i32, guest_pc as CpuReg, 32);
+    let val = do_load!(rs1 as *mut CpuReg, imm as i32, guest_pc as CpuReg, 32);
 
     unsafe {
         *(rd as *mut CpuReg) = sign_extend(val, 32) as CpuReg;
@@ -319,7 +376,7 @@ pub extern "C" fn c_lw_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) {
 }
 
 pub extern "C" fn c_lbu_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) {
-    let val = do_load(rs1 as *mut CpuReg, imm as i32, guest_pc as CpuReg, 8);
+    let val = do_load!(rs1 as *mut CpuReg, imm as i32, guest_pc as CpuReg, 8);
 
     unsafe {
         *(rd as *mut CpuReg) = val as CpuReg;
@@ -327,7 +384,7 @@ pub extern "C" fn c_lbu_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) {
 }
 
 pub extern "C" fn c_lhu_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) {
-    let val = do_load(rs1 as *mut CpuReg, imm as i32, guest_pc as CpuReg, 16);
+    let val = do_load!(rs1 as *mut CpuReg, imm as i32, guest_pc as CpuReg, 16);
 
     unsafe {
         *(rd as *mut CpuReg) = val as CpuReg;
