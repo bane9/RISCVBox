@@ -273,64 +273,72 @@ pub extern "C" fn c_bgeu_cb(rs1: usize, rs2: usize, imm: usize, guest_pc: usize)
 }
 
 #[inline(always)]
-fn do_load(rd: usize, rs1: usize, imm: i32, guest_pc: CpuReg, load_size: u8, is_unsigned: bool) {
+fn do_load(rs1: *mut CpuReg, imm: i32, guest_pc: CpuReg, load_size: u8) -> CpuReg {
     let cpu = cpu::get_cpu();
 
-    let addr = cpu.regs[rs1] as i64;
+    let addr = unsafe { *rs1 } as i64;
     let addr = addr + imm as i64;
 
     let addr = addr as CpuReg;
 
     let bus = bus::get_bus();
-
-    let guest_pc = guest_pc as CpuReg;
 
     let data = bus.load(addr, load_size as BusType, &cpu.mmu);
 
     if data.is_err() {
-        cpu.set_exception(data.err().unwrap(), guest_pc);
+        cpu.set_exception(data.err().unwrap(), guest_pc as CpuReg);
 
         ReturnableImpl::throw();
     }
 
-    let data_val = data.unwrap();
-
-    let data_val = if is_unsigned {
-        data_val
-    } else {
-        sign_extend(data_val, load_size as usize) as u32
-    };
-
-    if rd != 0 {
-        cpu.regs[rd] = data_val;
-    }
+    data.unwrap()
 }
 
 pub extern "C" fn c_lb_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) {
-    do_load(rd, rs1, imm as i32, guest_pc as CpuReg, 8, false);
+    let val = do_load(rs1 as *mut CpuReg, imm as i32, guest_pc as CpuReg, 8);
+
+    unsafe {
+        *(rd as *mut CpuReg) = sign_extend(val, 8) as CpuReg;
+    }
 }
 
 pub extern "C" fn c_lh_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) {
-    do_load(rd, rs1, imm as i32, guest_pc as CpuReg, 16, false);
+    let val = do_load(rs1 as *mut CpuReg, imm as i32, guest_pc as CpuReg, 16);
+
+    unsafe {
+        *(rd as *mut CpuReg) = sign_extend(val, 16) as CpuReg;
+    }
 }
 
 pub extern "C" fn c_lw_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) {
-    do_load(rd, rs1, imm as i32, guest_pc as CpuReg, 32, false);
+    let val = do_load(rs1 as *mut CpuReg, imm as i32, guest_pc as CpuReg, 32);
+
+    unsafe {
+        *(rd as *mut CpuReg) = sign_extend(val, 32) as CpuReg;
+    }
 }
 
 pub extern "C" fn c_lbu_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) {
-    do_load(rd, rs1, imm as i32, guest_pc as CpuReg, 8, true);
+    let val = do_load(rs1 as *mut CpuReg, imm as i32, guest_pc as CpuReg, 8);
+
+    unsafe {
+        *(rd as *mut CpuReg) = val as CpuReg;
+    }
 }
 
 pub extern "C" fn c_lhu_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) {
-    do_load(rd, rs1, imm as i32, guest_pc as CpuReg, 16, true);
+    let val = do_load(rs1 as *mut CpuReg, imm as i32, guest_pc as CpuReg, 16);
+
+    unsafe {
+        *(rd as *mut CpuReg) = val as CpuReg;
+    }
 }
 
 #[inline(always)]
-fn do_store(rs1: usize, rs2: usize, imm: i32, guest_pc: CpuReg, store_size: u8) {
+fn do_store(rs1: *mut CpuReg, rs2: *mut CpuReg, imm: i32, guest_pc: CpuReg, store_size: u8) {
     let cpu = cpu::get_cpu();
 
-    let addr = cpu.regs[rs1] as i64;
+    let addr = unsafe { *rs1 } as i64;
     let addr = addr + imm as i64;
 
     let addr = addr as CpuReg;
@@ -339,7 +347,7 @@ fn do_store(rs1: usize, rs2: usize, imm: i32, guest_pc: CpuReg, store_size: u8) 
 
     let guest_pc = guest_pc as CpuReg;
 
-    let data = cpu.regs[rs2];
+    let data = unsafe { *rs2 };
 
     let result = bus.store(addr, data, store_size as BusType, &cpu.mmu);
 
@@ -349,28 +357,46 @@ fn do_store(rs1: usize, rs2: usize, imm: i32, guest_pc: CpuReg, store_size: u8) 
         ReturnableImpl::throw();
     }
 
-    let gpfn = addr & RV_PAGE_MASK as CpuReg;
+    // let gpfn = addr & RV_PAGE_MASK as CpuReg;
 
-    if cpu.gpfn_state.contains_gpfn(gpfn) {
-        cpu.set_exception(
-            Exception::InvalidateJitBlock(gpfn >> RV_PAGE_SHIFT as CpuReg),
-            guest_pc,
-        );
+    // if cpu.gpfn_state.contains_gpfn(gpfn) {
+    //     cpu.set_exception(
+    //         Exception::InvalidateJitBlock(gpfn >> RV_PAGE_SHIFT as CpuReg),
+    //         guest_pc,
+    //     );
 
-        ReturnableImpl::throw();
-    }
+    //     ReturnableImpl::throw();
+    // }
 }
 
 pub extern "C" fn c_sb_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) {
-    do_store(rd, rs1, imm as i32, guest_pc as CpuReg, 8);
+    do_store(
+        rd as *mut CpuReg,
+        rs1 as *mut CpuReg,
+        imm as i32,
+        guest_pc as CpuReg,
+        8,
+    );
 }
 
 pub extern "C" fn c_sh_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) {
-    do_store(rd, rs1, imm as i32, guest_pc as CpuReg, 16);
+    do_store(
+        rd as *mut CpuReg,
+        rs1 as *mut CpuReg,
+        imm as i32,
+        guest_pc as CpuReg,
+        16,
+    );
 }
 
 pub extern "C" fn c_sw_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) {
-    do_store(rd, rs1, imm as i32, guest_pc as CpuReg, 32);
+    do_store(
+        rd as *mut CpuReg,
+        rs1 as *mut CpuReg,
+        imm as i32,
+        guest_pc as CpuReg,
+        32,
+    );
 }
 
 pub fn test_asm_common(enc: &HostEncodedInsn, expected: &[u8], insn_name: &str) {

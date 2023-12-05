@@ -1,6 +1,9 @@
 use crate::bus::mmu::*;
 use crate::cpu::*;
 
+use super::ram::RAM_BEGIN_ADDR;
+use super::ramfb::RAMFB_BEGIN_ADDR;
+
 pub type BusType = u32;
 
 pub trait BusDevice {
@@ -15,17 +18,37 @@ pub trait BusDevice {
 
 pub struct Bus {
     devices: Vec<Box<dyn BusDevice>>,
+    ram_ptr: *mut u8,
+    ram_end_addr: usize,
+
+    fb_ptr: *mut u8,
+    fb_end_addr: usize,
 }
 
 impl Bus {
     pub fn new() -> Bus {
         Bus {
             devices: Vec::new(),
+            ram_ptr: std::ptr::null_mut(),
+            ram_end_addr: 0,
+
+            fb_ptr: std::ptr::null_mut(),
+            fb_end_addr: 0,
         }
     }
 
     pub fn add_device(&mut self, device: Box<dyn BusDevice>) {
         self.devices.push(device);
+    }
+
+    pub fn set_ram_ptr(&mut self, ptr: *mut u8, end_addr: usize) {
+        self.ram_ptr = ptr;
+        self.ram_end_addr = end_addr;
+    }
+
+    pub fn set_fb_ptr(&mut self, ptr: *mut u8, end_addr: usize) {
+        self.fb_ptr = ptr;
+        self.fb_end_addr = end_addr;
     }
 
     pub fn translate(
@@ -44,6 +67,21 @@ impl Bus {
         mmu: &Sv32Mmu,
     ) -> Result<BusType, Exception> {
         if !mmu.is_active() {
+            if addr >= RAM_BEGIN_ADDR && addr < self.ram_end_addr as u32 {
+                let adj_addr = (addr as usize) - (RAM_BEGIN_ADDR as usize);
+
+                let data = unsafe {
+                    match size {
+                        8 => *(self.ram_ptr.add(adj_addr) as *const u8) as BusType,
+                        16 => *(self.ram_ptr.add(adj_addr) as *const u16) as BusType,
+                        32 => *(self.ram_ptr.add(adj_addr) as *const u32) as BusType,
+                        _ => panic!("Invalid size"),
+                    }
+                };
+
+                return Ok(data);
+            }
+
             return self.load_nommu(addr, size);
         }
 
@@ -65,6 +103,21 @@ impl Bus {
         mmu: &Sv32Mmu,
     ) -> Result<BusType, Exception> {
         if !mmu.is_active() {
+            if addr >= RAM_BEGIN_ADDR && addr < self.ram_end_addr as u32 {
+                let adj_addr = (addr as usize) - (RAM_BEGIN_ADDR as usize);
+
+                let data = unsafe {
+                    match size {
+                        8 => *(self.ram_ptr.add(adj_addr) as *const u8) as BusType,
+                        16 => *(self.ram_ptr.add(adj_addr) as *const u16) as BusType,
+                        32 => *(self.ram_ptr.add(adj_addr) as *const u32) as BusType,
+                        _ => panic!("Invalid size"),
+                    }
+                };
+
+                return Ok(data);
+            }
+
             return self.fetch_nommu(addr, size);
         }
 
@@ -91,6 +144,34 @@ impl Bus {
         mmu: &Sv32Mmu,
     ) -> Result<(), Exception> {
         if !mmu.is_active() {
+            if addr >= RAM_BEGIN_ADDR && addr < self.ram_end_addr as u32 {
+                let adj_addr = (addr as usize) - (RAM_BEGIN_ADDR as usize);
+
+                unsafe {
+                    match size {
+                        8 => *(self.ram_ptr.add(adj_addr) as *mut u8) = data as u8,
+                        16 => *(self.ram_ptr.add(adj_addr) as *mut u16) = data as u16,
+                        32 => *(self.ram_ptr.add(adj_addr) as *mut u32) = data as u32,
+                        _ => panic!("Invalid size"),
+                    }
+                };
+
+                return Ok(());
+            } else if addr >= RAMFB_BEGIN_ADDR as u32 && addr < self.fb_end_addr as u32 {
+                let adj_addr = (addr as usize) - (RAMFB_BEGIN_ADDR as usize);
+
+                unsafe {
+                    match size {
+                        8 => *(self.fb_ptr.add(adj_addr) as *mut u8) = data as u8,
+                        16 => *(self.fb_ptr.add(adj_addr) as *mut u16) = data as u16,
+                        32 => *(self.fb_ptr.add(adj_addr) as *mut u32) = data as u32,
+                        _ => panic!("Invalid size"),
+                    }
+                };
+
+                return Ok(());
+            }
+
             return self.store_nommu(addr, data, size);
         }
 

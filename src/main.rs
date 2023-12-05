@@ -13,7 +13,7 @@ use bus::ram::RAM_BEGIN_ADDR;
 use frontend::exec_core::ExecCoreThreadPool;
 use window::WindowCommon;
 
-use crate::bus::ps2keyboard;
+use crate::bus::{ps2keyboard, BusDevice};
 
 struct InitData {
     fb_ptr: *mut u8,
@@ -30,37 +30,44 @@ fn init_bus(
     assert!(ram_size >= rom.len());
     // There are roughly sorted by expected frequency of access
 
+    let bus = bus::bus::get_bus();
+
     rom.resize(ram_size, 0);
 
-    let ram = bus::ram::Ram::new(rom);
+    let mut ram = bus::ram::Ram::new(rom);
+    let ram_ptr = ram.get_ptr(RAM_BEGIN_ADDR).unwrap();
 
-    bus::bus::get_bus().add_device(Box::new(ram));
+    bus.set_ram_ptr(ram_ptr, ram.get_end_addr() as usize);
+
+    bus.add_device(Box::new(ram));
 
     let mut ramfb = bus::ramfb::RamFB::new(fb_width, fb_height, fb_bpp);
     let fb_ptr = ramfb.get_fb_ptr();
 
-    bus::bus::get_bus().add_device(Box::new(ramfb));
+    bus.set_fb_ptr(fb_ptr, ramfb.get_end_addr() as usize);
+
+    bus.add_device(Box::new(ramfb));
 
     let clint = bus::clint::Clint::new();
 
-    bus::bus::get_bus().add_device(Box::new(clint));
+    bus.add_device(Box::new(clint));
 
     let ns16550 = bus::ns16550::Ns16550::new();
 
-    bus::bus::get_bus().add_device(Box::new(ns16550));
+    bus.add_device(Box::new(ns16550));
 
     let plic = bus::plic::Plic::new();
 
-    bus::bus::get_bus().add_device(Box::new(plic));
+    bus.add_device(Box::new(plic));
 
     let ps2keyboard = ps2keyboard::PS2Keyboard::new();
 
-    bus::bus::get_bus().add_device(Box::new(ps2keyboard));
+    bus.add_device(Box::new(ps2keyboard));
 
     if let Some(dtb) = dtb {
         let dtb = bus::dtb::Dtb::new(&dtb);
 
-        bus::bus::get_bus().add_device(Box::new(dtb));
+        bus.add_device(Box::new(dtb));
     }
 
     InitData { fb_ptr }

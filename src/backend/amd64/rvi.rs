@@ -38,12 +38,14 @@ fn emit_bus_access(
     reg2: u8,
     imm: i32,
 ) -> HostEncodedInsn {
+    let cpu = cpu::get_cpu();
+
     BackendCoreImpl::emit_void_call_with_4_args(
         bus_fn,
-        reg1 as usize,
-        reg2 as usize,
+        &cpu.regs[reg1 as usize] as *const CpuReg as usize,
+        &cpu.regs[reg2 as usize] as *const CpuReg as usize,
         imm as i64 as usize,
-        cpu::get_cpu().current_gpfn_offset as usize,
+        cpu.current_gpfn_offset as usize,
     )
 }
 
@@ -53,6 +55,18 @@ impl common::Rvi for RviImpl {
         let cpu = cpu::get_cpu();
 
         emit_check_rd!(insn, rd);
+
+        if rs1 == 0 {
+            emit_mov_reg_imm!(insn, amd64_reg::RBX, imm);
+            emit_mov_reg_host_to_guest!(insn, cpu, amd64_reg::RCX, amd64_reg::RBX, rd);
+
+            return Ok(insn);
+        } else if imm == 0 {
+            emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RBX, rs1);
+            emit_mov_reg_host_to_guest!(insn, cpu, amd64_reg::RCX, amd64_reg::RBX, rd);
+
+            return Ok(insn);
+        }
 
         emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RBX, rs1);
 
@@ -68,6 +82,18 @@ impl common::Rvi for RviImpl {
         let cpu = cpu::get_cpu();
 
         emit_check_rd!(insn, rd);
+
+        if rs1 == 0 {
+            emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RBX, rs2);
+            emit_mov_reg_host_to_guest!(insn, cpu, amd64_reg::RCX, amd64_reg::RBX, rd);
+
+            return Ok(insn);
+        } else if rs2 == 0 {
+            emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RBX, rs1);
+            emit_mov_reg_host_to_guest!(insn, cpu, amd64_reg::RCX, amd64_reg::RBX, rd);
+
+            return Ok(insn);
+        }
 
         emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RBX, rs1);
         emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RCX, rs2);
