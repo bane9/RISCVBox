@@ -25,6 +25,7 @@ pub enum PteBitVal {
 pub struct Pte {
     pte: BusType,
     phys_base: BusType,
+    pte_addr: BusType,
 }
 
 impl Pte {
@@ -32,6 +33,7 @@ impl Pte {
         Pte {
             pte: 0,
             phys_base: 0,
+            pte_addr: 0,
         }
     }
 }
@@ -161,8 +163,9 @@ impl Mmu for Sv32Mmu {
                 pte.pte |= PteBit!(PteBitVal::Dirty);
             }
 
+            // TODO: make atomic
             if bus::get_bus()
-                .store_nommu(pte.phys_base, pte.pte, self.get_pte_size() * 8)
+                .store_nommu(pte.pte_addr, pte.pte, self.get_pte_size() * 8)
                 .is_err()
             {
                 return Self::create_exeption(addr, access_type);
@@ -185,8 +188,8 @@ impl Mmu for Sv32Mmu {
         let mut pte = Pte::default();
 
         while i >= 0 {
-            let pte_addr = a + vpn[i as usize] * pte_size;
-            let _pte = bus_instance.load_nommu(pte_addr, pte_size * 8);
+            pte.pte_addr = a + vpn[i as usize] * pte_size;
+            let _pte = bus_instance.load_nommu(pte.pte_addr, pte_size * 8);
 
             if _pte.is_err() {
                 return Err(Self::create_exeption(addr, access_type).err().unwrap());
@@ -256,7 +259,7 @@ impl Mmu for Sv32Mmu {
     }
 
     fn get_vpn(&self, addr: BusType, _level: BusType) -> Self::PnArr {
-        let mut ret: Self::PnArr = Self::PnArr::default();
+        let mut ret = Self::PnArr::default();
 
         ret[0] = (addr >> 12) & 0x3ff;
         ret[1] = (addr >> 22) & 0x3ff;
@@ -265,7 +268,7 @@ impl Mmu for Sv32Mmu {
     }
 
     fn get_ppn(&self, pte: BusType, _level: BusType) -> Self::PnArr {
-        let mut ret: Self::PnArr = Self::PnArr::default();
+        let mut ret = Self::PnArr::default();
 
         ret[0] = (pte >> 10) & 0x3ff;
         ret[1] = (pte >> 20) & 0xfff;

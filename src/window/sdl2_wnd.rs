@@ -201,6 +201,9 @@ impl WindowCommon for Sdl2Window {
         let window = window.build().unwrap();
 
         let canvas = window.into_canvas().build().unwrap();
+
+        crate::window::enable_dark_mode_for_window(&canvas.window());
+
         let texture_creator = canvas.texture_creator();
 
         Sdl2Window {

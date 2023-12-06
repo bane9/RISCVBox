@@ -5,7 +5,7 @@ edition = "2021"
 default-run = "rv32jit"
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3.9", features = ["winuser", "memoryapi"] }
+winapi = { version = "0.3.9", features = ["winuser", "memoryapi", "dwmapi"] }
 microseh = "0.2.0"
 
 [target.'cfg(unix)'.dependencies]
@@ -27,3 +27,6 @@ sdl2 = "0.36.0"
 multiqueue = "0.3.2"
 lazy_static = "1.4.0"
 hashbrown = "0.14.3"
+
+[profile.dev]
+debug-assertions = false
