@@ -1,13 +1,13 @@
 use crate::backend::common;
 use crate::backend::target::core::{amd64_reg, BackendCore, BackendCoreImpl};
 use crate::cpu::CpuReg;
-use crate::frontend::exec_core::RV_PAGE_SHIFT;
+use crate::frontend::exec_core::{RV_PAGE_SHIFT, RV_PAGE_SIZE};
 use crate::*;
 use common::*;
 
 pub struct RviImpl;
 
-fn emit_jmp(
+fn emit_jmp_absolute(
     jmp_fn: extern "C" fn(usize, usize, usize, usize) -> usize,
     reg1: CpuReg,
     reg2: CpuReg,
@@ -32,6 +32,23 @@ fn emit_jmp(
     insn.push_slice(jmp_insn.iter().as_slice());
 
     insn
+}
+
+fn emit_jmp(
+    jmp_fn: extern "C" fn(usize, usize, usize, usize) -> usize,
+    reg1: CpuReg,
+    reg2: CpuReg,
+    imm: i32,
+) -> HostEncodedInsn {
+    let cpu = cpu::get_cpu();
+
+    let diff = cpu.current_gpfn_offset as i32 + imm;
+
+    if diff >= 0 && diff < RV_PAGE_SIZE as i32 {
+        //println!("emit_jmp: relative jump");
+    }
+
+    emit_jmp_absolute(jmp_fn, reg1, reg2, imm)
 }
 
 fn emit_bus_access(
@@ -292,7 +309,7 @@ impl common::Rvi for RviImpl {
     }
 
     fn emit_jalr(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
-        Ok(emit_jmp(c_jalr_cb, rd as u32, rs1 as u32, imm))
+        Ok(emit_jmp_absolute(c_jalr_cb, rd as u32, rs1 as u32, imm))
     }
 
     fn emit_beq(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {

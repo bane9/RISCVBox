@@ -14,7 +14,7 @@ use bus::ram::RAM_BEGIN_ADDR;
 use frontend::exec_core::ExecCoreThreadPool;
 use window::WindowCommon;
 
-use crate::bus::{ps2keyboard, BusDevice};
+use crate::bus::{ps2keyboard, ps2mouse, BusDevice};
 
 struct InitData {
     fb_ptr: *mut u8,
@@ -60,6 +60,10 @@ fn init_bus(
     let plic = bus::plic::Plic::new();
 
     bus.add_device(Box::new(plic));
+
+    let ps2mouse = ps2mouse::PS2Mouse::new();
+
+    bus.add_device(Box::new(ps2mouse));
 
     let ps2keyboard = ps2keyboard::PS2Keyboard::new();
 

@@ -5,19 +5,30 @@ use std::time::{Duration, Instant};
 use lazy_static::lazy_static;
 use multiqueue::{broadcast_queue, BroadcastReceiver, BroadcastSender};
 use sdl2::keyboard::Keycode;
+use sdl2::keyboard::Mod;
 use std::sync::Mutex;
 
 use sdl2::event::*;
 use sdl2::render::*;
 use sdl2::video::*;
 
-const PS2_QUEUE_SIZE: u64 = 32;
+const PS2_KEYBOARD_QUEUE_SIZE: u64 = 32;
+const PS2_MOUSE_QUEUE_SIZE: u64 = 512;
 
 const LOGIC_UPDATE_HZ: u32 = 60;
 
+const MOUSE_CAPTURE_STRING: &str = " (ALT + H To release the mouse)";
+
 lazy_static! {
     static ref KEYBOARD: Mutex<(BroadcastSender<Ps2Key>, BroadcastReceiver<Ps2Key>)> = {
-        let (sender, receiver) = broadcast_queue::<Ps2Key>(PS2_QUEUE_SIZE);
+        let (sender, receiver) = broadcast_queue::<Ps2Key>(PS2_KEYBOARD_QUEUE_SIZE);
+        Mutex::new((sender, receiver))
+    };
+    static ref MOUSE: Mutex<(
+        BroadcastSender<Ps2MouseEvent>,
+        BroadcastReceiver<Ps2MouseEvent>
+    )> = {
+        let (sender, receiver) = broadcast_queue::<Ps2MouseEvent>(PS2_KEYBOARD_QUEUE_SIZE);
         Mutex::new((sender, receiver))
     };
 }
@@ -28,6 +39,7 @@ pub struct Sdl2Window {
     pub height: usize,
     pub bpp: usize,
     pub is_hidden: bool,
+    pub mouse_is_captured: bool,
 
     sdl2_context: sdl2::Sdl,
     video_subsystem: sdl2::VideoSubsystem,
@@ -197,6 +209,7 @@ impl WindowCommon for Sdl2Window {
             height,
             bpp,
             is_hidden: hide_window,
+            mouse_is_captured: false,
 
             sdl2_context,
             video_subsystem,
@@ -222,9 +235,29 @@ impl WindowCommon for Sdl2Window {
                         window_id: _,
                         keycode,
                         scancode: _,
-                        keymod: _,
+                        keymod,
                         repeat,
                     } => {
+                        if self.mouse_is_captured
+                            && keymod.contains(Mod::LALTMOD)
+                            && keycode == Some(Keycode::H)
+                        {
+                            self.sdl2_context.mouse().set_relative_mouse_mode(false);
+
+                            let title = self
+                                .canvas
+                                .window()
+                                .title()
+                                .to_string()
+                                .replace(MOUSE_CAPTURE_STRING, "");
+
+                            self.canvas.window_mut().set_title(&title).unwrap();
+
+                            self.mouse_is_captured = false;
+
+                            continue;
+                        }
+
                         if repeat {
                             continue;
                         }
@@ -243,7 +276,7 @@ impl WindowCommon for Sdl2Window {
                             }
                             key[idx] = (ps2key & 0xff) as u8;
 
-                            queue.try_send(key).unwrap();
+                            let _ = queue.try_send(key);
                         }
                     }
                     Event::KeyUp {
@@ -273,10 +306,117 @@ impl WindowCommon for Sdl2Window {
                             key[idx] = (ps2key & 0xff) as u8;
                             key[idx + 1] = 0xf0;
 
-                            queue.try_send(key).unwrap();
+                            let _ = queue.try_send(key);
                         }
                     }
-                    Event::Quit { .. } => std::process::exit(0),
+                    Event::MouseMotion {
+                        timestamp: _,
+                        window_id: _,
+                        which: _,
+                        mousestate: _,
+                        x: _,
+                        y: _,
+                        xrel,
+                        yrel,
+                    } => {
+                        if !self.mouse_is_captured {
+                            continue;
+                        }
+
+                        let queue = &MOUSE.lock().unwrap().0;
+
+                        let event = Ps2MouseEvent::Move { x: xrel, y: yrel };
+
+                        let _ = queue.try_send(event);
+                    }
+                    Event::MouseButtonDown {
+                        timestamp: _,
+                        window_id: _,
+                        which: _,
+                        mouse_btn,
+                        clicks: _,
+                        x: _,
+                        y: _,
+                    } => {
+                        if !self.mouse_is_captured {
+                            self.sdl2_context.mouse().set_relative_mouse_mode(true);
+
+                            let title =
+                                self.canvas.window().title().to_string() + MOUSE_CAPTURE_STRING;
+
+                            self.canvas.window_mut().set_title(&title).unwrap();
+
+                            self.mouse_is_captured = true;
+
+                            continue;
+                        }
+
+                        let queue = &MOUSE.lock().unwrap().0;
+
+                        let event = match mouse_btn {
+                            sdl2::mouse::MouseButton::Left => Ps2MouseEvent::LeftDown,
+                            sdl2::mouse::MouseButton::Right => Ps2MouseEvent::RightDown,
+                            sdl2::mouse::MouseButton::Middle => Ps2MouseEvent::MiddleDown,
+                            _ => continue,
+                        };
+
+                        let _ = queue.try_send(event);
+                    }
+                    Event::MouseButtonUp {
+                        timestamp: _,
+                        window_id: _,
+                        which: _,
+                        mouse_btn,
+                        clicks: _,
+                        x: _,
+                        y: _,
+                    } => {
+                        if !self.mouse_is_captured {
+                            continue;
+                        }
+
+                        let queue = &MOUSE.lock().unwrap().0;
+
+                        let event = match mouse_btn {
+                            sdl2::mouse::MouseButton::Left => Ps2MouseEvent::LeftUp,
+                            sdl2::mouse::MouseButton::Right => Ps2MouseEvent::RightUp,
+                            sdl2::mouse::MouseButton::Middle => Ps2MouseEvent::MiddleUp,
+                            _ => continue,
+                        };
+
+                        let _ = queue.try_send(event);
+                    }
+                    Event::MouseWheel {
+                        timestamp: _,
+                        window_id: _,
+                        which: _,
+                        x: _,
+                        y,
+                        direction,
+                        precise_x: _,
+                        precise_y: _,
+                    } => {
+                        if !self.mouse_is_captured {
+                            continue;
+                        }
+
+                        let queue = &MOUSE.lock().unwrap().0;
+
+                        let event = match direction {
+                            sdl2::mouse::MouseWheelDirection::Normal => {
+                                Ps2MouseEvent::WheelUp { delta: y }
+                            }
+                            sdl2::mouse::MouseWheelDirection::Flipped => {
+                                Ps2MouseEvent::WheelDown { delta: y }
+                            }
+                            _ => continue,
+                        };
+
+                        let _ = queue.try_send(event);
+                    }
+                    Event::Quit { timestamp: _ } => {
+                        std::process::exit(0);
+                    }
                     _ => {}
                 }
             }
@@ -297,6 +437,15 @@ impl WindowCommon for Sdl2Window {
 
         match receiver {
             Ok(key) => Some(key),
+            Err(_) => None,
+        }
+    }
+
+    fn get_mouse_event() -> Option<Ps2MouseEvent> {
+        let receiver = MOUSE.lock().unwrap().1.try_recv();
+
+        match receiver {
+            Ok(event) => Some(event),
             Err(_) => None,
         }
     }

@@ -337,15 +337,15 @@ macro_rules! do_load {
         let cpu = cpu::get_cpu();
 
         let addr = unsafe { *$rs1 } as i64;
-        let addr = (addr + $imm as i64) as CpuReg;
+        let addr = (addr.wrapping_add($imm as i64)) as CpuReg;
 
         let data = bus::get_bus().load(addr, $load_size as BusType, &cpu.mmu);
 
-        // if data.is_err() {
-        //     cpu.set_exception(data.err().unwrap(), $guest_pc as CpuReg);
+        if data.is_err() {
+            cpu.set_exception(data.err().unwrap(), $guest_pc as CpuReg);
 
-        //     ReturnableImpl::throw();
-        // }
+            ReturnableImpl::throw();
+        }
 
         data.unwrap()
     }};
