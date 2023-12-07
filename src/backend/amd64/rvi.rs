@@ -51,6 +51,22 @@ fn emit_jmp(
     emit_jmp_absolute(jmp_fn, reg1, reg2, imm)
 }
 
+pub fn emit_bus_access_raw(
+    bus_fn: extern "C" fn(usize, usize, usize, usize),
+    reg1: *mut u8,
+    reg2: *mut u8,
+    imm: i32,
+    current_gpfn_offset: usize,
+) -> HostEncodedInsn {
+    BackendCoreImpl::emit_void_call_with_4_args(
+        bus_fn,
+        reg1 as usize,
+        reg2 as usize,
+        imm as i64 as usize,
+        current_gpfn_offset,
+    )
+}
+
 fn emit_bus_access(
     bus_fn: extern "C" fn(usize, usize, usize, usize),
     reg1: u8,
@@ -59,11 +75,11 @@ fn emit_bus_access(
 ) -> HostEncodedInsn {
     let cpu = cpu::get_cpu();
 
-    BackendCoreImpl::emit_void_call_with_4_args(
+    emit_bus_access_raw(
         bus_fn,
-        &cpu.regs[reg1 as usize] as *const CpuReg as usize,
-        &cpu.regs[reg2 as usize] as *const CpuReg as usize,
-        imm as i64 as usize,
+        &cpu::get_cpu().regs[reg1 as usize] as *const CpuReg as *mut u8,
+        &cpu::get_cpu().regs[reg2 as usize] as *const CpuReg as *mut u8,
+        imm,
         cpu.current_gpfn_offset as usize,
     )
 }

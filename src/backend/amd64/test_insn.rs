@@ -390,3 +390,27 @@ test_encoded_insn!(
     |enc: &mut HostEncodedInsn| emit_jmp_rip_relative_imm32!(enc, 1000),
     [0xFF, 0x25, 0xE8, 0x03, 0x00, 0x000]
 );
+
+test_encoded_insn!(
+    test_mov_ptr_reg_word_ptr_rax_eax,
+    |enc: &mut HostEncodedInsn| emit_mov_ptr_reg_word_ptr!(enc, amd64_reg::RAX, amd64_reg::RAX),
+    [0x66, 0x8b, 0x00]
+);
+
+test_encoded_insn!(
+    test_mov_word_ptr_reg_eax_rax,
+    |enc: &mut HostEncodedInsn| emit_mov_word_ptr_reg!(enc, amd64_reg::RAX, amd64_reg::RAX),
+    [0x66, 0x89, 0x00]
+);
+
+test_encoded_insn!(
+    test_mov_ptr_reg_byte_ptr_rax_al,
+    |enc: &mut HostEncodedInsn| emit_mov_ptr_reg_byte_ptr!(enc, amd64_reg::RAX, amd64_reg::RAX),
+    [0x8a, 0x00]
+);
+
+test_encoded_insn!(
+    test_mov_word_ptr_reg_al_rax,
+    |enc: &mut HostEncodedInsn| emit_mov_byte_ptr_reg!(enc, amd64_reg::RAX, amd64_reg::RAX),
+    [0x88, 0x00]
+);

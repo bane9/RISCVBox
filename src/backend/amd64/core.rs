@@ -1,9 +1,11 @@
-use crate::bus::BusType;
+use crate::{backend::*, bus::BusType, frontend::exec_core::RV_PAGE_OFFSET_MASK};
 pub use crate::{
     backend::{BackendCore, JitError},
     cpu::*,
     util::EncodedInsn,
 };
+
+use crate::backend::amd64::rvi::emit_bus_access_raw;
 
 use std::arch::asm;
 
@@ -12,6 +14,8 @@ pub type HostInsnT = u8;
 pub const HOST_INSN_MAX_SIZE: usize = 96;
 pub type HostEncodedInsn = EncodedInsn<HostInsnT, HOST_INSN_MAX_SIZE>;
 pub type DecodeRet = Result<HostEncodedInsn, JitError>;
+
+const FASTMEM_BLOCK_SIZE: usize = 58;
 
 #[macro_export]
 macro_rules! host_get_return_addr {
@@ -192,6 +196,72 @@ macro_rules! emit_mov_ptr_reg_dword_ptr {
             $enc,
             [
                 0x8B,
+                (0x00 as u8)
+                    .wrapping_add($src_reg << 3)
+                    .wrapping_add($dst_reg)
+            ]
+        );
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_mov_word_ptr_reg {
+    ($enc:expr, $dst_reg:expr, $src_reg:expr) => {{
+        assert!($dst_reg < amd64_reg::R8 && $src_reg < amd64_reg::R8);
+        emit_insn!(
+            $enc,
+            [
+                0x66,
+                0x89,
+                (0x00 as u8)
+                    .wrapping_add($src_reg << 3)
+                    .wrapping_add($dst_reg)
+            ]
+        );
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_mov_ptr_reg_word_ptr {
+    ($enc:expr, $dst_reg:expr, $src_reg:expr) => {{
+        assert!($dst_reg < amd64_reg::R8 && $src_reg < amd64_reg::R8);
+        emit_insn!(
+            $enc,
+            [
+                0x66,
+                0x8B,
+                (0x00 as u8)
+                    .wrapping_add($src_reg << 3)
+                    .wrapping_add($dst_reg)
+            ]
+        );
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_mov_byte_ptr_reg {
+    ($enc:expr, $dst_reg:expr, $src_reg:expr) => {{
+        assert!($dst_reg < amd64_reg::R8 && $src_reg < amd64_reg::R8);
+        emit_insn!(
+            $enc,
+            [
+                0x88,
+                (0x00 as u8)
+                    .wrapping_add($src_reg << 3)
+                    .wrapping_add($dst_reg)
+            ]
+        );
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_mov_ptr_reg_byte_ptr {
+    ($enc:expr, $dst_reg:expr, $src_reg:expr) => {{
+        assert!($dst_reg < amd64_reg::R8 && $src_reg < amd64_reg::R8);
+        emit_insn!(
+            $enc,
+            [
+                0x8A,
                 (0x00 as u8)
                     .wrapping_add($src_reg << 3)
                     .wrapping_add($dst_reg)
@@ -766,6 +836,67 @@ macro_rules! emit_imul_reg_reg {
     }};
 }
 
+// Other
+
+pub enum FastmemAccessType {
+    Store = 0,
+    Load = 1,
+    LoadUnsigned = 2,
+}
+
+impl FastmemAccessType {
+    pub fn from_usize(val: usize) -> Self {
+        match val {
+            0 => Self::Store,
+            1 => Self::Load,
+            2 => Self::LoadUnsigned,
+            _ => panic!("Invalid fastmem access type"),
+        }
+    }
+
+    pub fn to_usize(&self) -> usize {
+        match self {
+            Self::Store => 0,
+            Self::Load => 1,
+            Self::LoadUnsigned => 2,
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! extract_imm_from_movabs {
+    ($ptr: expr) => {{
+        let mut imm = 0u64;
+
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                $ptr.wrapping_add(2),
+                &mut imm as *mut _ as *mut u8,
+                std::mem::size_of::<u64>(),
+            );
+        }
+
+        imm
+    }};
+}
+
+#[macro_export]
+macro_rules! extract_fastmem_metadata {
+    ($metadata: expr) => {{
+        let access_size = ($metadata >> 56) & 0xFF;
+        let access_type = ($metadata >> 48) & 0xFF;
+
+        (access_size, access_type)
+    }};
+}
+
+#[macro_export]
+macro_rules! create_fastmem_metadata {
+    ($access_size:expr, $access_type:expr) => {{
+        (($access_size as u64) << 56) | (($access_type as u64) << 48)
+    }};
+}
+
 pub struct BackendCoreImpl;
 
 impl BackendCore for BackendCoreImpl {
@@ -908,11 +1039,61 @@ impl BackendCore for BackendCoreImpl {
     }
 
     fn fastmem_violation_likely_offset() -> usize {
-        todo!()
+        46
     }
 
     fn patch_fastmem_violation(host_exception_addr: usize, guest_exception_addr: BusType) {
-        todo!()
+        let cpu = cpu::get_cpu();
+
+        let host_insn_begin = cpu
+            .insn_map
+            .get_by_guest_idx(guest_exception_addr)
+            .unwrap()
+            .host_ptr;
+
+        let imm = extract_imm_from_movabs!(host_insn_begin);
+
+        let (access_size, access_type) = extract_fastmem_metadata!(imm);
+
+        let access_type = FastmemAccessType::from_usize(access_type as usize);
+
+        let reg1 = extract_imm_from_movabs!(host_insn_begin.wrapping_add(10)) as *mut u8;
+        let reg2 = extract_imm_from_movabs!(host_insn_begin.wrapping_add(20)) as *mut u8;
+        let imm = extract_imm_from_movabs!(host_insn_begin.wrapping_add(30)) as i32;
+
+        let gpfn_offset = guest_exception_addr as usize & RV_PAGE_OFFSET_MASK;
+
+        let insn = match access_type {
+            FastmemAccessType::Store => match access_size {
+                8 => emit_bus_access_raw(c_sb_cb, reg1, reg2, imm, gpfn_offset),
+                16 => emit_bus_access_raw(c_sh_cb, reg1, reg2, imm, gpfn_offset),
+                32 => emit_bus_access_raw(c_sw_cb, reg1, reg2, imm, gpfn_offset),
+                _ => unreachable!(),
+            },
+            FastmemAccessType::Load => match access_size {
+                8 => emit_bus_access_raw(c_lb_cb, reg1, reg2, imm, gpfn_offset),
+                16 => emit_bus_access_raw(c_lh_cb, reg1, reg2, imm, gpfn_offset),
+                32 => emit_bus_access_raw(c_lw_cb, reg1, reg2, imm, gpfn_offset),
+                _ => unreachable!(),
+            },
+            FastmemAccessType::LoadUnsigned => match access_size {
+                8 => emit_bus_access_raw(c_lbu_cb, reg1, reg2, imm, gpfn_offset),
+                16 => emit_bus_access_raw(c_lhu_cb, reg1, reg2, imm, gpfn_offset),
+                _ => unreachable!(),
+            },
+        };
+
+        unsafe {
+            std::ptr::copy_nonoverlapping(insn.as_slice().as_ptr(), host_insn_begin, insn.size());
+        }
+
+        let remaining_bytes = FASTMEM_BLOCK_SIZE - insn.size();
+
+        unsafe {
+            for i in 0..remaining_bytes {
+                *host_insn_begin.wrapping_add(insn.size() + i) = 0x90; // nop
+            }
+        }
     }
 
     #[inline(never)]
@@ -926,6 +1107,7 @@ impl BackendCore for BackendCoreImpl {
             "push r13",
             "push r14",
             "push r15",
+            "mov rbp, rsp",
             "call {0}",
             "pop r15",
             "pop r14",
