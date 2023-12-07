@@ -11,8 +11,6 @@ impl CodePage {
     pub fn new() -> Self {
         let ptr = PageAllocator::allocate_pages(32).unwrap();
 
-        println!("Allocated code page at {:p}", ptr);
-
         CodePage {
             ptr,
             npages: 32,

@@ -87,7 +87,7 @@ fn emit_bus_access(
     )
 }
 
-fn emit_store(store_size: usize, data_reg: u8, addr_reg: u8, imm: i32) -> HostEncodedInsn {
+fn emit_store(store_size: usize, addr_reg: u8, data_reg: u8, imm: i32) -> HostEncodedInsn {
     let cpu = cpu::get_cpu();
 
     let data = &cpu.regs[data_reg as usize] as *const CpuReg as *mut u8;
@@ -99,12 +99,14 @@ fn emit_store(store_size: usize, data_reg: u8, addr_reg: u8, imm: i32) -> HostEn
     let fmem_encoded = create_fastmem_metadata!(store_size, fmem_type);
 
     emit_mov_reg_imm!(insn, amd64_reg::RAX, fmem_encoded);
-    emit_mov_reg_imm!(insn, amd64_reg::RAX, data as usize);
-    emit_mov_reg_imm!(insn, amd64_reg::RBX, addr as usize);
+    emit_mov_reg_imm!(insn, amd64_reg::RAX, addr as usize);
+    emit_mov_reg_imm!(insn, amd64_reg::RBX, data as usize);
     emit_mov_reg_imm!(insn, amd64_reg::RCX, imm as i64 as usize);
 
     emit_mov_ptr_reg_dword_ptr!(insn, amd64_reg::RAX, amd64_reg::RAX);
     emit_add_reg_reg!(insn, amd64_reg::RAX, amd64_reg::RCX);
+
+    emit_mov_ptr_reg_dword_ptr!(insn, amd64_reg::RBX, amd64_reg::RBX);
 
     match store_size {
         8 => emit_mov_byte_ptr_reg!(insn, amd64_reg::RAX, amd64_reg::RBX),
@@ -114,6 +116,12 @@ fn emit_store(store_size: usize, data_reg: u8, addr_reg: u8, imm: i32) -> HostEn
     }
 
     assert!(insn.size() <= FASTMEM_BLOCK_SIZE);
+
+    let diff = FASTMEM_BLOCK_SIZE - insn.size();
+
+    for _ in 0..diff {
+        emit_nop!(insn);
+    }
 
     insn
 }
