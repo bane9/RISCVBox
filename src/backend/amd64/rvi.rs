@@ -1,9 +1,12 @@
 use crate::backend::common;
+use crate::backend::core::FASTMEM_BLOCK_SIZE;
 use crate::backend::target::core::{amd64_reg, BackendCore, BackendCoreImpl};
 use crate::cpu::CpuReg;
 use crate::frontend::exec_core::{RV_PAGE_SHIFT, RV_PAGE_SIZE};
 use crate::*;
 use common::*;
+
+use super::core::FastmemAccessType;
 
 pub struct RviImpl;
 
@@ -77,11 +80,42 @@ fn emit_bus_access(
 
     emit_bus_access_raw(
         bus_fn,
-        &cpu::get_cpu().regs[reg1 as usize] as *const CpuReg as *mut u8,
-        &cpu::get_cpu().regs[reg2 as usize] as *const CpuReg as *mut u8,
+        &cpu.regs[reg1 as usize] as *const CpuReg as *mut u8,
+        &cpu.regs[reg2 as usize] as *const CpuReg as *mut u8,
         imm,
         cpu.current_gpfn_offset as usize,
     )
+}
+
+fn emit_store(store_size: usize, data_reg: u8, addr_reg: u8, imm: i32) -> HostEncodedInsn {
+    let cpu = cpu::get_cpu();
+
+    let data = &cpu.regs[data_reg as usize] as *const CpuReg as *mut u8;
+    let addr = &cpu.regs[addr_reg as usize] as *const CpuReg as *mut u8;
+
+    let mut insn = HostEncodedInsn::new();
+
+    let fmem_type = FastmemAccessType::Store.to_usize();
+    let fmem_encoded = create_fastmem_metadata!(store_size, fmem_type);
+
+    emit_mov_reg_imm!(insn, amd64_reg::RAX, fmem_encoded);
+    emit_mov_reg_imm!(insn, amd64_reg::RAX, data as usize);
+    emit_mov_reg_imm!(insn, amd64_reg::RBX, addr as usize);
+    emit_mov_reg_imm!(insn, amd64_reg::RCX, imm as i64 as usize);
+
+    emit_mov_ptr_reg_dword_ptr!(insn, amd64_reg::RAX, amd64_reg::RAX);
+    emit_add_reg_reg!(insn, amd64_reg::RAX, amd64_reg::RCX);
+
+    match store_size {
+        8 => emit_mov_byte_ptr_reg!(insn, amd64_reg::RAX, amd64_reg::RBX),
+        16 => emit_mov_word_ptr_reg!(insn, amd64_reg::RAX, amd64_reg::RBX),
+        32 => emit_mov_dword_ptr_reg!(insn, amd64_reg::RAX, amd64_reg::RBX),
+        _ => panic!("emit_store: invalid store size"),
+    }
+
+    assert!(insn.size() <= FASTMEM_BLOCK_SIZE);
+
+    insn
 }
 
 impl common::Rvi for RviImpl {
@@ -373,15 +407,15 @@ impl common::Rvi for RviImpl {
     }
 
     fn emit_sb(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access(c_sb_cb, rs1, rs2, imm))
+        Ok(emit_store(8, rs1, rs2, imm))
     }
 
     fn emit_sh(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access(c_sh_cb, rs1, rs2, imm))
+        Ok(emit_store(16, rs1, rs2, imm))
     }
 
     fn emit_sw(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access(c_sw_cb, rs1, rs2, imm))
+        Ok(emit_store(32, rs1, rs2, imm))
     }
 
     fn emit_fence(_pred: u8, _succ: u8) -> DecodeRet {

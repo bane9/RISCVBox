@@ -15,7 +15,7 @@ pub const HOST_INSN_MAX_SIZE: usize = 96;
 pub type HostEncodedInsn = EncodedInsn<HostInsnT, HOST_INSN_MAX_SIZE>;
 pub type DecodeRet = Result<HostEncodedInsn, JitError>;
 
-const FASTMEM_BLOCK_SIZE: usize = 58;
+pub const FASTMEM_BLOCK_SIZE: usize = 58;
 
 #[macro_export]
 macro_rules! host_get_return_addr {
@@ -1043,13 +1043,12 @@ impl BackendCore for BackendCoreImpl {
     }
 
     fn patch_fastmem_violation(host_exception_addr: usize, guest_exception_addr: BusType) {
-        let cpu = cpu::get_cpu();
+        let host_insn_begin = host_exception_addr as *mut u8;
 
-        let host_insn_begin = cpu
-            .insn_map
-            .get_by_guest_idx(guest_exception_addr)
-            .unwrap()
-            .host_ptr;
+        println!(
+            "patch_fastmem_violation {:p} 0x{:x}",
+            host_exception_addr as *mut u8, guest_exception_addr
+        );
 
         let imm = extract_imm_from_movabs!(host_insn_begin);
 

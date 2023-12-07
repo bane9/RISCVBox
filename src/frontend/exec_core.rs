@@ -7,6 +7,9 @@ use crate::bus::{self, BusType};
 use crate::cpu::{self, CpuReg};
 use crate::cpu::{trap, RegName};
 pub use crate::frontend::parse_core::*;
+use crate::xmem::PageState;
+
+use super::insn_lookup::InsnMappingData;
 
 pub struct ExecCore {
     parse_core: ParseCore,
@@ -84,16 +87,18 @@ impl ExecCore {
             match ret {
                 ReturnStatus::ReturnOk => {}
                 ReturnStatus::ReturnAccessViolation(violation_addr) => {
-                    let mut guest_exception_pc: Option<CpuReg> = None;
+                    let mut guest_exception_pc: Option<&InsnMappingData> = None;
                     let likely_offset = BackendCoreImpl::fastmem_violation_likely_offset();
-                    let likely_offset_lower = likely_offset - 16;
-                    let likely_offset_upper = likely_offset + 16;
+                    let likely_offset_lower = likely_offset - 8;
+                    let likely_offset_upper = likely_offset + 8;
+
+                    let addr = violation_addr as *mut u8;
 
                     for i in likely_offset_lower..likely_offset_upper {
-                        let exc = cpu.insn_map.get_by_host_ptr(host_ptr.wrapping_sub(i));
+                        let exc = cpu.insn_map.get_by_host_ptr(addr.wrapping_sub(i));
 
                         if exc.is_some() {
-                            guest_exception_pc = Some(exc.unwrap().guest_idx);
+                            guest_exception_pc = Some(exc.unwrap());
                             break;
                         }
                     }
@@ -103,11 +108,23 @@ impl ExecCore {
                     }
 
                     let guest_exception_pc = guest_exception_pc.unwrap();
+                    let jit_block_idx = guest_exception_pc.jit_block_idx;
 
-                    BackendCoreImpl::patch_fastmem_violation(violation_addr, guest_exception_pc);
+                    self.parse_core
+                        .mark_page_state(jit_block_idx, PageState::ReadWrite)
+                        .unwrap();
+
+                    BackendCoreImpl::patch_fastmem_violation(
+                        guest_exception_pc.host_ptr as usize,
+                        guest_exception_pc.guest_idx,
+                    );
+
+                    self.parse_core
+                        .mark_page_state(jit_block_idx, PageState::ReadExecute)
+                        .unwrap();
 
                     cpu.exception = cpu::Exception::FastmemViolation;
-                    cpu.next_pc = guest_exception_pc;
+                    cpu.next_pc = guest_exception_pc.guest_idx;
                 }
                 _ => {
                     panic!("Unhandled host exception during guest execution")

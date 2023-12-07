@@ -9,6 +9,7 @@ use crate::bus::mmu::AccessType;
 use crate::cpu;
 use crate::cpu::CpuReg;
 use crate::cpu::Exception;
+use crate::xmem::AllocationError;
 use crate::xmem::CodePage;
 
 use crate::frontend::csr;
@@ -187,5 +188,13 @@ impl ParseCore {
 
     pub fn get_exec_ptr(&mut self, idx: usize) -> *mut u8 {
         self.code_pages.get_code_page(idx).as_ptr()
+    }
+
+    pub fn mark_page_state(&mut self, idx: usize, state: PageState) -> Result<(), AllocationError> {
+        match state {
+            PageState::ReadWrite => self.code_pages.get_code_page(idx).mark_rw(),
+            PageState::ReadExecute => self.code_pages.get_code_page(idx).mark_rx(),
+            PageState::Invalid => panic!("Invalid page state"),
+        }
     }
 }

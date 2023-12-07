@@ -11,6 +11,8 @@ impl CodePage {
     pub fn new() -> Self {
         let ptr = PageAllocator::allocate_pages(32).unwrap();
 
+        println!("Allocated code page at {:p}", ptr);
+
         CodePage {
             ptr,
             npages: 32,
@@ -48,7 +50,13 @@ impl CodePage {
             return Ok(());
         }
 
-        PageAllocator::mark_page(self.ptr, self.npages, PageState::ReadWrite)
+        let res = PageAllocator::mark_page(self.ptr, self.npages, PageState::ReadWrite);
+
+        if res.is_ok() {
+            self.state = PageState::ReadWrite;
+        }
+
+        res
     }
 
     pub fn mark_rx(&mut self) -> Result<(), AllocationError> {
@@ -56,7 +64,13 @@ impl CodePage {
             return Ok(());
         }
 
-        PageAllocator::mark_page(self.ptr, self.npages, PageState::ReadExecute)
+        let res = PageAllocator::mark_page(self.ptr, self.npages, PageState::ReadExecute);
+
+        if res.is_ok() {
+            self.state = PageState::ReadExecute;
+        }
+
+        res
     }
 
     pub fn mark_invalid(&mut self) -> Result<(), AllocationError> {
@@ -64,11 +78,22 @@ impl CodePage {
             return Ok(());
         }
 
-        PageAllocator::mark_page(self.ptr, self.npages, PageState::Invalid)
+        let res = PageAllocator::mark_page(self.ptr, self.npages, PageState::Invalid);
+
+        if res.is_ok() {
+            self.state = PageState::Invalid;
+        }
+
+        res
     }
 
     pub fn dealloc(&mut self) {
         PageAllocator::free_pages(self.ptr, self.npages);
+
+        self.ptr = std::ptr::null_mut();
+        self.npages = 0;
+        self.offset = 0;
+        self.state = PageState::Invalid;
     }
 
     pub fn as_ptr(&self) -> *mut u8 {
