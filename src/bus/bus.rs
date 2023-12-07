@@ -6,6 +6,68 @@ use super::ramfb::RAMFB_BEGIN_ADDR;
 
 pub type BusType = u32;
 
+#[macro_export]
+#[cfg(feature = "no_unaligned_mem_access")]
+macro_rules! ptr_direct_load {
+    ($ptr:expr, $size:expr) => {{
+        let ret: u32 = 0;
+
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                $ptr,
+                &ret as *const u32 as *mut u8,
+                ($size as usize) / 8,
+            );
+        }
+
+        ret
+    }};
+}
+
+#[macro_export]
+#[cfg(feature = "no_unaligned_mem_access")]
+macro_rules! ptr_direct_store {
+    ($ptr:expr, $data:expr, $size:expr) => {{
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                &$data as *const u32 as *const u8,
+                $ptr,
+                ($size as usize) / 8,
+            );
+        }
+    }};
+}
+
+#[macro_export]
+#[cfg(not(feature = "no_unaligned_mem_access"))]
+macro_rules! ptr_direct_load {
+    ($ptr:expr, $size:expr) => {
+        unsafe {
+            match $size {
+                8 => *(($ptr) as *const u8) as u32,
+                16 => *(($ptr) as *const u16) as u32,
+                32 => *(($ptr) as *const u32) as u32,
+                _ => panic!("Invalid size"),
+            }
+        }
+    };
+}
+
+#[macro_export]
+#[cfg(not(feature = "no_unaligned_mem_access"))]
+macro_rules! ptr_direct_store {
+    ($ptr:expr, $data:expr, $size:expr) => {
+        unsafe {
+            match $size {
+                8 => *(($ptr) as *mut u8) = $data as u8,
+                16 => *(($ptr) as *mut u16) = $data as u16,
+                32 => *(($ptr) as *mut u32) = $data as u32,
+                _ => panic!("Invalid size"),
+            }
+        }
+    };
+}
+
 pub trait BusDevice {
     fn load(&mut self, addr: BusType, size: BusType) -> Result<BusType, Exception>;
     fn store(&mut self, addr: BusType, data: BusType, size: BusType) -> Result<(), Exception>;
@@ -130,16 +192,7 @@ impl Bus {
 
     pub fn load_nommu(&mut self, addr: BusType, size: BusType) -> Result<BusType, Exception> {
         if addr >= RAM_BEGIN_ADDR && addr < self.ram_end_addr as u32 {
-            let adj_addr = (addr as usize) - (RAM_BEGIN_ADDR as usize);
-
-            let data = unsafe {
-                match size {
-                    8 => *(self.ram_ptr.add(adj_addr) as *const u8) as BusType,
-                    16 => *(self.ram_ptr.add(adj_addr) as *const u16) as BusType,
-                    32 => *(self.ram_ptr.add(adj_addr) as *const u32) as BusType,
-                    _ => panic!("Invalid size"),
-                }
-            };
+            let data = ptr_direct_load!(addr as *mut u8, size);
 
             return Ok(data);
         }
@@ -155,16 +208,7 @@ impl Bus {
 
     pub fn fetch_nommu(&mut self, addr: BusType, size: BusType) -> Result<BusType, Exception> {
         if addr >= RAM_BEGIN_ADDR && addr < self.ram_end_addr as u32 {
-            let adj_addr = (addr as usize) - (RAM_BEGIN_ADDR as usize);
-
-            let data = unsafe {
-                match size {
-                    8 => *(self.ram_ptr.add(adj_addr) as *const u8) as BusType,
-                    16 => *(self.ram_ptr.add(adj_addr) as *const u16) as BusType,
-                    32 => *(self.ram_ptr.add(adj_addr) as *const u32) as BusType,
-                    _ => panic!("Invalid size"),
-                }
-            };
+            let data = ptr_direct_load!(addr as *mut u8, size);
 
             return Ok(data);
         }
@@ -185,29 +229,11 @@ impl Bus {
         size: BusType,
     ) -> Result<(), Exception> {
         if addr >= RAM_BEGIN_ADDR && addr < self.ram_end_addr as u32 {
-            let adj_addr = (addr as usize) - (RAM_BEGIN_ADDR as usize);
-
-            unsafe {
-                match size {
-                    8 => *(self.ram_ptr.add(adj_addr) as *mut u8) = data as u8,
-                    16 => *(self.ram_ptr.add(adj_addr) as *mut u16) = data as u16,
-                    32 => *(self.ram_ptr.add(adj_addr) as *mut u32) = data as u32,
-                    _ => panic!("Invalid size"),
-                }
-            };
+            ptr_direct_store!(addr as *mut u8, data, size);
 
             return Ok(());
         } else if addr >= RAMFB_BEGIN_ADDR as u32 && addr < self.fb_end_addr as u32 {
-            let adj_addr = (addr as usize) - (RAMFB_BEGIN_ADDR as usize);
-
-            unsafe {
-                match size {
-                    8 => *(self.fb_ptr.add(adj_addr) as *mut u8) = data as u8,
-                    16 => *(self.fb_ptr.add(adj_addr) as *mut u16) = data as u16,
-                    32 => *(self.fb_ptr.add(adj_addr) as *mut u32) = data as u32,
-                    _ => panic!("Invalid size"),
-                }
-            };
+            ptr_direct_store!(addr as *mut u8, data, size);
 
             return Ok(());
         }

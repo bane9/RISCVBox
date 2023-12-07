@@ -167,6 +167,7 @@ pub enum Exception {
     MmuStateUpdate = 0x106,
     Wfi = 0x107,
     BookkeepingRet = 0x108,
+    FastmemViolation = 0x109,
 }
 
 impl Exception {
@@ -196,6 +197,7 @@ impl Exception {
             0x106 => Exception::MmuStateUpdate,
             0x107 => Exception::Wfi,
             0x108 => Exception::BookkeepingRet,
+            0x109 => Exception::FastmemViolation,
             _ => Exception::None,
         }
     }
@@ -226,6 +228,7 @@ impl Exception {
             Exception::MmuStateUpdate => 0x106,
             Exception::Wfi => 0x107,
             Exception::BookkeepingRet => 0x108,
+            Exception::FastmemViolation => 0x109,
         }
     }
 
@@ -255,6 +258,7 @@ impl Exception {
             Exception::MmuStateUpdate => 0,
             Exception::Wfi => 0,
             Exception::BookkeepingRet => 0,
+            Exception::FastmemViolation => 0,
         };
 
         data

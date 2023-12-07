@@ -81,7 +81,38 @@ impl ExecCore {
                 BackendCoreImpl::call_jit_ptr(host_ptr);
             });
 
-            assert!(ret == ReturnStatus::ReturnOk);
+            match ret {
+                ReturnStatus::ReturnOk => {}
+                ReturnStatus::ReturnAccessViolation(violation_addr) => {
+                    let mut guest_exception_pc: Option<CpuReg> = None;
+                    let likely_offset = BackendCoreImpl::fastmem_violation_likely_offset();
+                    let likely_offset_lower = likely_offset - 16;
+                    let likely_offset_upper = likely_offset + 16;
+
+                    for i in likely_offset_lower..likely_offset_upper {
+                        let exc = cpu.insn_map.get_by_host_ptr(host_ptr.wrapping_sub(i));
+
+                        if exc.is_some() {
+                            guest_exception_pc = Some(exc.unwrap().guest_idx);
+                            break;
+                        }
+                    }
+
+                    if guest_exception_pc.is_none() {
+                        panic!("Failed to find guest pc for host ptr {:#x}", violation_addr);
+                    }
+
+                    let guest_exception_pc = guest_exception_pc.unwrap();
+
+                    BackendCoreImpl::patch_fastmem_violation(violation_addr, guest_exception_pc);
+
+                    cpu.exception = cpu::Exception::FastmemViolation;
+                    cpu.next_pc = guest_exception_pc;
+                }
+                _ => {
+                    panic!("Unhandled host exception during guest execution")
+                }
+            }
 
             self.handle_guest_exception();
         }
@@ -123,6 +154,7 @@ impl ExecCore {
                 self.parse_core.invalidate(gpfn);
                 cpu.next_pc = cpu.c_exception_pc as CpuReg + INSN_SIZE as CpuReg;
             }
+            cpu::Exception::FastmemViolation => {}
             cpu::Exception::DiscardJitBlock(_pc) => {
                 // If a mmu drops execute permission on a page, we can discard the jit block
                 unimplemented!()

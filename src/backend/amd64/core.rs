@@ -1,3 +1,4 @@
+use crate::bus::BusType;
 pub use crate::{
     backend::{BackendCore, JitError},
     cpu::*,
@@ -904,6 +905,14 @@ impl BackendCore for BackendCoreImpl {
         let fn_ptr = unsafe { std::mem::transmute::<_, extern "C" fn(usize)>(fn_ptr) };
 
         Self::emit_void_call_with_1_arg(fn_ptr, arg1)
+    }
+
+    fn fastmem_violation_likely_offset() -> usize {
+        todo!()
+    }
+
+    fn patch_fastmem_violation(host_exception_addr: usize, guest_exception_addr: BusType) {
+        todo!()
     }
 
     #[inline(never)]
