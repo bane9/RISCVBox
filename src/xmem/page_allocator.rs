@@ -5,7 +5,7 @@ pub mod win32_page_allocator {
     use std::ptr;
     use winapi::um::memoryapi::{VirtualAlloc, VirtualFree, VirtualProtect};
     use winapi::um::winnt::{
-        MEM_COMMIT, MEM_RELEASE, PAGE_EXECUTE_READ, PAGE_NOACCESS, PAGE_READWRITE,
+        MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_EXECUTE_READ, PAGE_NOACCESS, PAGE_READWRITE,
     };
 
     const PAGE_SIZE: usize = 4096;
@@ -15,6 +15,29 @@ pub mod win32_page_allocator {
 
         unsafe {
             let ptr = VirtualAlloc(ptr::null_mut(), size, MEM_COMMIT, PAGE_READWRITE) as *mut u8;
+
+            if ptr == ptr::null_mut() {
+                Err(AllocationError::UnknownError)
+            } else {
+                Ok(ptr)
+            }
+        }
+    }
+
+    pub fn allocate_pages_at(address: usize, npages: usize) -> Result<*mut u8, AllocationError> {
+        let size = npages * PAGE_SIZE;
+
+        unsafe {
+            let ptr = VirtualAlloc(
+                address as *mut _,
+                size,
+                MEM_COMMIT | MEM_RESERVE,
+                PAGE_READWRITE,
+            ) as *mut u8;
+
+            if ptr != address as *mut u8 {
+                panic!("VirtualAlloc returned a different address than requested (requested: {:p}, returned: {:p})", address as *mut u8, ptr);
+            }
 
             if ptr == ptr::null_mut() {
                 Err(AllocationError::UnknownError)

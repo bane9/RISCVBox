@@ -15,6 +15,10 @@ impl ReturnableHandler for ReturnableImpl {
 
         match res.err().unwrap().code() {
             microseh::ExceptionCode::IllegalInstruction => ReturnStatus::ReturnOk,
+            microseh::ExceptionCode::AccessViolation => {
+                let addr = res.err().unwrap().address() as usize;
+                ReturnStatus::ReturnAccessViolation(addr)
+            }
             code => {
                 println!("code: {:?}", code);
                 ReturnStatus::ReturnNotOk

@@ -1,6 +1,7 @@
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ReturnStatus {
     ReturnOk,
+    ReturnAccessViolation(usize),
     ReturnNotOk,
 }
 

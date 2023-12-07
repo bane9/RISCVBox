@@ -1,27 +1,28 @@
-use crate::{bus::bus::*, cpu::Exception};
+use crate::{bus::bus::*, cpu::Exception, util, xmem::PageAllocator};
 
-pub const RAMFB_BEGIN_ADDR: BusType = 0x1d385000;
+pub const RAMFB_BEGIN_ADDR: BusType = 0x1d380000;
 
 pub struct RamFB {
-    pub mem: Vec<u8>,
-
-    pub width: usize,
-    pub height: usize,
-    pub bpp: usize,
+    pub mem: *mut u8,
+    len: usize,
 }
 
 impl RamFB {
     pub fn new(width: usize, height: usize, bpp: usize) -> Self {
-        Self {
-            mem: vec![0; width * height * (bpp / 8)],
-            width,
-            height,
-            bpp,
-        }
+        let fb_len = width * height * (bpp / 8);
+        let fb_len = util::align_up(fb_len, PageAllocator::get_page_size());
+
+        let mem = PageAllocator::allocate_pages_at(
+            RAMFB_BEGIN_ADDR as usize,
+            fb_len / PageAllocator::get_page_size(),
+        )
+        .unwrap();
+
+        Self { mem, len: fb_len }
     }
 
     pub fn get_fb_ptr(&mut self) -> *mut u8 {
-        self.mem.as_mut_ptr()
+        self.mem
     }
 }
 
@@ -41,9 +42,9 @@ impl BusDevice for RamFB {
 
         let data = unsafe {
             match size {
-                8 => *(self.mem.as_ptr().add(adj_addr) as *const u8) as BusType,
-                16 => *(self.mem.as_ptr().add(adj_addr) as *const u16) as BusType,
-                32 => *(self.mem.as_ptr().add(adj_addr) as *const u32) as BusType,
+                8 => *(self.mem.add(adj_addr) as *const u8) as BusType,
+                16 => *(self.mem.add(adj_addr) as *const u16) as BusType,
+                32 => *(self.mem.add(adj_addr) as *const u32) as BusType,
                 _ => panic!("Invalid size"),
             }
         };
@@ -64,9 +65,9 @@ impl BusDevice for RamFB {
 
         unsafe {
             match size {
-                8 => *(self.mem.as_mut_ptr().add(adj_addr) as *mut u8) = data as u8,
-                16 => *(self.mem.as_mut_ptr().add(adj_addr) as *mut u16) = data as u16,
-                32 => *(self.mem.as_mut_ptr().add(adj_addr) as *mut u32) = data as u32,
+                8 => *(self.mem.add(adj_addr) as *mut u8) = data as u8,
+                16 => *(self.mem.add(adj_addr) as *mut u16) = data as u16,
+                32 => *(self.mem.add(adj_addr) as *mut u32) = data as u32,
                 _ => panic!("Invalid size"),
             }
         };
@@ -79,7 +80,7 @@ impl BusDevice for RamFB {
     }
 
     fn get_end_addr(&self) -> BusType {
-        return self.get_begin_addr() + self.mem.len() as BusType;
+        return self.get_begin_addr() + self.len as BusType;
     }
 
     fn tick_core_local(&mut self) {}
@@ -87,7 +88,7 @@ impl BusDevice for RamFB {
     fn get_ptr(&mut self, addr: BusType) -> Result<*mut u8, Exception> {
         let adj_addr = (addr as usize) - (self.get_begin_addr() as usize);
 
-        unsafe { Ok(self.mem.as_mut_ptr().add(adj_addr)) }
+        unsafe { Ok(self.mem.add(adj_addr)) }
     }
 
     fn tick_from_main_thread(&mut self) {}
