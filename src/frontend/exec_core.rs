@@ -89,12 +89,12 @@ impl ExecCore {
                 ReturnStatus::ReturnAccessViolation(violation_addr) => {
                     let mut guest_exception_pc: Option<&InsnMappingData> = None;
                     let likely_offset = BackendCoreImpl::fastmem_violation_likely_offset();
-                    let likely_offset_lower = likely_offset + 0;
+                    let likely_offset_lower = likely_offset - 16;
                     let likely_offset_upper = likely_offset + 16;
 
                     let addr = violation_addr as *mut u8;
 
-                    for i in 0..100 {
+                    for i in likely_offset_lower..likely_offset_upper {
                         let exc = cpu.insn_map.get_by_host_ptr(addr.wrapping_sub(i));
 
                         if exc.is_some() {

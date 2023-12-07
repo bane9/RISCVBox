@@ -87,6 +87,67 @@ fn emit_bus_access(
     )
 }
 
+fn emit_load(
+    load_size: usize,
+    dest_reg: u8,
+    src_reg: u8,
+    imm: i32,
+    is_unsigned: bool,
+) -> HostEncodedInsn {
+    let cpu = cpu::get_cpu();
+
+    let dst = &cpu.regs[dest_reg as usize] as *const CpuReg as *mut u8;
+    let src = &cpu.regs[src_reg as usize] as *const CpuReg as *mut u8;
+
+    let mut insn = HostEncodedInsn::new();
+
+    let fmem_type = if is_unsigned {
+        FastmemAccessType::LoadUnsigned.to_usize()
+    } else {
+        FastmemAccessType::Load.to_usize()
+    };
+
+    let fmem_encoded = create_fastmem_metadata!(load_size, fmem_type);
+
+    emit_mov_reg_imm!(insn, amd64_reg::RAX, fmem_encoded);
+    emit_mov_reg_imm!(insn, amd64_reg::RBX, dst as usize);
+    emit_mov_reg_imm!(insn, amd64_reg::RAX, src as usize);
+    emit_mov_reg_imm!(insn, amd64_reg::RCX, imm as i64 as usize);
+
+    emit_mov_ptr_reg_dword_ptr!(insn, amd64_reg::RAX, amd64_reg::RAX);
+    emit_add_reg_reg!(insn, amd64_reg::RAX, amd64_reg::RCX);
+    emit_mov_ptr_reg_dword_ptr!(insn, amd64_reg::RAX, amd64_reg::RAX);
+
+    if dest_reg != 0 {
+        match load_size {
+            8 => emit_and_reg_imm!(insn, amd64_reg::RAX, 0xff),
+            16 => emit_and_reg_imm!(insn, amd64_reg::RAX, 0xffff),
+            32 => {}
+            _ => panic!("emit_load: invalid load size"),
+        }
+
+        if !is_unsigned {
+            match load_size {
+                8 => emit_movsxd_reg64_reg8!(insn, amd64_reg::RAX, amd64_reg::RAX),
+                16 => emit_movsxd_reg64_reg16!(insn, amd64_reg::RAX, amd64_reg::RAX),
+                _ => {}
+            }
+        }
+
+        emit_mov_dword_ptr_reg!(insn, amd64_reg::RBX, amd64_reg::RAX);
+    }
+
+    assert!(insn.size() <= FASTMEM_BLOCK_SIZE);
+
+    let diff = FASTMEM_BLOCK_SIZE - insn.size();
+
+    for _ in 0..diff {
+        emit_nop!(insn);
+    }
+
+    insn
+}
+
 fn emit_store(store_size: usize, addr_reg: u8, data_reg: u8, imm: i32) -> HostEncodedInsn {
     let cpu = cpu::get_cpu();
 
@@ -395,23 +456,23 @@ impl common::Rvi for RviImpl {
     }
 
     fn emit_lb(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access(c_lb_cb, rd, rs1, imm))
+        Ok(emit_load(8, rd, rs1, imm, false))
     }
 
     fn emit_lh(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access(c_lh_cb, rd, rs1, imm))
+        Ok(emit_load(16, rd, rs1, imm, false))
     }
 
     fn emit_lw(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access(c_lw_cb, rd, rs1, imm))
+        Ok(emit_load(32, rd, rs1, imm, false))
     }
 
     fn emit_lbu(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access(c_lbu_cb, rd, rs1, imm))
+        Ok(emit_load(8, rd, rs1, imm, true))
     }
 
     fn emit_lhu(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
-        Ok(emit_bus_access(c_lhu_cb, rd, rs1, imm))
+        Ok(emit_load(16, rd, rs1, imm, true))
     }
 
     fn emit_sb(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {

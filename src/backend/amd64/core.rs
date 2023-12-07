@@ -15,7 +15,7 @@ pub const HOST_INSN_MAX_SIZE: usize = 96;
 pub type HostEncodedInsn = EncodedInsn<HostInsnT, HOST_INSN_MAX_SIZE>;
 pub type DecodeRet = Result<HostEncodedInsn, JitError>;
 
-pub const FASTMEM_BLOCK_SIZE: usize = 58;
+pub const FASTMEM_BLOCK_SIZE: usize = 59;
 
 #[macro_export]
 macro_rules! host_get_return_addr {
@@ -367,6 +367,86 @@ macro_rules! emit_movsxd_reg_reg {
             [
                 0x48,
                 0x63,
+                (0xC0 as u8).wrapping_add($reg2 << 3).wrapping_add($reg1)
+            ]
+        );
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_movsxd_reg64_reg8 {
+    ($enc:expr, $reg1:expr, $reg2:expr) => {{
+        assert!($reg1 < amd64_reg::R8 && $reg2 < amd64_reg::R8);
+        emit_insn!(
+            $enc,
+            [
+                0x48,
+                0x0f,
+                0xbe,
+                (0xC0 as u8).wrapping_add($reg2 << 3).wrapping_add($reg1)
+            ]
+        );
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_movsxd_reg64_reg16 {
+    ($enc:expr, $reg1:expr, $reg2:expr) => {{
+        assert!($reg1 < amd64_reg::R8 && $reg2 < amd64_reg::R8);
+        emit_insn!(
+            $enc,
+            [
+                0x48,
+                0x0f,
+                0xbf,
+                (0xC0 as u8).wrapping_add($reg2 << 3).wrapping_add($reg1)
+            ]
+        );
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_movzx_reg64_reg8 {
+    ($enc:expr, $reg1:expr, $reg2:expr) => {{
+        assert!($reg1 < amd64_reg::R8 && $reg2 < amd64_reg::R8);
+        emit_insn!(
+            $enc,
+            [
+                0x48,
+                0x0F,
+                0xB6,
+                (0xC0 as u8).wrapping_add($reg2 << 3).wrapping_add($reg1)
+            ]
+        );
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_movzx_reg64_reg16 {
+    ($enc:expr, $reg1:expr, $reg2:expr) => {{
+        assert!($reg1 < amd64_reg::R8 && $reg2 < amd64_reg::R8);
+        emit_insn!(
+            $enc,
+            [
+                0x48,
+                0x0F,
+                0xB7,
+                (0xC0 as u8).wrapping_add($reg2 << 3).wrapping_add($reg1)
+            ]
+        );
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_movsx_reg_reg {
+    ($enc:expr, $reg1:expr, $reg2:expr) => {{
+        assert!($reg1 < amd64_reg::R8 && $reg2 < amd64_reg::R8);
+        emit_insn!(
+            $enc,
+            [
+                0x48,
+                0x0F,
+                0xBF,
                 (0xC0 as u8).wrapping_add($reg2 << 3).wrapping_add($reg1)
             ]
         );
@@ -1045,11 +1125,6 @@ impl BackendCore for BackendCoreImpl {
     fn patch_fastmem_violation(host_exception_addr: usize, guest_exception_addr: BusType) {
         let host_insn_begin = host_exception_addr as *mut u8;
 
-        println!(
-            "patch_fastmem_violation {:p} 0x{:x}",
-            host_exception_addr as *mut u8, guest_exception_addr
-        );
-
         let imm = extract_imm_from_movabs!(host_insn_begin);
 
         let (access_size, access_type) = extract_fastmem_metadata!(imm);
@@ -1085,6 +1160,8 @@ impl BackendCore for BackendCoreImpl {
         unsafe {
             std::ptr::copy_nonoverlapping(insn.as_slice().as_ptr(), host_insn_begin, insn.size());
         }
+
+        assert!(insn.size() <= FASTMEM_BLOCK_SIZE);
 
         let remaining_bytes = FASTMEM_BLOCK_SIZE - insn.size();
 
