@@ -1,25 +1,95 @@
-pub trait CodePage {
-    fn new() -> Self;
+use crate::{util, xmem::PageAllocator};
 
-    fn push(&mut self, data: &[u8]) -> Result<(), AllocationError>;
+pub struct CodePage {
+    ptr: *mut u8,
+    npages: usize,
+    offset: usize,
+    state: PageState,
+}
 
-    fn mark_rw(&mut self) -> Result<(), AllocationError>;
+impl CodePage {
+    pub fn new() -> Self {
+        let ptr = PageAllocator::allocate_pages(32).unwrap();
 
-    fn mark_rx(&mut self) -> Result<(), AllocationError>;
+        CodePage {
+            ptr,
+            npages: 32,
+            offset: 0,
+            state: PageState::ReadWrite,
+        }
+    }
 
-    fn mark_invalid(&mut self) -> Result<(), AllocationError>;
+    pub fn push(&mut self, data: &[u8]) -> Result<(), AllocationError> {
+        let page_size = PageAllocator::get_page_size();
 
-    fn dealloc(&mut self);
+        if self.offset + data.len() > self.npages * page_size {
+            let npages = std::cmp::max(
+                util::align_up(self.offset + data.len(), page_size) / page_size,
+                self.npages * 2, // A logarithmic growth strategy may be better
+            );
 
-    fn as_ptr(&self) -> *mut u8;
-    fn as_end_ptr(&self) -> *mut u8 {
+            let new_ptr = PageAllocator::realloc_pages(self.ptr, self.npages, npages).unwrap();
+
+            self.ptr = new_ptr;
+            self.npages = npages;
+        }
+
+        unsafe {
+            std::ptr::copy_nonoverlapping(data.as_ptr(), self.ptr.add(self.offset), data.len());
+        }
+
+        self.offset += data.len();
+
+        Ok(())
+    }
+
+    pub fn mark_rw(&mut self) -> Result<(), AllocationError> {
+        if self.state == PageState::ReadWrite {
+            return Ok(());
+        }
+
+        PageAllocator::mark_page(self.ptr, self.npages, PageState::ReadWrite)
+    }
+
+    pub fn mark_rx(&mut self) -> Result<(), AllocationError> {
+        if self.state == PageState::ReadExecute {
+            return Ok(());
+        }
+
+        PageAllocator::mark_page(self.ptr, self.npages, PageState::ReadExecute)
+    }
+
+    pub fn mark_invalid(&mut self) -> Result<(), AllocationError> {
+        if self.state == PageState::Invalid {
+            return Ok(());
+        }
+
+        PageAllocator::mark_page(self.ptr, self.npages, PageState::Invalid)
+    }
+
+    pub fn dealloc(&mut self) {
+        PageAllocator::free_pages(self.ptr, self.npages);
+    }
+
+    pub fn as_ptr(&self) -> *mut u8 {
+        self.ptr
+    }
+
+    pub fn as_end_ptr(&self) -> *mut u8 {
         unsafe { self.as_ptr().add(self.size()) }
     }
 
-    fn size(&self) -> usize;
-    fn npages(&self) -> usize;
+    pub fn size(&self) -> usize {
+        self.offset
+    }
 
-    fn state(&self) -> PageState;
+    pub fn npages(&self) -> usize {
+        self.npages
+    }
+
+    pub fn state(&self) -> PageState {
+        self.state
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]

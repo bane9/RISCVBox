@@ -15,7 +15,6 @@ use crate::frontend::csr;
 use crate::frontend::rva;
 use crate::frontend::rvi;
 use crate::frontend::rvm;
-use crate::xmem::CodePageImpl;
 use crate::xmem::PageState;
 
 use super::code_pages::CodePages;
@@ -72,7 +71,7 @@ impl ParseCore {
 
         assert!((gpfn as usize) << RV_PAGE_SHIFT < BusType::MAX as usize);
 
-        let code_page: &mut CodePageImpl;
+        let code_page: &mut CodePage;
         let code_page_idx: usize;
 
         // lol
@@ -106,7 +105,7 @@ impl ParseCore {
             let result: Result<(), JitCommon::JitError>;
 
             unsafe {
-                let code_page_mut = code_page as *mut CodePageImpl;
+                let code_page_mut = code_page as *mut CodePage;
                 result = self.decode_single(
                     &mut *code_page_mut,
                     code_page_idx,
@@ -136,7 +135,7 @@ impl ParseCore {
 
     fn decode_single(
         &mut self,
-        code_page: &mut CodePageImpl,
+        code_page: &mut CodePage,
         code_page_idx: usize,
         insn: u32,
         current_address: BusType,

@@ -1,8 +1,8 @@
 use crate::backend::common::HostEncodedInsn;
-use crate::xmem::{self, AllocationError, CodePage, PageState};
+use crate::xmem::{self, AllocationError, PageState};
 
 pub struct CodePages {
-    xmem: Vec<xmem::CodePageImpl>,
+    xmem: Vec<xmem::CodePage>,
 }
 
 impl CodePages {
@@ -10,12 +10,12 @@ impl CodePages {
         CodePages { xmem: vec![] }
     }
 
-    pub fn get_code_page(&mut self, idx: usize) -> &mut xmem::CodePageImpl {
+    pub fn get_code_page(&mut self, idx: usize) -> &mut xmem::CodePage {
         self.xmem.get_mut(idx).unwrap()
     }
 
-    pub fn alloc_code_page(&mut self) -> (&mut xmem::CodePageImpl, usize) {
-        self.xmem.push(xmem::CodePageImpl::new());
+    pub fn alloc_code_page(&mut self) -> (&mut xmem::CodePage, usize) {
+        self.xmem.push(xmem::CodePage::new());
         let idx = self.xmem.len() - 1;
         (self.xmem.get_mut(idx).unwrap(), idx)
     }
