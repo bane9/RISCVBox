@@ -265,6 +265,38 @@ impl Exception {
     }
 }
 
+pub struct JumpAddrPatch {
+    guest_addr: CpuReg,
+    host_addr: *mut u8,
+    jump_insn_offset: u32,
+}
+
+impl JumpAddrPatch {
+    pub fn new(guest_addr: CpuReg, host_addr: *mut u8, jump_insn_offset: u32) -> JumpAddrPatch {
+        JumpAddrPatch {
+            guest_addr,
+            host_addr,
+            jump_insn_offset,
+        }
+    }
+
+    pub fn get_guest_addr(&self) -> CpuReg {
+        self.guest_addr
+    }
+
+    pub fn get_host_addr(&self) -> *mut u8 {
+        self.host_addr
+    }
+
+    pub fn get_jmp_insn_offset(&self) -> u32 {
+        self.jump_insn_offset
+    }
+
+    pub fn get_data(&self) -> (CpuReg, *mut u8, u32) {
+        (self.guest_addr, self.host_addr, self.jump_insn_offset)
+    }
+}
+
 pub struct Cpu {
     pub core_id: CpuReg,
     pub next_pc: CpuReg,
@@ -272,6 +304,8 @@ pub struct Cpu {
     pub current_gpfn_offset: CpuReg,
     pub regs: [CpuReg; 32],
     pub insn_map: InsnData,
+    pub insn_patch_list: Vec<JumpAddrPatch>,
+    pub jit_current_ptr: *mut u8,
     pub exception: Exception,
     pub c_exception: usize,
     pub c_exception_data: usize,
@@ -293,6 +327,8 @@ impl Cpu {
             current_gpfn_offset: 0,
             regs: [0; 32],
             insn_map: InsnData::new(),
+            insn_patch_list: Vec::new(),
+            jit_current_ptr: std::ptr::null_mut(),
             exception: Exception::None,
             c_exception: Exception::None.to_cpu_reg() as usize,
             c_exception_data: 0,

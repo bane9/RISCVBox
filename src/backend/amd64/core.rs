@@ -279,7 +279,7 @@ macro_rules! emit_mov_reg_guest_to_host {
             emit_mov_reg_imm!($enc, $dst_reg, &$cpu.regs[$src_reg as usize] as *const _);
             emit_mov_ptr_reg_dword_ptr!($enc, $dst_reg, $dst_reg);
         } else {
-            emit_mov_reg_imm!($enc, $dst_reg, 0);
+            emit_xor_reg_reg!($enc, $dst_reg, $dst_reg);
         }
     }};
 }
@@ -801,6 +801,30 @@ macro_rules! emit_jne_imm {
     }};
 }
 
+#[macro_export]
+macro_rules! emit_je_imm {
+    ($enc:expr, $imm:expr) => {{
+        emit_insn!($enc, [0x0F, 0x84]);
+        emit_insn!($enc, ($imm as u32).to_le_bytes());
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_jl_imm {
+    ($enc:expr, $imm:expr) => {{
+        emit_insn!($enc, [0x0F, 0x8C]);
+        emit_insn!($enc, ($imm as u32).to_le_bytes());
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_jge_imm {
+    ($enc:expr, $imm:expr) => {{
+        emit_insn!($enc, [0x0F, 0x8D]);
+        emit_insn!($enc, ($imm as u32).to_le_bytes());
+    }};
+}
+
 // reg1 is always RAX
 #[macro_export]
 macro_rules! emit_test_greater_reg_reg {
@@ -832,11 +856,45 @@ macro_rules! emit_jmp_rip_relative_imm32 {
 
 #[macro_export]
 macro_rules! emit_jmp_imm32 {
-    ($enc:expr, $reg:expr) => {{
+    ($enc:expr, $offset:expr) => {{
         emit_insn!($enc, [0xE9]);
-        emit_insn!($enc, ($reg as u32).to_le_bytes());
+        emit_insn!($enc, ($offset as u32).to_le_bytes());
     }};
 }
+
+#[macro_export]
+macro_rules! get_jmp_imm32 {
+    ($enc:expr, $reg:expr) => {{
+        let mut imm = 0u32;
+
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                $enc.as_ptr().wrapping_add($reg as usize).wrapping_add(1),
+                &mut imm as *mut _ as *mut u8,
+                std::mem::size_of::<u32>(),
+            );
+        }
+
+        imm
+    }};
+}
+
+#[macro_export]
+macro_rules! patch_jmp_imm32 {
+    ($insn_ptr:expr, $imm:expr) => {{
+        let mut imm = $imm.to_le_bytes();
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                &mut imm as *mut _ as *mut u8,
+                $insn_ptr.wrapping_add(1),
+                std::mem::size_of::<u32>(),
+            );
+        }
+    }};
+}
+
+pub const JMP_IMM32_SIZE: usize = 5;
+pub const CMP_JMP_IMM32_SIZE: usize = 6;
 
 /////////// RVM
 
@@ -1194,6 +1252,33 @@ impl BackendCore for BackendCoreImpl {
         unsafe {
             for i in 0..remaining_bytes {
                 *host_insn_begin.wrapping_add(insn.size() + i) = 0x90; // nop
+            }
+        }
+    }
+
+    fn patch_jump_list(jump_list: &Vec<JumpAddrPatch>) {
+        let cpu = cpu::get_cpu();
+
+        for patch in jump_list {
+            let (guest_addr, host_addr, jmp_insn_offset) = patch.get_data();
+
+            let host_target = cpu
+                .insn_map
+                .get_by_guest_idx(guest_addr)
+                .expect("While patching relocation: guest address not found in insn map")
+                .host_ptr;
+
+            let diff = host_target as i64 - host_addr as i64 - jmp_insn_offset as i64;
+
+            assert!(diff >= std::i32::MIN as i64 && diff <= std::i32::MAX as i64);
+
+            let mut diff = (diff as u32).to_le_bytes();
+            unsafe {
+                std::ptr::copy_nonoverlapping(
+                    &mut diff as *mut _ as *mut u8,
+                    host_addr.wrapping_add(jmp_insn_offset as usize - std::mem::size_of::<u32>()),
+                    std::mem::size_of::<u32>(),
+                );
             }
         }
     }

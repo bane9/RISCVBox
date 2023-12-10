@@ -75,7 +75,6 @@ impl ParseCore {
         let code_page: &mut CodePage;
         let code_page_idx: usize;
 
-        // lol
         unsafe {
             let self_mut = self as *mut Self;
             let (code_page_, code_page_idx_) = (*self_mut).code_pages.alloc_code_page();
@@ -89,7 +88,7 @@ impl ParseCore {
 
         cpu.gpfn_state.add_gpfn(base_addr as CpuReg);
 
-        cpu.current_gpfn = gpfn;
+        cpu.current_gpfn = base_addr >> RV_PAGE_SHIFT as BusType;
         cpu.current_gpfn_offset = 0;
 
         while cpu.current_gpfn_offset < RV_PAGE_SIZE as BusType {
@@ -120,6 +119,7 @@ impl ParseCore {
             if let Err(JitCommon::JitError::ReachedBlockBoundary) = result {
                 break;
             } else if result.is_err() {
+                cpu.current_gpfn = gpfn;
                 self.code_pages.mark_all_pages(PageState::ReadExecute);
                 return result;
             }
@@ -129,7 +129,14 @@ impl ParseCore {
             .push(BackendCoreImpl::emit_ret_with_exception(Exception::BlockExit).as_slice())
             .expect("Out of memory");
 
+        if cpu.insn_patch_list.len() > 0 {
+            BackendCoreImpl::patch_jump_list(&cpu.insn_patch_list);
+            cpu.insn_patch_list.clear();
+        }
+
         code_page.mark_rx().unwrap();
+
+        cpu.current_gpfn = gpfn;
 
         Ok(())
     }
@@ -149,6 +156,11 @@ impl ParseCore {
         ];
 
         let mut out_res: JitCommon::DecodeRet = Err(JitCommon::JitError::InvalidInstruction(insn));
+
+        let cpu = cpu::get_cpu();
+
+        let host_insn_ptr = code_page.as_end_ptr();
+        cpu.jit_current_ptr = host_insn_ptr;
 
         for decode in &DECODERS {
             let result = decode(insn);
@@ -175,7 +187,6 @@ impl ParseCore {
             }
         }
 
-        let host_insn_ptr = code_page.as_end_ptr();
         code_page.push(insn_res.as_slice()).expect("Out of memory");
 
         let cpu = cpu::get_cpu();

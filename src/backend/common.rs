@@ -1,4 +1,4 @@
-use cpu::Exception;
+use cpu::{Exception, JumpAddrPatch};
 
 use crate::bus::bus::{self, BusType};
 use crate::bus::mmu::{AccessType, Mmu};
@@ -551,6 +551,7 @@ pub trait BackendCore {
     ) -> HostEncodedInsn;
     fn fastmem_violation_likely_offset() -> usize;
     fn patch_fastmem_violation(host_exception_addr: usize, guest_exception_addr: BusType);
+    fn patch_jump_list(jump_list: &Vec<JumpAddrPatch>);
     unsafe fn call_jit_ptr(jit_ptr: PtrT);
     unsafe fn call_jit_ptr_nommu(jit_ptr: PtrT);
 }

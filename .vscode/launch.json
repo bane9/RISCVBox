@@ -25,7 +25,7 @@
                 "env": {
                     "CARGO_MANIFEST_DIR": "${workspaceFolder}",
                     // Change this to the path of SDL2.dll if you need to debug the program under Windows.
-                    "PATH": "${env:USERPROFILE}\\.rustup\\toolchains\\stable-x86_64-pc-windows-msvc\\lib\\rustlib\\x86_64-pc-windows-msvc\\lib;${workspaceFolder}/target/debug/deps;${env:PATH}",
+                    "PATH": "${env:USERPROFILE}\\.rustup\\toolchains\\nightly-x86_64-pc-windows-msvc\\lib\\rustlib\\x86_64-pc-windows-msvc\\lib;${workspaceFolder}/target/debug/deps;${env:PATH}",
                 },
             }
         },

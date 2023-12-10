@@ -1,9 +1,11 @@
-use crate::backend::core::{abi_reg, FASTMEM_BLOCK_SIZE, MMU_IS_ACTIVE_REG};
+use crate::backend::core::{
+    abi_reg, CMP_JMP_IMM32_SIZE, FASTMEM_BLOCK_SIZE, JMP_IMM32_SIZE, MMU_IS_ACTIVE_REG,
+};
 use crate::backend::target::core::{amd64_reg, BackendCore, BackendCoreImpl};
 use crate::backend::{common, ReturnableHandler, ReturnableImpl};
 use crate::bus::mmu::AccessType;
-use crate::cpu::CpuReg;
-use crate::frontend::exec_core::{RV_PAGE_SHIFT, RV_PAGE_SIZE};
+use crate::cpu::{CpuReg, JumpAddrPatch};
+use crate::frontend::exec_core::{INSN_SIZE, RV_PAGE_SHIFT, RV_PAGE_SIZE};
 use crate::*;
 use common::*;
 
@@ -38,19 +40,82 @@ fn emit_jmp_absolute(
     insn
 }
 
-fn emit_jmp(
-    jmp_fn: extern "C" fn(usize, usize, usize, usize) -> usize,
-    reg1: CpuReg,
-    reg2: CpuReg,
-    imm: i32,
-) -> HostEncodedInsn {
+fn emit_jmp_relative(jump_cond: JumpCond, reg1: CpuReg, reg2: CpuReg, imm: i32) -> HostEncodedInsn {
+    let cpu = cpu::get_cpu();
+    let diff = cpu.current_gpfn_offset as i32 + imm;
+
+    let target_guest_pc = cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg;
+    let target_guest_pc = target_guest_pc as i64 + diff as i64;
+    let jmp_insn_offset: u32;
+
+    let mut insn = HostEncodedInsn::new();
+    let target_host_addr: usize;
+
+    if jump_cond == JumpCond::Always {
+        if reg1 != 0 {
+            let auipc = RviImpl::emit_auipc(reg1 as u8, INSN_SIZE as i32).unwrap();
+
+            insn.push_slice(auipc.as_slice());
+        }
+
+        target_host_addr = cpu.jit_current_ptr as usize + insn.size();
+
+        emit_jmp_imm32!(insn, 0);
+        jmp_insn_offset = JMP_IMM32_SIZE as u32;
+    } else {
+        emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RAX, reg1);
+        emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RBX, reg2);
+
+        if jump_cond == JumpCond::LessThan || jump_cond == JumpCond::GreaterThanEqual {
+            emit_movsxd_reg_reg!(insn, amd64_reg::RAX, amd64_reg::RAX);
+            emit_movsxd_reg_reg!(insn, amd64_reg::RBX, amd64_reg::RBX);
+        }
+
+        emit_cmp_reg_reg!(insn, amd64_reg::RAX, amd64_reg::RBX);
+
+        target_host_addr = cpu.jit_current_ptr as usize + insn.size();
+
+        match jump_cond {
+            JumpCond::Equal => emit_je_imm!(insn, 0),
+            JumpCond::NotEqual => emit_jne_imm!(insn, 0),
+            JumpCond::LessThanUnsigned | JumpCond::LessThan => emit_jl_imm!(insn, 0),
+            JumpCond::GreaterThanEqualUnsigned | JumpCond::GreaterThanEqual => {
+                emit_jge_imm!(insn, 0)
+            }
+            _ => unreachable!(),
+        }
+
+        jmp_insn_offset = CMP_JMP_IMM32_SIZE as u32;
+    }
+
+    cpu.insn_patch_list.push(JumpAddrPatch::new(
+        target_guest_pc as CpuReg,
+        target_host_addr as *mut u8,
+        jmp_insn_offset,
+    ));
+
+    insn
+}
+
+fn emit_jmp(jump_cond: JumpCond, reg1: CpuReg, reg2: CpuReg, imm: i32) -> HostEncodedInsn {
     let cpu = cpu::get_cpu();
 
     let diff = cpu.current_gpfn_offset as i32 + imm;
 
-    if diff >= 0 && diff < RV_PAGE_SIZE as i32 {
-        //println!("emit_jmp: relative jump");
+    if jump_cond != JumpCond::AlwaysAbsolute && diff >= 0 && diff < RV_PAGE_SIZE as i32 {
+        return emit_jmp_relative(jump_cond, reg1, reg2, imm);
     }
+
+    let jmp_fn = match jump_cond {
+        JumpCond::Equal => c_beq_cb,
+        JumpCond::NotEqual => c_bne_cb,
+        JumpCond::LessThan => c_blt_cb,
+        JumpCond::GreaterThanEqual => c_bge_cb,
+        JumpCond::LessThanUnsigned => c_bltu_cb,
+        JumpCond::GreaterThanEqualUnsigned => c_bgeu_cb,
+        JumpCond::Always => c_jal_cb,
+        JumpCond::AlwaysAbsolute => c_jalr_cb,
+    };
 
     emit_jmp_absolute(jmp_fn, reg1, reg2, imm)
 }
@@ -479,7 +544,10 @@ impl common::Rvi for RviImpl {
         emit_shl_reg_imm!(insn, amd64_reg::RAX, RV_PAGE_SHIFT as u8);
 
         emit_or_reg_imm!(insn, amd64_reg::RAX, cpu.current_gpfn_offset);
-        emit_add_reg_imm!(insn, amd64_reg::RAX, imm);
+
+        if imm != 0 {
+            emit_add_reg_imm!(insn, amd64_reg::RAX, imm);
+        }
 
         let rd_addr = &cpu.regs[rd as usize] as *const _ as usize;
 
@@ -490,35 +558,55 @@ impl common::Rvi for RviImpl {
     }
 
     fn emit_jal(rd: u8, imm: i32) -> DecodeRet {
-        Ok(emit_jmp(c_jal_cb, rd as u32, 0, imm))
+        Ok(emit_jmp(JumpCond::Always, rd as u32, 0, imm))
     }
 
     fn emit_jalr(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
-        Ok(emit_jmp_absolute(c_jalr_cb, rd as u32, rs1 as u32, imm))
+        Ok(emit_jmp(
+            JumpCond::AlwaysAbsolute,
+            rd as u32,
+            rs1 as u32,
+            imm,
+        ))
     }
 
     fn emit_beq(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_jmp(c_beq_cb, rs1 as u32, rs2 as u32, imm))
+        Ok(emit_jmp(JumpCond::Equal, rs1 as u32, rs2 as u32, imm))
     }
 
     fn emit_bne(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_jmp(c_bne_cb, rs1 as u32, rs2 as u32, imm))
+        Ok(emit_jmp(JumpCond::NotEqual, rs1 as u32, rs2 as u32, imm))
     }
 
     fn emit_blt(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_jmp(c_blt_cb, rs1 as u32, rs2 as u32, imm))
+        Ok(emit_jmp(JumpCond::LessThan, rs1 as u32, rs2 as u32, imm))
     }
 
     fn emit_bge(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_jmp(c_bge_cb, rs1 as u32, rs2 as u32, imm))
+        Ok(emit_jmp(
+            JumpCond::GreaterThanEqual,
+            rs1 as u32,
+            rs2 as u32,
+            imm,
+        ))
     }
 
     fn emit_bltu(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_jmp(c_bltu_cb, rs1 as u32, rs2 as u32, imm))
+        Ok(emit_jmp(
+            JumpCond::LessThanUnsigned,
+            rs1 as u32,
+            rs2 as u32,
+            imm,
+        ))
     }
 
     fn emit_bgeu(rs1: u8, rs2: u8, imm: i32) -> DecodeRet {
-        Ok(emit_jmp(c_bgeu_cb, rs1 as u32, rs2 as u32, imm))
+        Ok(emit_jmp(
+            JumpCond::GreaterThanEqualUnsigned,
+            rs1 as u32,
+            rs2 as u32,
+            imm,
+        ))
     }
 
     fn emit_lb(rd: u8, rs1: u8, imm: i32) -> DecodeRet {
