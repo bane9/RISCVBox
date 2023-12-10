@@ -2,7 +2,7 @@ use crate::backend::target::core::BackendCoreImpl;
 use crate::backend::{BackendCore, ReturnStatus, ReturnableHandler, ReturnableImpl};
 use crate::bus::clint::Clint;
 use crate::bus::dtb::DTB_BEGIN_ADDR;
-use crate::bus::mmu::AccessType;
+use crate::bus::mmu::{AccessType, Mmu};
 use crate::bus::{self, BusType};
 use crate::cpu::{self, CpuReg};
 use crate::cpu::{trap, RegName};
@@ -80,9 +80,15 @@ impl ExecCore {
             cpu.jump_count = 0;
             cpu.next_pc = 0;
 
-            let ret = ReturnableImpl::handle(|| unsafe {
-                BackendCoreImpl::call_jit_ptr(host_ptr);
-            });
+            let ret = if cpu.mmu.is_active() {
+                ReturnableImpl::handle(|| unsafe {
+                    BackendCoreImpl::call_jit_ptr(host_ptr);
+                })
+            } else {
+                ReturnableImpl::handle(|| unsafe {
+                    BackendCoreImpl::call_jit_ptr_nommu(host_ptr);
+                })
+            };
 
             match ret {
                 ReturnStatus::ReturnOk => {}

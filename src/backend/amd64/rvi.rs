@@ -1,6 +1,7 @@
-use crate::backend::common;
-use crate::backend::core::FASTMEM_BLOCK_SIZE;
+use crate::backend::core::{abi_reg, FASTMEM_BLOCK_SIZE, MMU_IS_ACTIVE_REG};
 use crate::backend::target::core::{amd64_reg, BackendCore, BackendCoreImpl};
+use crate::backend::{common, ReturnableHandler, ReturnableImpl};
+use crate::bus::mmu::AccessType;
 use crate::cpu::CpuReg;
 use crate::frontend::exec_core::{RV_PAGE_SHIFT, RV_PAGE_SIZE};
 use crate::*;
@@ -31,8 +32,8 @@ fn emit_jmp_absolute(
     let mut jmp_insn = HostEncodedInsn::new();
     emit_jmp_reg!(jmp_insn, amd64_reg::RAX);
 
-    emit_jz_imm!(insn, jmp_insn.size() as u8);
-    insn.push_slice(jmp_insn.iter().as_slice());
+    emit_jz_imm!(insn, jmp_insn.size());
+    insn.push_slice(jmp_insn.as_slice());
 
     insn
 }
@@ -87,6 +88,24 @@ fn emit_bus_access(
     )
 }
 
+extern "C" fn c_load_mmu_translate_cb(addr: usize, gpfn_offset: usize) -> usize {
+    let cpu = cpu::get_cpu();
+
+    let bus = bus::get_bus();
+
+    let addr = addr as CpuReg;
+
+    let ret = bus.translate(addr, &cpu.mmu, AccessType::Load);
+
+    if ret.is_err() {
+        cpu.set_exception(ret.err().unwrap(), gpfn_offset as CpuReg);
+
+        ReturnableImpl::throw();
+    }
+
+    ret.unwrap() as usize
+}
+
 fn emit_load(
     load_size: usize,
     dest_reg: u8,
@@ -116,6 +135,21 @@ fn emit_load(
 
     emit_mov_ptr_reg_dword_ptr!(insn, amd64_reg::RAX, amd64_reg::RAX);
     emit_add_reg_reg!(insn, amd64_reg::RAX, amd64_reg::RCX);
+
+    let mut mmu_translate_insn = HostEncodedInsn::new();
+    emit_mov_reg_reg1!(mmu_translate_insn, abi_reg::ARG1, amd64_reg::RAX);
+    emit_mov_reg_imm!(mmu_translate_insn, abi_reg::ARG2, cpu.current_gpfn_offset);
+    emit_mov_reg_imm!(
+        mmu_translate_insn,
+        amd64_reg::R11,
+        c_load_mmu_translate_cb as usize
+    ); // Stack manipulation is left out as it's technically not needed here
+    emit_call_reg!(mmu_translate_insn, amd64_reg::R11);
+
+    emit_cmp_reg_imm!(insn, MMU_IS_ACTIVE_REG, 1);
+    emit_jne_imm!(insn, mmu_translate_insn.size());
+    insn.push_slice(mmu_translate_insn.as_slice());
+
     emit_mov_ptr_reg_dword_ptr!(insn, amd64_reg::RAX, amd64_reg::RAX);
 
     if dest_reg != 0 {
@@ -148,6 +182,24 @@ fn emit_load(
     insn
 }
 
+extern "C" fn c_store_mmu_translate_cb(addr: usize, gpfn_offset: usize) -> usize {
+    let cpu = cpu::get_cpu();
+
+    let bus = bus::get_bus();
+
+    let addr = addr as CpuReg;
+
+    let ret = bus.translate(addr, &cpu.mmu, AccessType::Store);
+
+    if ret.is_err() {
+        cpu.set_exception(ret.err().unwrap(), gpfn_offset as CpuReg);
+
+        ReturnableImpl::throw();
+    }
+
+    ret.unwrap() as usize
+}
+
 fn emit_store(store_size: usize, addr_reg: u8, data_reg: u8, imm: i32) -> HostEncodedInsn {
     let cpu = cpu::get_cpu();
 
@@ -165,9 +217,23 @@ fn emit_store(store_size: usize, addr_reg: u8, data_reg: u8, imm: i32) -> HostEn
     emit_mov_reg_imm!(insn, amd64_reg::RCX, imm as i64 as usize);
 
     emit_mov_ptr_reg_dword_ptr!(insn, amd64_reg::RAX, amd64_reg::RAX);
-    emit_add_reg_reg!(insn, amd64_reg::RAX, amd64_reg::RCX);
+    emit_add_reg_imm!(insn, amd64_reg::RAX, imm as i64 as usize);
 
     emit_mov_ptr_reg_dword_ptr!(insn, amd64_reg::RBX, amd64_reg::RBX);
+
+    let mut mmu_translate_insn = HostEncodedInsn::new();
+    emit_mov_reg_reg1!(mmu_translate_insn, abi_reg::ARG1, amd64_reg::RAX);
+    emit_mov_reg_imm!(mmu_translate_insn, abi_reg::ARG2, cpu.current_gpfn_offset);
+    emit_mov_reg_imm!(
+        mmu_translate_insn,
+        amd64_reg::R11,
+        c_store_mmu_translate_cb as usize
+    );
+    emit_call_reg!(mmu_translate_insn, amd64_reg::R11);
+
+    emit_cmp_reg_imm!(insn, MMU_IS_ACTIVE_REG, 1);
+    emit_jne_imm!(insn, mmu_translate_insn.size());
+    insn.push_slice(mmu_translate_insn.as_slice());
 
     match store_size {
         8 => emit_mov_byte_ptr_reg!(insn, amd64_reg::RAX, amd64_reg::RBX),

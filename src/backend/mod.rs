@@ -1,13 +1,13 @@
-#[cfg(all(target_arch = "x86_64", not(feature = "nojit")))]
+#[cfg(all(target_arch = "x86_64"))]
 pub mod amd64;
 
-#[cfg(all(target_arch = "x86_64", not(feature = "nojit")))]
+#[cfg(all(target_arch = "x86_64"))]
 pub use amd64 as target;
 
-#[cfg(all(target_arch = "aarch64", not(feature = "nojit")))]
+#[cfg(all(target_arch = "aarch64"))]
 pub mod aarch64;
 
-#[cfg(all(target_arch = "aarch64", not(feature = "nojit")))]
+#[cfg(all(target_arch = "aarch64"))]
 pub use aarch64 as target;
 
 pub use target::*;

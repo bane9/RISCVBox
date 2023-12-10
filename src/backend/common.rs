@@ -9,6 +9,8 @@ use crate::util::EncodedInsn;
 use crate::backend::{ReturnableHandler, ReturnableImpl};
 use crate::util::util::sign_extend;
 
+use super::target;
+
 #[derive(Debug)]
 pub enum JitError {
     InvalidInstruction(u32),
@@ -18,7 +20,7 @@ pub enum JitError {
 
 pub type PtrT = *mut u8;
 pub type HostInsnT = u8;
-pub const HOST_INSN_MAX_SIZE: usize = 96;
+pub const HOST_INSN_MAX_SIZE: usize = target::core::HOST_INSN_MAX_SIZE;
 pub type HostEncodedInsn = EncodedInsn<HostInsnT, HOST_INSN_MAX_SIZE>;
 pub type DecodeRet = Result<HostEncodedInsn, JitError>;
 pub const JUMP_COUNT_MAX: usize = 0x1000 * 0x10;
@@ -550,6 +552,7 @@ pub trait BackendCore {
     fn fastmem_violation_likely_offset() -> usize;
     fn patch_fastmem_violation(host_exception_addr: usize, guest_exception_addr: BusType);
     unsafe fn call_jit_ptr(jit_ptr: PtrT);
+    unsafe fn call_jit_ptr_nommu(jit_ptr: PtrT);
 }
 
 pub trait Rvi {

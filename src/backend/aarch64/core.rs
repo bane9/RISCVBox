@@ -6,7 +6,7 @@ use std::arch::asm;
 
 pub type PtrT = *mut u8;
 pub type HostInsnT = u8;
-pub const HOST_INSN_MAX_SIZE: usize = 96;
+pub const HOST_INSN_MAX_SIZE: usize = 128;
 pub type HostEncodedInsn = EncodedInsn<HostInsnT, HOST_INSN_MAX_SIZE>;
 pub type DecodeRet = Result<HostEncodedInsn, JitError>;
 

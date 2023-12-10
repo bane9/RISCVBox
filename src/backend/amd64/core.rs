@@ -11,11 +11,11 @@ use std::arch::asm;
 
 pub type PtrT = *mut u8;
 pub type HostInsnT = u8;
-pub const HOST_INSN_MAX_SIZE: usize = 96;
+pub const HOST_INSN_MAX_SIZE: usize = 98;
 pub type HostEncodedInsn = EncodedInsn<HostInsnT, HOST_INSN_MAX_SIZE>;
 pub type DecodeRet = Result<HostEncodedInsn, JitError>;
 
-pub const FASTMEM_BLOCK_SIZE: usize = 59;
+pub const FASTMEM_BLOCK_SIZE: usize = HOST_INSN_MAX_SIZE;
 
 #[macro_export]
 macro_rules! host_get_return_addr {
@@ -52,6 +52,8 @@ pub mod amd64_reg {
     pub const R14: u8 = 14;
     pub const R15: u8 = 15;
 }
+
+pub const MMU_IS_ACTIVE_REG: u8 = amd64_reg::R15;
 
 #[cfg(windows)]
 pub mod abi_reg {
@@ -705,7 +707,7 @@ macro_rules! emit_cmp_reg_imm {
         } else if $reg1 < amd64_reg::R8 {
             emit_insn!($enc, [0x48, 0x81, 0xF8 + $reg1 as u8]);
         } else {
-            emit_insn!($enc, [0x49, 0x81, 0xF8 + $reg1 as u8 - amd64_reg::R8]);
+            emit_insn!($enc, [0x49, 0x81, 0xF8 + ($reg1 as u8 - amd64_reg::R8)]);
         }
 
         emit_insn!($enc, ($imm as u32).to_le_bytes());
@@ -727,6 +729,22 @@ macro_rules! emit_cmp_reg_reg {
     }};
 }
 
+#[macro_export]
+macro_rules! emit_cmp_reg_reg2 {
+    ($enc:expr, $reg1:expr, $reg2:expr) => {{
+        assert!($reg1 >= amd64_reg::R8 && $reg2 >= amd64_reg::R8);
+        emit_insn!(
+            $enc,
+            [
+                0x4D,
+                0x39,
+                (0xC0 as u8)
+                    .wrapping_add(($reg2 - amd64_reg::R8) << 3)
+                    .wrapping_add($reg1)
+            ]
+        );
+    }};
+}
 // reg1 is always RAX
 #[macro_export]
 macro_rules! emit_test_less_reg_imm {
@@ -771,6 +789,14 @@ macro_rules! emit_test_greater_reg_imm {
 macro_rules! emit_jz_imm {
     ($enc:expr, $imm:expr) => {{
         emit_insn!($enc, [0x0F, 0x84]);
+        emit_insn!($enc, ($imm as u32).to_le_bytes());
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_jne_imm {
+    ($enc:expr, $imm:expr) => {{
+        emit_insn!($enc, [0x0F, 0x85]);
         emit_insn!($enc, ($imm as u32).to_le_bytes());
     }};
 }
@@ -1119,7 +1145,7 @@ impl BackendCore for BackendCoreImpl {
     }
 
     fn fastmem_violation_likely_offset() -> usize {
-        46
+        93
     }
 
     fn patch_fastmem_violation(host_exception_addr: usize, guest_exception_addr: BusType) {
@@ -1183,8 +1209,36 @@ impl BackendCore for BackendCoreImpl {
             "push r13",
             "push r14",
             "push r15",
-            "mov rbp, rsp",
+            "mov r15, 1",
             "call {0}",
+
+            "pop r15",
+            "pop r14",
+            "pop r13",
+            "pop r12",
+            "pop rsi",
+            "pop rdi",
+            "pop rbx",
+            "pop rbp",
+
+            in(reg) jit_ptr,
+        );
+    }
+
+    #[inline(never)]
+    unsafe fn call_jit_ptr_nommu(jit_ptr: *mut u8) {
+        asm!(
+            "push rbp",
+            "push rbx",
+            "push rdi",
+            "push rsi",
+            "push r12",
+            "push r13",
+            "push r14",
+            "push r15",
+            "mov r15, 0",
+            "call {0}",
+
             "pop r15",
             "pop r14",
             "pop r13",
