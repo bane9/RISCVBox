@@ -755,6 +755,20 @@ macro_rules! emit_cmp_reg_reg {
 }
 
 #[macro_export]
+macro_rules! emit_cmp_reg_reg32 {
+    ($enc:expr, $reg1:expr, $reg2:expr) => {{
+        assert!($reg1 < amd64_reg::R8 && $reg2 < amd64_reg::R8);
+        emit_insn!(
+            $enc,
+            [
+                0x39,
+                (0xC0 as u8).wrapping_add($reg2 << 3).wrapping_add($reg1)
+            ]
+        );
+    }};
+}
+
+#[macro_export]
 macro_rules! emit_cmp_reg_reg2 {
     ($enc:expr, $reg1:expr, $reg2:expr) => {{
         assert!($reg1 >= amd64_reg::R8 && $reg2 >= amd64_reg::R8);
@@ -838,6 +852,22 @@ macro_rules! emit_je_imm {
 macro_rules! emit_jl_imm {
     ($enc:expr, $imm:expr) => {{
         emit_insn!($enc, [0x0F, 0x8C]);
+        emit_insn!($enc, ($imm as u32).to_le_bytes());
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_jb_imm {
+    ($enc:expr, $imm:expr) => {{
+        emit_insn!($enc, [0x0F, 0x82]);
+        emit_insn!($enc, ($imm as u32).to_le_bytes());
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_jae_imm {
+    ($enc:expr, $imm:expr) => {{
+        emit_insn!($enc, [0x0F, 0x83]);
         emit_insn!($enc, ($imm as u32).to_le_bytes());
     }};
 }

@@ -44,6 +44,8 @@ fn emit_jmp_relative(jump_cond: JumpCond, reg1: CpuReg, reg2: CpuReg, imm: i32) 
     let cpu = cpu::get_cpu();
     let diff = cpu.current_gpfn_offset as i32 + imm;
 
+    assert!(diff >= 0 && diff < RV_PAGE_SIZE as i32);
+
     let target_guest_pc = cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg;
     let target_guest_pc = target_guest_pc as i64 + diff as i64;
     let jmp_insn_offset: u32;
@@ -66,22 +68,17 @@ fn emit_jmp_relative(jump_cond: JumpCond, reg1: CpuReg, reg2: CpuReg, imm: i32) 
         emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RAX, reg1);
         emit_mov_reg_guest_to_host!(insn, cpu, amd64_reg::RBX, reg2);
 
-        if jump_cond == JumpCond::LessThan || jump_cond == JumpCond::GreaterThanEqual {
-            emit_movsxd_reg_reg!(insn, amd64_reg::RAX, amd64_reg::RAX);
-            emit_movsxd_reg_reg!(insn, amd64_reg::RBX, amd64_reg::RBX);
-        }
-
-        emit_cmp_reg_reg!(insn, amd64_reg::RAX, amd64_reg::RBX);
+        emit_cmp_reg_reg32!(insn, amd64_reg::RAX, amd64_reg::RBX);
 
         target_host_addr = cpu.jit_current_ptr as usize + insn.size();
 
         match jump_cond {
             JumpCond::Equal => emit_je_imm!(insn, 0),
             JumpCond::NotEqual => emit_jne_imm!(insn, 0),
-            JumpCond::LessThanUnsigned | JumpCond::LessThan => emit_jl_imm!(insn, 0),
-            JumpCond::GreaterThanEqualUnsigned | JumpCond::GreaterThanEqual => {
-                emit_jge_imm!(insn, 0)
-            }
+            JumpCond::LessThan => emit_jl_imm!(insn, 0),
+            JumpCond::GreaterThanEqual => emit_jge_imm!(insn, 0),
+            JumpCond::LessThanUnsigned => emit_jb_imm!(insn, 0),
+            JumpCond::GreaterThanEqualUnsigned => emit_jae_imm!(insn, 0),
             _ => unreachable!(),
         }
 
@@ -102,7 +99,11 @@ fn emit_jmp(jump_cond: JumpCond, reg1: CpuReg, reg2: CpuReg, imm: i32) -> HostEn
 
     let diff = cpu.current_gpfn_offset as i32 + imm;
 
-    if jump_cond != JumpCond::AlwaysAbsolute && diff >= 0 && diff < RV_PAGE_SIZE as i32 {
+    if jump_cond != JumpCond::AlwaysAbsolute
+        && diff % INSN_SIZE as i32 == 0
+        && diff >= 0
+        && diff < RV_PAGE_SIZE as i32
+    {
         return emit_jmp_relative(jump_cond, reg1, reg2, imm);
     }
 
