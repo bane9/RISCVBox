@@ -193,18 +193,18 @@ fn emit_load(
 
     let fmem_encoded = create_fastmem_metadata!(load_size, fmem_type);
 
-    emit_mov_reg_imm!(insn, amd64_reg::RAX, fmem_encoded);
-    emit_mov_reg_imm!(insn, amd64_reg::RBX, dst as usize);
-    emit_mov_reg_imm!(insn, amd64_reg::RAX, src as usize);
-    emit_mov_reg_imm!(insn, amd64_reg::RCX, imm as i64 as usize);
+    emit_mov_reg_imm_auto!(insn, amd64_reg::RAX, fmem_encoded);
+    emit_mov_reg_imm_auto!(insn, amd64_reg::RBX, dst as usize);
+    emit_mov_reg_imm_auto!(insn, amd64_reg::RAX, src as usize);
+    emit_mov_reg_imm_auto!(insn, amd64_reg::RCX, imm as i64 as usize);
 
     emit_mov_ptr_reg_dword_ptr!(insn, amd64_reg::RAX, amd64_reg::RAX);
     emit_add_reg_reg!(insn, amd64_reg::RAX, amd64_reg::RCX);
 
     let mut mmu_translate_insn = HostEncodedInsn::new();
     emit_mov_reg_reg1!(mmu_translate_insn, abi_reg::ARG1, amd64_reg::RAX);
-    emit_mov_reg_imm!(mmu_translate_insn, abi_reg::ARG2, cpu.current_gpfn_offset);
-    emit_mov_reg_imm!(
+    emit_mov_reg_imm_auto!(mmu_translate_insn, abi_reg::ARG2, cpu.current_gpfn_offset);
+    emit_mov_reg_imm_auto!(
         mmu_translate_insn,
         amd64_reg::R11,
         c_load_mmu_translate_cb as usize
@@ -276,10 +276,10 @@ fn emit_store(store_size: usize, addr_reg: u8, data_reg: u8, imm: i32) -> HostEn
     let fmem_type = FastmemAccessType::Store.to_usize();
     let fmem_encoded = create_fastmem_metadata!(store_size, fmem_type);
 
-    emit_mov_reg_imm!(insn, amd64_reg::RAX, fmem_encoded);
-    emit_mov_reg_imm!(insn, amd64_reg::RAX, addr as usize);
-    emit_mov_reg_imm!(insn, amd64_reg::RBX, data as usize);
-    emit_mov_reg_imm!(insn, amd64_reg::RCX, imm as i64 as usize);
+    emit_mov_reg_imm_auto!(insn, amd64_reg::RAX, fmem_encoded);
+    emit_mov_reg_imm_auto!(insn, amd64_reg::RAX, addr as usize);
+    emit_mov_reg_imm_auto!(insn, amd64_reg::RBX, data as usize);
+    emit_mov_reg_imm_auto!(insn, amd64_reg::RCX, imm as i64 as usize);
 
     emit_mov_ptr_reg_dword_ptr!(insn, amd64_reg::RAX, amd64_reg::RAX);
     emit_add_reg_imm!(insn, amd64_reg::RAX, imm as i64 as usize);
@@ -288,8 +288,8 @@ fn emit_store(store_size: usize, addr_reg: u8, data_reg: u8, imm: i32) -> HostEn
 
     let mut mmu_translate_insn = HostEncodedInsn::new();
     emit_mov_reg_reg1!(mmu_translate_insn, abi_reg::ARG1, amd64_reg::RAX);
-    emit_mov_reg_imm!(mmu_translate_insn, abi_reg::ARG2, cpu.current_gpfn_offset);
-    emit_mov_reg_imm!(
+    emit_mov_reg_imm_auto!(mmu_translate_insn, abi_reg::ARG2, cpu.current_gpfn_offset);
+    emit_mov_reg_imm_auto!(
         mmu_translate_insn,
         amd64_reg::R11,
         c_store_mmu_translate_cb as usize
@@ -326,7 +326,7 @@ impl common::Rvi for RviImpl {
         emit_check_rd!(insn, rd);
 
         if rs1 == 0 {
-            emit_mov_reg_imm!(insn, amd64_reg::RBX, imm);
+            emit_mov_reg_imm_auto!(insn, amd64_reg::RBX, imm);
             emit_mov_reg_host_to_guest!(insn, cpu, amd64_reg::RCX, amd64_reg::RBX, rd);
 
             return Ok(insn);
@@ -524,7 +524,7 @@ impl common::Rvi for RviImpl {
 
         let rd_addr = &cpu.regs[rd as usize] as *const _ as usize;
 
-        emit_mov_reg_imm!(insn, amd64_reg::RBX, rd_addr);
+        emit_mov_reg_imm_auto!(insn, amd64_reg::RBX, rd_addr);
         emit_mov_dword_ptr_imm!(insn, amd64_reg::RBX, imm as u32);
 
         Ok(insn)
@@ -538,7 +538,7 @@ impl common::Rvi for RviImpl {
 
         let current_gpfn = &cpu.current_gpfn as *const _ as usize;
 
-        emit_mov_reg_imm!(insn, amd64_reg::RAX, current_gpfn);
+        emit_mov_reg_imm_auto!(insn, amd64_reg::RAX, current_gpfn);
         emit_mov_ptr_reg_dword_ptr!(insn, amd64_reg::RAX, amd64_reg::RAX);
 
         emit_shl_reg_imm!(insn, amd64_reg::RAX, RV_PAGE_SHIFT as u8);
@@ -551,7 +551,7 @@ impl common::Rvi for RviImpl {
 
         let rd_addr = &cpu.regs[rd as usize] as *const _ as usize;
 
-        emit_mov_reg_imm!(insn, amd64_reg::RBX, rd_addr);
+        emit_mov_reg_imm_auto!(insn, amd64_reg::RBX, rd_addr);
         emit_mov_dword_ptr_reg!(insn, amd64_reg::RBX, amd64_reg::RAX);
 
         Ok(insn)

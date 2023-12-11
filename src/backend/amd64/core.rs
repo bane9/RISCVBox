@@ -1,3 +1,5 @@
+#![allow(unused_unsafe)]
+
 use crate::{backend::*, bus::BusType, frontend::exec_core::RV_PAGE_OFFSET_MASK};
 pub use crate::{
     backend::{BackendCore, JitError},
@@ -15,7 +17,7 @@ pub const HOST_INSN_MAX_SIZE: usize = 98;
 pub type HostEncodedInsn = EncodedInsn<HostInsnT, HOST_INSN_MAX_SIZE>;
 pub type DecodeRet = Result<HostEncodedInsn, JitError>;
 
-pub const FASTMEM_BLOCK_SIZE: usize = HOST_INSN_MAX_SIZE;
+pub const FASTMEM_BLOCK_SIZE: usize = 88;
 
 #[macro_export]
 macro_rules! host_get_return_addr {
@@ -113,7 +115,7 @@ macro_rules! emit_pop_reg {
 }
 
 #[macro_export]
-macro_rules! emit_mov_reg_imm {
+macro_rules! emit_movabs_reg_imm {
     ($enc:expr, $reg:expr, $imm:expr) => {{
         if $reg < amd64_reg::R8 {
             emit_insn!($enc, [0x48, 0xB8 + $reg as u8]);
@@ -121,6 +123,29 @@ macro_rules! emit_mov_reg_imm {
             emit_insn!($enc, [0x49, 0xB8 + $reg as u8 - amd64_reg::R8]);
         }
         emit_insn!($enc, (($imm) as u64).to_le_bytes());
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_mov_reg_imm32 {
+    ($enc:expr, $reg:expr, $imm:expr) => {{
+        if $reg < amd64_reg::R8 {
+            emit_insn!($enc, [0xB8 + $reg as u8]);
+        } else {
+            emit_insn!($enc, [0x49, 0xC7, 0xC0 + $reg as u8 - amd64_reg::R8]);
+        }
+        emit_insn!($enc, (($imm) as u32).to_le_bytes());
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_mov_reg_imm_auto {
+    ($enc:expr, $reg:expr, $imm:expr) => {{
+        if $imm as usize <= 0xFFFFFFFF {
+            emit_mov_reg_imm32!($enc, $reg, $imm);
+        } else {
+            emit_movabs_reg_imm!($enc, $reg, $imm);
+        }
     }};
 }
 
@@ -276,7 +301,7 @@ macro_rules! emit_mov_ptr_reg_byte_ptr {
 macro_rules! emit_mov_reg_guest_to_host {
     ($enc:expr, $cpu:expr, $dst_reg:expr, $src_reg:expr) => {{
         if $src_reg != 0 {
-            emit_mov_reg_imm!($enc, $dst_reg, &$cpu.regs[$src_reg as usize] as *const _);
+            emit_mov_reg_imm_auto!($enc, $dst_reg, &$cpu.regs[$src_reg as usize] as *const _);
             emit_mov_ptr_reg_dword_ptr!($enc, $dst_reg, $dst_reg);
         } else {
             emit_xor_reg_reg!($enc, $dst_reg, $dst_reg);
@@ -287,7 +312,7 @@ macro_rules! emit_mov_reg_guest_to_host {
 #[macro_export]
 macro_rules! emit_mov_reg_host_to_guest {
     ($enc:expr, $cpu:expr, $dst_addr_reg:expr, $dst_val_reg:expr, $src_reg:expr) => {{
-        emit_mov_reg_imm!(
+        emit_mov_reg_imm_auto!(
             $enc,
             $dst_addr_reg,
             &$cpu.regs[$src_reg as usize] as *const _ as usize
@@ -311,15 +336,15 @@ macro_rules! emit_check_rd {
 macro_rules! emit_set_exception {
     ($enc:expr, $cpu:expr, $exception:expr, $data:expr, $pc:expr) => {{
         let exception_addr = &$cpu.c_exception as *const _ as usize;
-        emit_mov_reg_imm!($enc, amd64_reg::RAX, exception_addr);
+        emit_mov_reg_imm_auto!($enc, amd64_reg::RAX, exception_addr);
         emit_mov_dword_ptr_imm!($enc, amd64_reg::RAX, $exception as usize);
 
         let exception_data_addr = &$cpu.c_exception_data as *const _ as usize;
-        emit_mov_reg_imm!($enc, amd64_reg::RAX, exception_data_addr);
+        emit_mov_reg_imm_auto!($enc, amd64_reg::RAX, exception_data_addr);
         emit_mov_dword_ptr_imm!($enc, amd64_reg::RAX, $data as usize);
 
         let exception_pc = &$cpu.c_exception_pc as *const _ as usize;
-        emit_mov_reg_imm!($enc, amd64_reg::RAX, exception_pc);
+        emit_mov_reg_imm_auto!($enc, amd64_reg::RAX, exception_pc);
         emit_mov_dword_ptr_imm!($enc, amd64_reg::RAX, $pc as usize);
 
         emit_ret!($enc);
@@ -1045,10 +1070,42 @@ macro_rules! extract_imm_from_movabs {
 }
 
 #[macro_export]
+macro_rules! extract_imm_from_mov32 {
+    ($ptr: expr) => {{
+        let mut imm = 0u32;
+
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                $ptr.wrapping_add(1),
+                &mut imm as *mut _ as *mut u8,
+                std::mem::size_of::<u32>(),
+            );
+        }
+
+        imm
+    }};
+}
+
+#[macro_export]
+macro_rules! extract_imm_from_mov_auto {
+    ($ptr: expr) => {{
+        unsafe {
+            if *$ptr == 0x48 || *$ptr == 0x49 {
+                (extract_imm_from_movabs!($ptr), 10usize)
+            } else if *$ptr >= 0xB8 && *$ptr <= 0xBF {
+                (extract_imm_from_mov32!($ptr) as u64, 5usize)
+            } else {
+                panic!("Invalid mov instruction");
+            }
+        }
+    }};
+}
+
+#[macro_export]
 macro_rules! extract_fastmem_metadata {
     ($metadata: expr) => {{
-        let access_size = ($metadata >> 56) & 0xFF;
-        let access_type = ($metadata >> 48) & 0xFF;
+        let access_size = ($metadata >> 8) & 0xFF;
+        let access_type = $metadata & 0xFF;
 
         (access_size, access_type)
     }};
@@ -1057,7 +1114,7 @@ macro_rules! extract_fastmem_metadata {
 #[macro_export]
 macro_rules! create_fastmem_metadata {
     ($access_size:expr, $access_type:expr) => {{
-        (($access_size as u64) << 56) | (($access_type as u64) << 48)
+        (($access_size & 0xFF) << 8) | ($access_type & 0xFF)
     }};
 }
 
@@ -1108,7 +1165,7 @@ impl BackendCore for BackendCoreImpl {
 
         emit_push_reg!(insn, amd64_reg::RBP);
         emit_mov_reg_reg1!(insn, amd64_reg::RBP, amd64_reg::RSP);
-        emit_mov_reg_imm!(insn, amd64_reg::R11, fn_ptr);
+        emit_mov_reg_imm_auto!(insn, amd64_reg::R11, fn_ptr);
         emit_call_reg!(insn, amd64_reg::R11);
         emit_pop_reg!(insn, amd64_reg::RBP);
 
@@ -1126,11 +1183,11 @@ impl BackendCore for BackendCoreImpl {
 
         emit_push_reg!(insn, amd64_reg::RBP);
         emit_mov_reg_reg1!(insn, amd64_reg::RBP, amd64_reg::RSP);
-        emit_mov_reg_imm!(insn, abi_reg::ARG1, arg1);
-        emit_mov_reg_imm!(insn, abi_reg::ARG2, arg2);
-        emit_mov_reg_imm!(insn, abi_reg::ARG3, arg3);
-        emit_mov_reg_imm!(insn, abi_reg::ARG4, arg4);
-        emit_mov_reg_imm!(insn, amd64_reg::R11, fn_ptr);
+        emit_mov_reg_imm_auto!(insn, abi_reg::ARG1, arg1);
+        emit_mov_reg_imm_auto!(insn, abi_reg::ARG2, arg2);
+        emit_mov_reg_imm_auto!(insn, abi_reg::ARG3, arg3);
+        emit_mov_reg_imm_auto!(insn, abi_reg::ARG4, arg4);
+        emit_mov_reg_imm_auto!(insn, amd64_reg::R11, fn_ptr);
         emit_call_reg!(insn, amd64_reg::R11);
         emit_pop_reg!(insn, amd64_reg::RBP);
 
@@ -1146,9 +1203,9 @@ impl BackendCore for BackendCoreImpl {
 
         emit_push_reg!(insn, amd64_reg::RBP);
         emit_mov_reg_reg1!(insn, amd64_reg::RBP, amd64_reg::RSP);
-        emit_mov_reg_imm!(insn, abi_reg::ARG1, arg1);
-        emit_mov_reg_imm!(insn, abi_reg::ARG2, arg2);
-        emit_mov_reg_imm!(insn, amd64_reg::R11, fn_ptr);
+        emit_mov_reg_imm_auto!(insn, abi_reg::ARG1, arg1);
+        emit_mov_reg_imm_auto!(insn, abi_reg::ARG2, arg2);
+        emit_mov_reg_imm_auto!(insn, amd64_reg::R11, fn_ptr);
         emit_call_reg!(insn, amd64_reg::R11);
         emit_pop_reg!(insn, amd64_reg::RBP);
 
@@ -1185,8 +1242,8 @@ impl BackendCore for BackendCoreImpl {
 
         emit_push_reg!(insn, amd64_reg::RBP);
         emit_mov_reg_reg1!(insn, amd64_reg::RBP, amd64_reg::RSP);
-        emit_mov_reg_imm!(insn, abi_reg::ARG1, arg1);
-        emit_mov_reg_imm!(insn, amd64_reg::R11, fn_ptr);
+        emit_mov_reg_imm_auto!(insn, abi_reg::ARG1, arg1);
+        emit_mov_reg_imm_auto!(insn, amd64_reg::R11, fn_ptr);
         emit_call_reg!(insn, amd64_reg::R11);
         emit_pop_reg!(insn, amd64_reg::RBP);
 
@@ -1203,21 +1260,32 @@ impl BackendCore for BackendCoreImpl {
     }
 
     fn fastmem_violation_likely_offset() -> usize {
-        93
+        FASTMEM_BLOCK_SIZE - 16
     }
 
     fn patch_fastmem_violation(host_exception_addr: usize, guest_exception_addr: BusType) {
         let host_insn_begin = host_exception_addr as *mut u8;
 
-        let imm = extract_imm_from_movabs!(host_insn_begin);
+        let imm = extract_imm_from_mov_auto!(host_insn_begin);
 
-        let (access_size, access_type) = extract_fastmem_metadata!(imm);
+        let (access_size, access_type) = extract_fastmem_metadata!(imm.0);
 
         let access_type = FastmemAccessType::from_usize(access_type as usize);
 
-        let reg1 = extract_imm_from_movabs!(host_insn_begin.wrapping_add(10)) as *mut u8;
-        let reg2 = extract_imm_from_movabs!(host_insn_begin.wrapping_add(20)) as *mut u8;
-        let imm = extract_imm_from_movabs!(host_insn_begin.wrapping_add(30)) as i32;
+        let mut offset = imm.1;
+
+        let reg1 = extract_imm_from_mov_auto!(host_insn_begin.wrapping_add(offset));
+
+        offset += reg1.1;
+
+        let reg2 = extract_imm_from_mov_auto!(host_insn_begin.wrapping_add(offset));
+
+        offset += reg2.1;
+
+        let imm = extract_imm_from_mov_auto!(host_insn_begin.wrapping_add(offset)).0 as i32;
+
+        let reg1 = reg1.0 as *mut u8;
+        let reg2 = reg2.0 as *mut u8;
 
         let gpfn_offset = guest_exception_addr as usize & RV_PAGE_OFFSET_MASK;
 

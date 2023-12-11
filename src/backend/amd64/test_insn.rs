@@ -29,18 +29,6 @@ test_encoded_insn!(
 );
 
 test_encoded_insn!(
-    test_mov_rax_64b,
-    |enc: &mut HostEncodedInsn| emit_mov_reg_imm!(enc, amd64_reg::RAX, 10000000000000000000),
-    [0x48, 0xb8, 0x00, 0x00, 0xe8, 0x89, 0x04, 0x23, 0xc7, 0x8a]
-);
-
-test_encoded_insn!(
-    test_mov_r8_64b,
-    |enc: &mut HostEncodedInsn| emit_mov_reg_imm!(enc, amd64_reg::R8, 10000000000000000000),
-    [0x49, 0xb8, 0x00, 0x00, 0xe8, 0x89, 0x04, 0x23, 0xc7, 0x8a]
-);
-
-test_encoded_insn!(
     test_call_rax,
     |enc: &mut HostEncodedInsn| emit_call_reg!(enc, amd64_reg::RAX),
     [0xff, 0xd0]

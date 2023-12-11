@@ -1,4 +1,5 @@
 use crate::backend::{common, core::amd64_reg};
+use crate::cpu::CpuReg;
 use crate::*;
 use common::{DecodeRet, HostEncodedInsn};
 
@@ -90,7 +91,7 @@ impl common::Rvm for RvmImpl {
         emit_check_rd!(insn, rd);
 
         let mut set_constant_insn = HostEncodedInsn::new();
-        emit_mov_reg_imm!(set_constant_insn, amd64_reg::RAX, u64::MAX);
+        emit_mov_reg_imm_auto!(set_constant_insn, amd64_reg::RAX, CpuReg::MAX);
 
         let mut div_insn = HostEncodedInsn::new();
         emit_movsxd_reg_reg!(div_insn, amd64_reg::RAX, amd64_reg::RAX);
@@ -123,7 +124,7 @@ impl common::Rvm for RvmImpl {
         emit_check_rd!(insn, rd);
 
         let mut set_constant_insn = HostEncodedInsn::new();
-        emit_mov_reg_imm!(set_constant_insn, amd64_reg::RAX, u64::MAX);
+        emit_mov_reg_imm_auto!(set_constant_insn, amd64_reg::RAX, CpuReg::MAX);
 
         let mut div_insn = HostEncodedInsn::new();
         emit_div_reg!(div_insn, amd64_reg::RBX);
