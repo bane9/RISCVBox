@@ -1,8 +1,10 @@
+use std::sync::atomic::AtomicU32;
+
 use crate::cpu::*;
 use crate::frontend::exec_core::{RV_PAGE_OFFSET_MASK, RV_PAGE_SIZE};
 use crate::{cpu::csr::*, util::read_bit};
 
-use super::{bus, BusType};
+use super::BusType;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum AccessType {
@@ -25,7 +27,7 @@ pub enum PteBitVal {
 pub struct Pte {
     pte: BusType,
     phys_base: BusType,
-    pte_addr: BusType,
+    pte_addr: *mut CpuReg,
 }
 
 impl Pte {
@@ -33,7 +35,7 @@ impl Pte {
         Pte {
             pte: 0,
             phys_base: 0,
-            pte_addr: 0,
+            pte_addr: std::ptr::null_mut(),
         }
     }
 }
@@ -163,21 +165,15 @@ impl Mmu for Sv32Mmu {
                 pte.pte |= PteBit!(PteBitVal::Dirty);
             }
 
-            // TODO: make atomic
-            if bus::get_bus()
-                .store_nommu(pte.pte_addr, pte.pte, self.get_pte_size() * 8)
-                .is_err()
-            {
-                return Self::create_exeption(addr, access_type);
-            }
+            let atomic_pte = unsafe { &*(pte.pte_addr as *const AtomicU32) };
+
+            atomic_pte.store(pte.pte, std::sync::atomic::Ordering::Release);
         }
 
         Ok(pte.phys_base | (addr & RV_PAGE_OFFSET_MASK as BusType))
     }
 
     fn get_pte(&self, addr: BusType, access_type: AccessType) -> Result<Pte, Exception> {
-        let bus_instance = bus::get_bus();
-
         let levels = self.get_levels();
         let pte_size = self.get_pte_size();
         let vpn = self.get_vpn(addr, levels);
@@ -188,14 +184,11 @@ impl Mmu for Sv32Mmu {
         let mut pte = Pte::default();
 
         while i >= 0 {
-            pte.pte_addr = a + vpn[i as usize] * pte_size;
-            let _pte = bus_instance.load_nommu(pte.pte_addr, pte_size * 8);
+            pte.pte_addr = (a + vpn[i as usize] * pte_size) as *mut CpuReg;
 
-            if _pte.is_err() {
-                return Err(Self::create_exeption(addr, access_type).err().unwrap());
-            }
+            let atomic_pte = unsafe { &*(pte.pte_addr as *const AtomicU32) };
 
-            pte.pte = _pte.unwrap();
+            pte.pte = atomic_pte.load(std::sync::atomic::Ordering::Acquire);
 
             let valid = PteBitTest!(pte.pte, PteBitVal::Valid);
 
