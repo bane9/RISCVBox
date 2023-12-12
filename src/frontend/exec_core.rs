@@ -92,15 +92,15 @@ impl ExecCore {
                 })
             };
 
-            match ret {
+            match ret.return_status {
                 ReturnStatus::ReturnOk => {}
-                ReturnStatus::ReturnAccessViolation(violation_addr) => {
+                ReturnStatus::ReturnAccessViolation => {
                     let mut guest_exception_pc: Option<&InsnMappingData> = None;
                     let likely_offset = BackendCoreImpl::fastmem_violation_likely_offset();
                     let likely_offset_lower = likely_offset - 16;
                     let likely_offset_upper = likely_offset + 16;
 
-                    let addr = violation_addr as *mut u8;
+                    let addr = ret.exception_address as *mut u8;
 
                     for i in likely_offset_lower..likely_offset_upper {
                         let exc = cpu.insn_map.get_by_host_ptr(addr.wrapping_sub(i));
@@ -112,7 +112,10 @@ impl ExecCore {
                     }
 
                     if guest_exception_pc.is_none() {
-                        panic!("Failed to find guest pc for host ptr {:#x}", violation_addr);
+                        panic!(
+                            "Failed to find guest pc for host ptr {:#x}",
+                            ret.exception_address
+                        );
                     }
 
                     let guest_exception_pc = guest_exception_pc.unwrap();

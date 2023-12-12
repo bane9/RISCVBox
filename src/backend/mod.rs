@@ -19,13 +19,13 @@ pub use returnable::*;
 pub mod returnable_posix;
 
 #[cfg(unix)]
-pub use returnable_posix::ReturnableImpl;
+pub use returnable_posix::*;
 
 #[cfg(windows)]
 pub mod returnable_win32;
 
 #[cfg(windows)]
-pub use returnable_win32::ReturnableImpl;
+pub use returnable_win32::*;
 
 pub mod common;
 pub use common::*;
