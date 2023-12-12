@@ -216,6 +216,14 @@ macro_rules! emit_mov_dword_ptr_reg {
 }
 
 #[macro_export]
+macro_rules! emit_mov_dword_ptr_reg_rip_relative {
+    ($enc:expr, $src_reg:expr, $rip_offset:expr) => {{
+        emit_insn!($enc, [0x89, (0x05 as u8).wrapping_add($src_reg << 3)]);
+        emit_insn!($enc, ($rip_offset as u32).to_le_bytes());
+    }};
+}
+
+#[macro_export]
 macro_rules! emit_mov_ptr_reg_dword_ptr {
     ($enc:expr, $dst_reg:expr, $src_reg:expr) => {{
         assert!($dst_reg < amd64_reg::R8 && $src_reg < amd64_reg::R8);
@@ -230,6 +238,17 @@ macro_rules! emit_mov_ptr_reg_dword_ptr {
         );
     }};
 }
+
+#[macro_export]
+macro_rules! emit_mov_ptr_reg_dword_ptr_rip_relative {
+    ($enc:expr, $dst_reg:expr, $rip_offset:expr) => {{
+        assert!($dst_reg < amd64_reg::R8);
+        emit_insn!($enc, [0x8B, (0x05 as u8).wrapping_add($dst_reg << 3)]);
+        emit_insn!($enc, ($rip_offset as u32).to_le_bytes());
+    }};
+}
+
+const INSN_MOV_RIP_RELATIVE_SIZE: usize = 6;
 
 #[macro_export]
 macro_rules! emit_mov_word_ptr_reg {
@@ -294,31 +313,6 @@ macro_rules! emit_mov_ptr_reg_byte_ptr {
                     .wrapping_add($dst_reg)
             ]
         );
-    }};
-}
-
-#[macro_export]
-macro_rules! emit_mov_reg_guest_to_host {
-    ($enc:expr, $cpu:expr, $dst_reg:expr, $src_reg:expr) => {{
-        if $src_reg != 0 {
-            emit_mov_reg_imm_auto!($enc, $dst_reg, &$cpu.regs[$src_reg as usize] as *const _);
-            emit_mov_ptr_reg_dword_ptr!($enc, $dst_reg, $dst_reg);
-        } else {
-            emit_xor_reg_reg!($enc, $dst_reg, $dst_reg);
-        }
-    }};
-}
-
-#[macro_export]
-macro_rules! emit_mov_reg_host_to_guest {
-    ($enc:expr, $cpu:expr, $dst_addr_reg:expr, $dst_val_reg:expr, $src_reg:expr) => {{
-        emit_mov_reg_imm_auto!(
-            $enc,
-            $dst_addr_reg,
-            &$cpu.regs[$src_reg as usize] as *const _ as usize
-        );
-
-        emit_mov_dword_ptr_reg!($enc, $dst_addr_reg, $dst_val_reg);
     }};
 }
 
@@ -1056,6 +1050,91 @@ macro_rules! emit_imul_reg_reg {
 }
 
 // Other
+
+pub fn emit_rel_load(
+    enc: &mut HostEncodedInsn,
+    cpu: &mut Cpu,
+    host_dst_reg: u8,
+    guest_addr: *mut CpuReg,
+) -> bool {
+    let guest_dst_addr = guest_addr as i64;
+
+    let current_rip =
+        cpu.jit_current_ptr as i64 + enc.size() as i64 + INSN_MOV_RIP_RELATIVE_SIZE as i64;
+
+    let offset = guest_dst_addr - current_rip;
+
+    if offset >= i32::MIN as i64 && offset < i32::MAX as i64 {
+        emit_mov_ptr_reg_dword_ptr_rip_relative!(enc, host_dst_reg, offset as i32);
+        return true;
+    }
+
+    false
+}
+
+pub fn emit_mov_reg_guest_to_host(
+    enc: &mut HostEncodedInsn,
+    cpu: &mut Cpu,
+    host_dst_reg: u8,
+    guest_src_reg: u8,
+) {
+    if guest_src_reg == 0 {
+        emit_xor_reg_reg!(enc, host_dst_reg, host_dst_reg);
+        return;
+    }
+
+    let guest_src_addr = &cpu.regs[guest_src_reg as usize] as *const CpuReg;
+
+    if emit_rel_load(enc, cpu, host_dst_reg, guest_src_addr as *mut CpuReg) {
+        return;
+    }
+
+    emit_mov_reg_imm_auto!(enc, host_dst_reg, guest_src_addr);
+    emit_mov_ptr_reg_dword_ptr!(enc, host_dst_reg, host_dst_reg);
+}
+
+pub fn emit_rel_store(
+    enc: &mut HostEncodedInsn,
+    cpu: &mut Cpu,
+    host_val_reg: u8,
+    guest_dst_reg: *mut CpuReg,
+) -> bool {
+    let guest_dst_addr = guest_dst_reg as i64;
+
+    let current_rip =
+        cpu.jit_current_ptr as i64 + enc.size() as i64 + INSN_MOV_RIP_RELATIVE_SIZE as i64;
+
+    let offset = guest_dst_addr - current_rip;
+
+    if offset >= i32::MIN as i64 && offset < i32::MAX as i64 {
+        emit_mov_dword_ptr_reg_rip_relative!(enc, host_val_reg, offset as i32);
+        return true;
+    }
+
+    false
+}
+
+pub fn emit_mov_reg_host_to_guest(
+    enc: &mut HostEncodedInsn,
+    cpu: &mut Cpu,
+    host_clobber_reg: u8,
+    host_val_reg: u8,
+    guest_dst_reg: u8,
+) {
+    if guest_dst_reg == 0 {
+        emit_nop!(enc);
+        return;
+    }
+
+    let guest_dst_addr = &cpu.regs[guest_dst_reg as usize] as *const CpuReg;
+
+    if emit_rel_store(enc, cpu, host_val_reg, guest_dst_addr as *mut CpuReg) {
+        return;
+    }
+
+    emit_mov_reg_imm_auto!(enc, host_clobber_reg, guest_dst_addr);
+    emit_mov_dword_ptr_reg!(enc, host_clobber_reg, host_val_reg);
+}
 
 pub enum FastmemAccessType {
     Store = 0,
