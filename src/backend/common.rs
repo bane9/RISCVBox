@@ -3,7 +3,7 @@ use cpu::{Exception, JumpAddrPatch};
 use crate::bus::bus::{self, BusType};
 use crate::bus::mmu::{AccessType, Mmu};
 use crate::cpu::{cpu, CpuReg};
-use crate::frontend::exec_core::{INSN_SIZE, RV_PAGE_SHIFT};
+use crate::frontend::exec_core::{INSN_SIZE, RV_PAGE_MASK, RV_PAGE_SHIFT};
 use crate::util::EncodedInsn;
 
 use crate::backend::{ReturnableHandler, ReturnableImpl};
@@ -165,6 +165,7 @@ fn do_jump(guest_address: CpuReg, current_guest_pc: CpuReg, rd: *mut CpuReg) -> 
     // If we are jumping to a different page (block boundary won't protect us here)
     // we need to update the current_gpfn.
     cpu.current_gpfn = guest_address >> RV_PAGE_SHIFT as CpuReg;
+    cpu.current_guest_page = guest_address & RV_PAGE_MASK as CpuReg;
 
     host_addr.unwrap().host_ptr as usize
 }

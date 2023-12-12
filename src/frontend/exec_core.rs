@@ -34,6 +34,7 @@ impl ExecCore {
         }
 
         cpu.current_gpfn = cpu.next_pc >> RV_PAGE_SHIFT as CpuReg;
+        cpu.current_guest_page = cpu.next_pc & RV_PAGE_MASK as CpuReg;
 
         let bus = bus::get_bus();
 
@@ -45,6 +46,7 @@ impl ExecCore {
             trap::handle_exception();
 
             cpu.current_gpfn = cpu.next_pc >> RV_PAGE_SHIFT as CpuReg;
+            cpu.current_guest_page = cpu.next_pc & RV_PAGE_MASK as CpuReg;
 
             bus.translate(cpu.next_pc, &cpu.mmu, AccessType::Fetch)
                 .expect("Failed to translate pc after exception")

@@ -2,8 +2,8 @@ use crate::backend::core::{
     abi_reg, CMP_JMP_IMM32_SIZE, FASTMEM_BLOCK_SIZE, JMP_IMM32_SIZE, MMU_IS_ACTIVE_REG,
 };
 use crate::backend::target::core::{
-    amd64_reg, emit_mov_reg_guest_to_host, emit_mov_reg_host_to_guest, emit_rel_load,
-    emit_rel_store, BackendCore, BackendCoreImpl,
+    amd64_reg, emit_mov_reg_guest_to_host, emit_mov_reg_host_to_guest, emit_rel_load, BackendCore,
+    BackendCoreImpl,
 };
 use crate::backend::{common, ReturnableHandler, ReturnableImpl};
 use crate::bus::mmu::AccessType;
@@ -540,27 +540,20 @@ impl common::Rvi for RviImpl {
 
         emit_check_rd!(insn, rd);
 
-        let current_gpfn = &cpu.current_gpfn as *const CpuReg;
+        let current_gpfn = &cpu.current_guest_page as *const CpuReg;
 
         if !emit_rel_load(&mut insn, cpu, amd64_reg::RAX, current_gpfn as *mut CpuReg) {
             emit_mov_reg_imm_auto!(insn, amd64_reg::RAX, current_gpfn);
             emit_mov_ptr_reg_dword_ptr!(insn, amd64_reg::RAX, amd64_reg::RAX);
         }
 
-        emit_shl_reg_imm!(insn, amd64_reg::RAX, RV_PAGE_SHIFT as u8);
-
-        emit_or_reg_imm!(insn, amd64_reg::RAX, cpu.current_gpfn_offset);
+        let imm = imm + cpu.current_gpfn_offset as i32;
 
         if imm != 0 {
             emit_add_reg_imm!(insn, amd64_reg::RAX, imm);
         }
 
-        let rd_addr = &cpu.regs[rd as usize] as *const _ as usize;
-
-        if !emit_rel_store(&mut insn, cpu, amd64_reg::RAX, rd_addr as *mut CpuReg) {
-            emit_mov_reg_imm_auto!(insn, amd64_reg::RBX, rd_addr);
-            emit_mov_dword_ptr_reg!(insn, amd64_reg::RBX, amd64_reg::RAX);
-        }
+        emit_mov_reg_host_to_guest(&mut insn, cpu, amd64_reg::RBX, amd64_reg::RAX, rd);
 
         Ok(insn)
     }

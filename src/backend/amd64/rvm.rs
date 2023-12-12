@@ -17,10 +17,7 @@ impl common::Rvm for RvmImpl {
         emit_mov_reg_guest_to_host(&mut insn, cpu, amd64_reg::RAX, rs1);
         emit_mov_reg_guest_to_host(&mut insn, cpu, amd64_reg::RBX, rs2);
 
-        emit_movsxd_reg_reg!(insn, amd64_reg::RAX, amd64_reg::RAX);
-        emit_movsxd_reg_reg!(insn, amd64_reg::RBX, amd64_reg::RBX);
-
-        emit_imul_reg_reg!(insn, amd64_reg::RAX, amd64_reg::RBX);
+        emit_imul32_reg_reg!(insn, amd64_reg::RAX, amd64_reg::RBX);
 
         emit_mov_reg_host_to_guest(&mut insn, cpu, amd64_reg::RBX, amd64_reg::RAX, rd);
 

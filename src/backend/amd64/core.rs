@@ -530,9 +530,9 @@ macro_rules! emit_shl_reg_cl {
 macro_rules! emit_add_reg_imm {
     ($enc:expr, $reg:expr, $imm:expr) => {{
         if $reg == amd64_reg::RAX {
-            emit_insn!($enc, [0x48, 0x05]);
+            emit_insn!($enc, [0x05]);
         } else if $reg < amd64_reg::R8 {
-            emit_insn!($enc, [0x48, 0x81, 0xC0 + $reg as u8]);
+            emit_insn!($enc, [0x81, 0xC0 + $reg as u8]);
         } else {
             emit_insn!($enc, [0x49, 0x81, 0xC0 + $reg as u8 - amd64_reg::R8]);
         }
@@ -997,10 +997,26 @@ macro_rules! emit_div_reg {
 }
 
 #[macro_export]
+macro_rules! emit_div32_reg {
+    ($enc:expr, $reg:expr) => {{
+        assert!($reg < amd64_reg::R8);
+        emit_insn!($enc, [0xF7, (0xF8 as u8).wrapping_add($reg)]);
+    }};
+}
+
+#[macro_export]
 macro_rules! emit_idiv_reg {
     ($enc:expr, $reg:expr) => {{
         assert!($reg < amd64_reg::R8);
         emit_insn!($enc, [0x48, 0xF7, (0xF8 as u8).wrapping_add($reg)]);
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_idiv32_reg {
+    ($enc:expr, $reg:expr) => {{
+        assert!($reg < amd64_reg::R8);
+        emit_insn!($enc, [0xF7, (0xF8 as u8).wrapping_add($reg)]);
     }};
 }
 
@@ -1041,6 +1057,21 @@ macro_rules! emit_imul_reg_reg {
             $enc,
             [
                 0x48,
+                0x0F,
+                0xAF,
+                (0xC0 as u8).wrapping_add($reg1 << 3).wrapping_add($reg2)
+            ]
+        );
+    }};
+}
+
+#[macro_export]
+macro_rules! emit_imul32_reg_reg {
+    ($enc:expr, $reg1:expr, $reg2:expr) => {{
+        assert!($reg1 < amd64_reg::R8 && $reg2 < amd64_reg::R8);
+        emit_insn!(
+            $enc,
+            [
                 0x0F,
                 0xAF,
                 (0xC0 as u8).wrapping_add($reg1 << 3).wrapping_add($reg2)

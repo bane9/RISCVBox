@@ -89,6 +89,7 @@ impl ParseCore {
         cpu.gpfn_state.add_gpfn(base_addr as CpuReg);
 
         cpu.current_gpfn = base_addr >> RV_PAGE_SHIFT as BusType;
+        cpu.current_guest_page = base_addr;
         cpu.current_gpfn_offset = 0;
 
         while cpu.current_gpfn_offset < RV_PAGE_SIZE as BusType {
@@ -120,6 +121,7 @@ impl ParseCore {
                 break;
             } else if result.is_err() {
                 cpu.current_gpfn = gpfn;
+                cpu.current_guest_page = gpfn << RV_PAGE_SHIFT;
                 self.code_pages.mark_all_pages(PageState::ReadExecute);
                 return result;
             }
@@ -137,6 +139,7 @@ impl ParseCore {
         code_page.mark_rx().unwrap();
 
         cpu.current_gpfn = gpfn;
+        cpu.current_guest_page = gpfn << RV_PAGE_SHIFT;
 
         Ok(())
     }
