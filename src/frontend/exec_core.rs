@@ -135,7 +135,8 @@ impl ExecCore {
                         .unwrap();
 
                     cpu.exception = cpu::Exception::FastmemViolation;
-                    cpu.next_pc = guest_exception_pc.guest_idx;
+                    cpu.next_pc = guest_exception_pc.guest_idx & RV_PAGE_OFFSET_MASK as CpuReg;
+                    cpu.next_pc += cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg;
                 }
                 _ => {
                     panic!("Unhandled host exception during guest execution")

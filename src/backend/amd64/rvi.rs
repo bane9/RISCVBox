@@ -330,12 +330,11 @@ impl common::Rvi for RviImpl {
         emit_check_rd!(insn, rd);
 
         if rs1 == 0 {
-            emit_mov_reg_imm_auto!(insn, amd64_reg::RBX, imm);
-            emit_mov_reg_host_to_guest(&mut insn, cpu, amd64_reg::RCX, amd64_reg::RBX, rd);
-
-            return Ok(insn);
-        } else if imm == 0 {
-            emit_mov_reg_guest_to_host(&mut insn, cpu, amd64_reg::RBX, rs1);
+            if imm != 0 {
+                emit_mov_reg_imm_auto!(insn, amd64_reg::RBX, imm);
+            } else {
+                emit_xor_reg_reg!(insn, amd64_reg::RBX, amd64_reg::RBX);
+            }
             emit_mov_reg_host_to_guest(&mut insn, cpu, amd64_reg::RCX, amd64_reg::RBX, rd);
 
             return Ok(insn);
@@ -343,7 +342,9 @@ impl common::Rvi for RviImpl {
 
         emit_mov_reg_guest_to_host(&mut insn, cpu, amd64_reg::RBX, rs1);
 
-        emit_add_reg_imm!(insn, amd64_reg::RBX, imm);
+        if imm != 0 {
+            emit_add_reg_imm!(insn, amd64_reg::RBX, imm);
+        }
 
         emit_mov_reg_host_to_guest(&mut insn, cpu, amd64_reg::RCX, amd64_reg::RBX, rd);
 

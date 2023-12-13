@@ -545,9 +545,9 @@ macro_rules! emit_add_reg_imm {
 macro_rules! emit_sub_reg_imm {
     ($enc:expr, $reg:expr, $imm:expr) => {{
         if $reg == amd64_reg::RAX {
-            emit_insn!($enc, [0x48, 0x2D]);
+            emit_insn!($enc, [0x2D]);
         } else if $reg < amd64_reg::R8 {
-            emit_insn!($enc, [0x48, 0x81, 0xE8 + $reg as u8]);
+            emit_insn!($enc, [0x81, 0xE8 + $reg as u8]);
         } else {
             emit_insn!($enc, [0x49, 0x81, 0xE8 + $reg as u8 - amd64_reg::R8]);
         }
@@ -563,7 +563,6 @@ macro_rules! emit_sub_reg_reg {
         emit_insn!(
             $enc,
             [
-                0x48,
                 0x29,
                 (0xC0 as u8).wrapping_add($reg2 << 3).wrapping_add($reg1)
             ]
@@ -578,7 +577,6 @@ macro_rules! emit_add_reg_reg {
         emit_insn!(
             $enc,
             [
-                0x48,
                 0x01,
                 (0xC0 as u8).wrapping_add($reg2 << 3).wrapping_add($reg1)
             ]
