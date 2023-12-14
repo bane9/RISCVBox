@@ -6,7 +6,7 @@ default-run = "rv32jit"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3.9", features = ["winuser", "memoryapi", "dwmapi"] }
-microseh = { path = "../microseh" }
+microseh = "1.0.0"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.150"

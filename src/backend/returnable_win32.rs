@@ -76,16 +76,20 @@ impl ReturnableHandler for ReturnableImpl {
 
         match err.code() {
             microseh::ExceptionCode::IllegalInstruction => {
-                ExceptionInfo::new_from_silce(ReturnStatus::ReturnOk, addr, err.registers())
+                ExceptionInfo::new_from_silce(ReturnStatus::ReturnOk, addr, err.registers().list())
             }
             microseh::ExceptionCode::AccessViolation => ExceptionInfo::new_from_silce(
                 ReturnStatus::ReturnAccessViolation,
                 addr,
-                err.registers(),
+                err.registers().list(),
             ),
             code => {
                 println!("code: {:?}", code);
-                ExceptionInfo::new_from_silce(ReturnStatus::ReturnNotOk, addr, err.registers())
+                ExceptionInfo::new_from_silce(
+                    ReturnStatus::ReturnNotOk,
+                    addr,
+                    err.registers().list(),
+                )
             }
         }
     }

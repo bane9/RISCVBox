@@ -43,6 +43,14 @@ impl ExceptionInfo {
             registers: Registers::new_from_slice(slice),
         }
     }
+
+    pub fn new_no_reg(return_status: ReturnStatus, exception_address: usize) -> ExceptionInfo {
+        ExceptionInfo {
+            return_status,
+            exception_address,
+            registers: Registers::new(),
+        }
+    }
 }
 
 pub trait ReturnableHandler {
