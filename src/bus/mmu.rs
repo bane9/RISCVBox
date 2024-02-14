@@ -255,7 +255,7 @@ impl Mmu for Sv32Mmu {
     }
 
     fn get_levels(&self) -> BusType {
-        return 2;
+        2
     }
 
     fn get_vpn(&self, addr: BusType, _level: BusType) -> Self::PnArr {
@@ -277,7 +277,7 @@ impl Mmu for Sv32Mmu {
     }
 
     fn get_pte_size(&self) -> BusType {
-        return 4;
+        4
     }
 
     fn is_active(&self) -> bool {

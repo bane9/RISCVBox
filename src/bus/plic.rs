@@ -102,7 +102,7 @@ impl BusDevice for Plic {
                 } else if offset == 4 {
                     Ok(self.claim[context as usize] as BusType)
                 } else {
-                    return Err(Exception::LoadAccessFault(addr));
+                    Err(Exception::LoadAccessFault(addr))
                 }
             }
             _ => return Err(Exception::LoadAccessFault(addr)),
@@ -144,7 +144,7 @@ impl BusDevice for Plic {
                 } else if offset == 4 {
                     self.clear_pending(data.into());
                 } else {
-                    return Err(Exception::StoreAccessFault(addr));
+                    Err(Exception::StoreAccessFault(addr))?
                 }
             }
             _ => return Err(Exception::StoreAccessFault(addr)),

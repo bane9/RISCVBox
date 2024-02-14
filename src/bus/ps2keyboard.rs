@@ -180,11 +180,11 @@ impl BusDevice for PS2Keyboard {
     }
 
     fn get_begin_addr(&self) -> BusType {
-        return PS2KEYBOARD_BEGIN_ADDR;
+        PS2KEYBOARD_BEGIN_ADDR
     }
 
     fn get_end_addr(&self) -> BusType {
-        return PS2KEYBOARD_END_ADDR;
+        PS2KEYBOARD_END_ADDR
     }
 
     fn tick_core_local(&mut self) {}

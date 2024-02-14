@@ -200,11 +200,11 @@ impl BusDevice for PS2Mouse {
     }
 
     fn get_begin_addr(&self) -> BusType {
-        return PS2MOUSE_BEGIN_ADDR;
+        PS2MOUSE_BEGIN_ADDR
     }
 
     fn get_end_addr(&self) -> BusType {
-        return PS2MOUSE_END_ADDR;
+        PS2MOUSE_END_ADDR
     }
 
     fn tick_core_local(&mut self) {}

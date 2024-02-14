@@ -52,11 +52,11 @@ impl BusDevice for Dtb {
     }
 
     fn get_begin_addr(&self) -> BusType {
-        return DTB_BEGIN_ADDR;
+        DTB_BEGIN_ADDR
     }
 
     fn get_end_addr(&self) -> BusType {
-        return DTB_END;
+        DTB_END
     }
 
     fn tick_core_local(&mut self) {}

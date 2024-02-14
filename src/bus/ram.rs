@@ -47,11 +47,11 @@ impl BusDevice for Ram {
     }
 
     fn get_begin_addr(&self) -> BusType {
-        return RAM_BEGIN_ADDR;
+        RAM_BEGIN_ADDR
     }
 
     fn get_end_addr(&self) -> BusType {
-        return self.get_begin_addr() + self.len as BusType;
+        self.get_begin_addr() + self.len as BusType
     }
 
     fn tick_core_local(&mut self) {}

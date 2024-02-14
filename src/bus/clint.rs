@@ -52,7 +52,11 @@ impl Clint {
 
         let diff = clint.mtimecmp as i64 - mtime as i64;
 
-        return if diff < 0 { 0 } else { diff as u64 };
+        if diff < 0 {
+            0
+        } else {
+            diff as u64
+        }
     }
 }
 
