@@ -113,7 +113,7 @@ extern "C" fn csr_handler_cb(csr_reg: usize, rd_rhs: usize, op: usize, pc: usize
         _ => panic!("Invalid CSR operation"),
     };
 
-    let rd_val = unsafe { &CSR_HANDLERS }[csr_reg](csr_reg, new_csr_val);
+    let rd_val = unsafe { CSR_HANDLERS[csr_reg](csr_reg, new_csr_val) };
 
     if rd_val.is_err() {
         cpu.set_exception(rd_val.err().unwrap(), pc as CpuReg);

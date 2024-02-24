@@ -17,9 +17,9 @@ function (build_asm asm_path out_path)
         set(filename_bin "${filename}.bin")
         set(filename_dump "${filename}.dump")
 
-        exec_program("/home/bane9/Desktop/riscv/bin/riscv${BITS}-${DIST}-gcc -T${MISC_FOLDER}/link.ld -I${RVTEST_FOLDER}/env/p -I${RVTEST_FOLDER}/isa/macros/scalar -nostdlib -ffreestanding -march=${ARCH} -mabi=${ABI} -nostartfiles -O0 -o temp ${file}")
-        exec_program("/home/bane9/Desktop/riscv/bin/riscv${BITS}-${DIST}-objcopy -O binary temp ${out_path}/bin/${filename_bin}")
-        exec_program("/home/bane9/Desktop/riscv/bin/riscv${BITS}-${DIST}-objdump --disassemble-all -Mno-aliases temp > ${out_path}/dumped/${filename_dump}")
+        exec_program("riscv64-${DIST}-gcc -T${MISC_FOLDER}/link.ld -I${RVTEST_FOLDER}/env/p -I${RVTEST_FOLDER}/isa/macros/scalar -nostdlib -ffreestanding -march=${ARCH} -mabi=${ABI} -nostartfiles -O0 -o temp ${file}")
+        exec_program("riscv64-${DIST}-objcopy -O binary temp ${out_path}/bin/${filename_bin}")
+        exec_program("riscv64-${DIST}-objdump --disassemble-all -Mno-aliases temp > ${out_path}/dumped/${filename_dump}")
     endforeach()
 endfunction()
 

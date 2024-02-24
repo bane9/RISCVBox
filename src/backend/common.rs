@@ -394,7 +394,7 @@ pub extern "C" fn c_lhu_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) {
     }
 }
 
-#[inline(always)]
+#[inline(never)]
 fn do_store(rs1: *mut CpuReg, rs2: *mut CpuReg, imm: i32, guest_pc: CpuReg, store_size: u8) {
     let cpu = cpu::get_cpu();
 
