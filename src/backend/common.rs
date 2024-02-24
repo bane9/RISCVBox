@@ -8,6 +8,7 @@ use crate::util::EncodedInsn;
 
 use crate::backend::{ReturnableHandler, ReturnableImpl};
 use crate::util::util::sign_extend;
+use crate::xmem::PageState;
 
 use super::target;
 
@@ -394,7 +395,7 @@ pub extern "C" fn c_lhu_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) {
     }
 }
 
-#[inline(never)]
+#[inline(always)]
 fn do_store(rs1: *mut CpuReg, rs2: *mut CpuReg, imm: i32, guest_pc: CpuReg, store_size: u8) {
     let cpu = cpu::get_cpu();
 
@@ -409,6 +410,43 @@ fn do_store(rs1: *mut CpuReg, rs2: *mut CpuReg, imm: i32, guest_pc: CpuReg, stor
 
     let data = unsafe { *rs2 };
 
+    let gpfn = addr & RV_PAGE_MASK as CpuReg;
+
+    let gpfn_state = cpu.gpfn_state.get_gpfn_state_mut(gpfn);
+
+    if let Some(gpfn_state) = gpfn_state {
+        let mut was_rx = false;
+
+        if gpfn_state.get_state() == PageState::ReadExecute {
+            was_rx = true;
+
+            gpfn_state.set_state(PageState::ReadWrite);
+        }
+
+        let result = bus.store(addr, data, store_size as BusType, &cpu.mmu);
+
+        if was_rx {
+            gpfn_state.set_state(PageState::ReadExecute);
+
+            if !result.is_err() {
+                cpu.set_exception(
+                    Exception::InvalidateJitBlock(gpfn >> RV_PAGE_SHIFT as CpuReg),
+                    guest_pc,
+                );
+
+                ReturnableImpl::throw();
+            }
+        }
+
+        if result.is_err() {
+            cpu.set_exception(result.err().unwrap(), guest_pc);
+
+            ReturnableImpl::throw();
+        }
+
+        return;
+    }
+
     let result = bus.store(addr, data, store_size as BusType, &cpu.mmu);
 
     if result.is_err() {
@@ -416,17 +454,6 @@ fn do_store(rs1: *mut CpuReg, rs2: *mut CpuReg, imm: i32, guest_pc: CpuReg, stor
 
         ReturnableImpl::throw();
     }
-
-    // let gpfn = addr & RV_PAGE_MASK as CpuReg;
-
-    // if cpu.gpfn_state.contains_gpfn(gpfn) {
-    //     cpu.set_exception(
-    //         Exception::InvalidateJitBlock(gpfn >> RV_PAGE_SHIFT as CpuReg),
-    //         guest_pc,
-    //     );
-
-    //     ReturnableImpl::throw();
-    // }
 }
 
 pub extern "C" fn c_sb_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) {
@@ -515,6 +542,12 @@ macro_rules! test_encoded_insn {
     };
 }
 
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum FastmemHandleType {
+    Patched,
+    Manual,
+}
+
 pub trait BackendCore {
     fn emit_atomic_access(insn: HostEncodedInsn) -> HostEncodedInsn;
     fn emit_ret() -> HostEncodedInsn;
@@ -551,7 +584,10 @@ pub trait BackendCore {
         arg1: usize,
     ) -> HostEncodedInsn;
     fn fastmem_violation_likely_offset() -> usize;
-    fn patch_fastmem_violation(host_exception_addr: usize, guest_exception_addr: BusType);
+    fn patch_fastmem_violation(
+        host_exception_addr: usize,
+        guest_exception_addr: BusType,
+    ) -> FastmemHandleType;
     fn patch_jump_list(jump_list: &Vec<JumpAddrPatch>);
     unsafe fn call_jit_ptr(jit_ptr: PtrT);
     unsafe fn call_jit_ptr_nommu(jit_ptr: PtrT);

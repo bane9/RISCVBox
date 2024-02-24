@@ -1,6 +1,11 @@
 #![allow(unused_unsafe)]
 
-use crate::{backend::*, bus::BusType, frontend::exec_core::RV_PAGE_OFFSET_MASK};
+use crate::{
+    backend::*,
+    bus::{self, BusType},
+    frontend::exec_core::RV_PAGE_OFFSET_MASK,
+    xmem::PageState,
+};
 pub use crate::{
     backend::{BackendCore, JitError},
     cpu::*,
@@ -1165,6 +1170,7 @@ pub fn emit_mov_reg_host_to_guest(
     emit_mov_dword_ptr_reg!(enc, host_clobber_reg, host_val_reg);
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FastmemAccessType {
     Store = 0,
     Load = 1,
@@ -1401,7 +1407,10 @@ impl BackendCore for BackendCoreImpl {
         FASTMEM_BLOCK_SIZE - 16
     }
 
-    fn patch_fastmem_violation(host_exception_addr: usize, guest_exception_addr: BusType) {
+    fn patch_fastmem_violation(
+        host_exception_addr: usize,
+        guest_exception_addr: BusType,
+    ) -> FastmemHandleType {
         let host_insn_begin = host_exception_addr as *mut u8;
 
         let imm = extract_imm_from_mov_auto!(host_insn_begin);
@@ -1426,6 +1435,35 @@ impl BackendCore for BackendCoreImpl {
         let reg2 = reg2.0 as *mut u8;
 
         let gpfn_offset = guest_exception_addr as usize & RV_PAGE_OFFSET_MASK;
+        let cpu = cpu::get_cpu();
+
+        let gpfn_state = cpu.gpfn_state.get_gpfn_state_mut(gpfn_offset as CpuReg);
+
+        if access_type == FastmemAccessType::Store && gpfn_state.is_some() {
+            let gpfn_state = gpfn_state.unwrap();
+            if gpfn_state.get_state() == PageState::ReadExecute {
+                let src_val = unsafe { std::ptr::read_unaligned(reg1 as *const i64) };
+                let dst_addr = unsafe {
+                    std::ptr::read_unaligned(reg2 as *const i64).wrapping_add(imm as i64)
+                };
+
+                let bus = bus::get_bus();
+
+                gpfn_state.set_state(PageState::ReadWrite);
+
+                bus.store(
+                    dst_addr as BusType,
+                    src_val as BusType,
+                    access_size as BusType,
+                    &cpu.mmu,
+                )
+                .unwrap();
+
+                gpfn_state.set_state(PageState::ReadExecute);
+
+                return FastmemHandleType::Manual;
+            }
+        }
 
         let insn = match access_type {
             FastmemAccessType::Store => match access_size {
@@ -1460,6 +1498,8 @@ impl BackendCore for BackendCoreImpl {
                 *host_insn_begin.wrapping_add(insn.size() + i) = 0x90; // nop
             }
         }
+
+        FastmemHandleType::Patched
     }
 
     fn patch_jump_list(jump_list: &Vec<JumpAddrPatch>) {

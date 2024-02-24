@@ -2,7 +2,7 @@ use crate::bus::bus::BusType;
 use crate::bus::mmu::{Mmu, Sv32Mmu};
 use crate::cpu;
 use crate::cpu::csr;
-use crate::frontend::gpfn_state::GpfnState;
+use crate::frontend::gpfn_state::GpfnStateSet;
 use crate::frontend::insn_lookup::InsnData;
 use std::collections::HashSet;
 
@@ -313,7 +313,7 @@ pub struct Cpu {
     pub c_exception_pc: usize,
     pub jump_count: usize,
     pub mode: csr::MppMode,
-    pub gpfn_state: GpfnState,
+    pub gpfn_state: GpfnStateSet,
     pub atomic_reservations: HashSet<BusType>, // TODO: this probably isn't core local, check later
     pub mmu: Sv32Mmu,
     pub csr: &'static mut csr::Csr,
@@ -337,7 +337,7 @@ impl Cpu {
             c_exception_pc: 0,
             jump_count: 0,
             mode: csr::MppMode::Machine,
-            gpfn_state: GpfnState::new(),
+            gpfn_state: GpfnStateSet::new(),
             atomic_reservations: HashSet::new(),
             mmu: Sv32Mmu::new(),
             csr: csr::get_csr(),

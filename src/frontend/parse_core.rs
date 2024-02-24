@@ -141,6 +141,9 @@ impl ParseCore {
         cpu.current_gpfn = gpfn;
         cpu.current_guest_page = gpfn << RV_PAGE_SHIFT;
 
+        cpu.gpfn_state
+            .set_gpfn_state(base_addr as CpuReg, PageState::ReadExecute);
+
         Ok(())
     }
 

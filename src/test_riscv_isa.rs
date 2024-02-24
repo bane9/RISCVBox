@@ -103,8 +103,8 @@ fn main() {
         timeout_thread();
     }
 
-    //let arg = "testbins/rv32ui/bin/addi.bin";
-    //let rom = util::read_file(arg).unwrap();
+    // let arg = "testbins/rv32ui/bin/fence_i.bin";
+    // let rom = util::read_file(arg).unwrap();
 
     init_backend_csr();
 
