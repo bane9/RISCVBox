@@ -132,13 +132,6 @@ impl UsizeConversions for BusAccessCond {
 fn do_jump(guest_address: CpuReg, current_guest_pc: CpuReg, rd: *mut CpuReg) -> usize {
     let cpu = cpu::get_cpu();
 
-    if !rd.is_null() {
-        unsafe {
-            *rd = (cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg)
-                + (current_guest_pc + INSN_SIZE as CpuReg);
-        }
-    }
-
     let guest_address_phys = if cpu.mmu.is_active() {
         let bus = bus::get_bus();
 
@@ -158,9 +151,23 @@ fn do_jump(guest_address: CpuReg, current_guest_pc: CpuReg, rd: *mut CpuReg) -> 
     let host_addr = cpu.insn_map.get_by_guest_idx(guest_address_phys);
 
     if host_addr.is_none() {
+        if guest_address % INSN_SIZE as CpuReg == 0 && !rd.is_null() {
+            unsafe {
+                *rd = (cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg)
+                    + (current_guest_pc + INSN_SIZE as CpuReg);
+            }
+        }
+
         cpu.set_exception(Exception::ForwardJumpFault(guest_address), current_guest_pc);
 
         ReturnableImpl::throw();
+    }
+
+    if !rd.is_null() {
+        unsafe {
+            *rd = (cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg)
+                + (current_guest_pc + INSN_SIZE as CpuReg);
+        }
     }
 
     // If we are jumping to a different page (block boundary won't protect us here)
