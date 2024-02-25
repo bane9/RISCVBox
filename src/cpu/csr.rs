@@ -141,7 +141,9 @@ impl Csr {
             register::SSTATUS => self.regs[register::MSTATUS] & SSTATUS as CsrType,
             register::SIE => self.regs[register::SIE] & self.regs[register::MIDELEG],
             register::SIP => self.regs[register::MIP] & self.regs[register::MIDELEG],
-            register::CYCLE | register::TIME => util::ms_since_program_start() as CsrType,
+            register::CYCLE | register::TIME => {
+                std::cmp::max(util::ms_since_program_start() as CsrType, 1)
+            }
             _ => self.regs[addr],
         }
     }
