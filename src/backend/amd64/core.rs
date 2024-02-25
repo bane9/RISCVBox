@@ -3,7 +3,7 @@
 use crate::{
     backend::*,
     bus::{self, BusType},
-    frontend::exec_core::RV_PAGE_OFFSET_MASK,
+    frontend::exec_core::{RV_PAGE_MASK, RV_PAGE_OFFSET_MASK},
     xmem::PageState,
 };
 pub use crate::{
@@ -1437,15 +1437,16 @@ impl BackendCore for BackendCoreImpl {
         let gpfn_offset = guest_exception_addr as usize & RV_PAGE_OFFSET_MASK;
         let cpu = cpu::get_cpu();
 
-        let gpfn_state = cpu.gpfn_state.get_gpfn_state_mut(gpfn_offset as CpuReg);
+        let gpfn_state = cpu
+            .gpfn_state
+            .get_gpfn_state_mut(guest_exception_addr & RV_PAGE_MASK as CpuReg);
 
         if access_type == FastmemAccessType::Store && gpfn_state.is_some() {
             let gpfn_state = gpfn_state.unwrap();
             if gpfn_state.get_state() == PageState::ReadExecute {
-                let src_val = unsafe { std::ptr::read_unaligned(reg1 as *const i64) };
-                let dst_addr = unsafe {
-                    std::ptr::read_unaligned(reg2 as *const i64).wrapping_add(imm as i64)
-                };
+                let dst_addr =
+                    unsafe { std::ptr::read_unaligned(reg1 as *const CpuReg) as i64 + imm as i64 };
+                let src_val = unsafe { std::ptr::read_unaligned(reg2 as *const CpuReg) };
 
                 let bus = bus::get_bus();
 
@@ -1457,7 +1458,7 @@ impl BackendCore for BackendCoreImpl {
                     access_size as BusType,
                     &cpu.mmu,
                 )
-                .unwrap();
+                .expect("Bus error while manually handling fastmem violation");
 
                 gpfn_state.set_state(PageState::ReadExecute);
 

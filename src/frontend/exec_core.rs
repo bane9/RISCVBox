@@ -136,12 +136,14 @@ impl ExecCore {
                         .mark_page_state(jit_block_idx, PageState::ReadExecute)
                         .unwrap();
 
-                    cpu.exception = cpu::Exception::FastmemViolation;
-                    cpu.next_pc = guest_exception_pc.guest_idx & RV_PAGE_OFFSET_MASK as CpuReg;
-                    cpu.next_pc += cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg;
-
                     if handling_type == FastmemHandleType::Manual {
-                        cpu.next_pc += INSN_SIZE as CpuReg;
+                        cpu.exception = cpu::Exception::InvalidateJitBlock(cpu.current_gpfn);
+                        cpu.c_exception_pc =
+                            (guest_exception_pc.guest_idx & RV_PAGE_OFFSET_MASK as CpuReg) as usize;
+                    } else {
+                        cpu.exception = cpu::Exception::FastmemViolation;
+                        cpu.next_pc = guest_exception_pc.guest_idx & RV_PAGE_OFFSET_MASK as CpuReg;
+                        cpu.next_pc += cpu.current_gpfn << RV_PAGE_SHIFT as CpuReg;
                     }
                 }
                 _ => {
@@ -164,11 +166,6 @@ impl ExecCore {
         }
 
         cpu.c_exception_pc += (cpu.current_gpfn as usize) << RV_PAGE_SHIFT;
-
-        println!(
-            "ret_status: {:#x?} with pc 0x{:x} cpu.next_pc {:x} gp {}",
-            cpu.exception, cpu.c_exception_pc, cpu.next_pc, cpu.regs[3]
-        );
 
         match cpu.exception {
             cpu::Exception::MmuStateUpdate => {
@@ -240,10 +237,10 @@ impl ExecCore {
                         | cpu::Exception::IllegalInstruction(_)
                 ) {
                 } else {
-                    // println!(
-                    //     "ret_status: {:#x?} with pc 0x{:x} cpu.next_pc {:x} gp {}",
-                    //     cpu.exception, cpu.c_exception_pc, cpu.next_pc, cpu.regs[3]
-                    // );
+                    println!(
+                        "ret_status: {:#x?} with pc 0x{:x} cpu.next_pc {:x} gp {}",
+                        cpu.exception, cpu.c_exception_pc, cpu.next_pc, cpu.regs[3]
+                    );
                 }
             }
         }
