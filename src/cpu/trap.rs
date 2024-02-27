@@ -24,7 +24,7 @@ pub fn are_interrupts_enabled(cpu: &mut cpu::Cpu) -> bool {
         csr::MppMode::User => {}
     }
 
-    return true;
+    true
 }
 
 pub fn has_pending_interrupt(cpu: &mut cpu::Cpu) -> Option<Interrupt> {

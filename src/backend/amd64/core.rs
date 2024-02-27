@@ -4,7 +4,7 @@ use crate::{
     backend::*,
     bus::{self, BusType},
     frontend::exec_core::{RV_PAGE_MASK, RV_PAGE_OFFSET_MASK},
-    xmem::PageState,
+    xmem::{PageAllocator, PageState},
 };
 pub use crate::{
     backend::{BackendCore, JitError},
@@ -1437,32 +1437,36 @@ impl BackendCore for BackendCoreImpl {
         let gpfn_offset = guest_exception_addr as usize & RV_PAGE_OFFSET_MASK;
         let cpu = cpu::get_cpu();
 
-        let gpfn_state = cpu
-            .gpfn_state
-            .get_gpfn_state_mut(guest_exception_addr & RV_PAGE_MASK as CpuReg);
+        if access_type == FastmemAccessType::Store {
+            let dst_addr =
+                unsafe { std::ptr::read_unaligned(reg1 as *const CpuReg) as i64 + imm as i64 };
 
-        if access_type == FastmemAccessType::Store && gpfn_state.is_some() {
-            let gpfn_state = gpfn_state.unwrap();
-            if gpfn_state.get_state() == PageState::ReadExecute {
-                let dst_addr =
-                    unsafe { std::ptr::read_unaligned(reg1 as *const CpuReg) as i64 + imm as i64 };
-                let src_val = unsafe { std::ptr::read_unaligned(reg2 as *const CpuReg) };
+            let gpfn_state = cpu
+                .gpfn_state
+                .get_gpfn_state_mut(dst_addr as CpuReg & RV_PAGE_MASK as CpuReg);
 
-                let bus = bus::get_bus();
+            if gpfn_state.is_some() {
+                let gpfn_state = gpfn_state.unwrap();
 
-                gpfn_state.set_state(PageState::ReadWrite);
+                if gpfn_state.get_state() == PageState::ReadExecute {
+                    let src_val = unsafe { std::ptr::read_unaligned(reg2 as *const CpuReg) };
 
-                bus.store(
-                    dst_addr as BusType,
-                    src_val as BusType,
-                    access_size as BusType,
-                    &cpu.mmu,
-                )
-                .expect("Bus error while manually handling fastmem violation");
+                    let bus = bus::get_bus();
 
-                gpfn_state.set_state(PageState::ReadExecute);
+                    gpfn_state.set_state(PageState::ReadWrite);
 
-                return FastmemHandleType::Manual;
+                    bus.store(
+                        dst_addr as BusType,
+                        src_val as BusType,
+                        access_size as BusType,
+                        &cpu.mmu,
+                    )
+                    .expect("Bus error while manually handling fastmem violation");
+
+                    gpfn_state.set_state(PageState::ReadExecute);
+
+                    return FastmemHandleType::Manual;
+                }
             }
         }
 
@@ -1486,6 +1490,18 @@ impl BackendCore for BackendCoreImpl {
             },
         };
 
+        let page_size_mask = PageAllocator::get_page_size() - 1;
+        let host_insn_begin_aligned = host_insn_begin as usize & !page_size_mask;
+        let host_insn_begin_npages =
+            (insn.size() + page_size_mask) / PageAllocator::get_page_size();
+
+        PageAllocator::mark_page(
+            host_insn_begin_aligned as *mut u8,
+            host_insn_begin_npages,
+            PageState::ReadWrite,
+        )
+        .expect("Failed to mark page as read-write while patching fastmem violation");
+
         unsafe {
             std::ptr::copy_nonoverlapping(insn.as_slice().as_ptr(), host_insn_begin, insn.size());
         }
@@ -1499,6 +1515,13 @@ impl BackendCore for BackendCoreImpl {
                 *host_insn_begin.wrapping_add(insn.size() + i) = 0x90; // nop
             }
         }
+
+        PageAllocator::mark_page(
+            host_insn_begin_aligned as *mut u8,
+            host_insn_begin_npages,
+            PageState::ReadExecute,
+        )
+        .expect("Failed to mark page as read-execute while patching fastmem violation");
 
         FastmemHandleType::Patched
     }

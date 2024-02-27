@@ -222,7 +222,14 @@ impl ExecCore {
                     loop {
                         bus.tick_core_local();
 
-                        if trap::has_pending_interrupt(cpu).is_some() {
+                        if cpu
+                            .has_pending_interrupt
+                            .load(std::sync::atomic::Ordering::Acquire)
+                            == 1
+                        {
+                            cpu.has_pending_interrupt
+                                .store(0, std::sync::atomic::Ordering::Release);
+                            cpu.pending_interrupt = None;
                             break;
                         }
 
