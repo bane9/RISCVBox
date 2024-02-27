@@ -9,9 +9,7 @@ use cpu::{Exception, Interrupt};
 
 use super::{csr::MppMode, CpuReg};
 
-pub fn are_interrupts_enabled() -> bool {
-    let cpu = cpu::get_cpu();
-
+pub fn are_interrupts_enabled(cpu: &mut cpu::Cpu) -> bool {
     match cpu.mode {
         csr::MppMode::Machine => {
             if !cpu.csr.read_bit_mstatus(csr::bits::MIE) {
@@ -29,12 +27,10 @@ pub fn are_interrupts_enabled() -> bool {
     return true;
 }
 
-pub fn has_pending_interrupt() -> Option<Interrupt> {
-    if !are_interrupts_enabled() {
+pub fn has_pending_interrupt(cpu: &mut cpu::Cpu) -> Option<Interrupt> {
+    if !are_interrupts_enabled(cpu) {
         return None;
     }
-
-    let cpu = cpu::get_cpu();
 
     let mie = cpu.csr.read(csr::register::MIE);
     let mip = cpu.csr.read(csr::register::MIP);
@@ -45,45 +41,58 @@ pub fn has_pending_interrupt() -> Option<Interrupt> {
         return None;
     }
 
+    let irq: Option<Interrupt>;
+
     if (pending & csr::bits::MEIP) != 0 {
         cpu.csr
             .write_bit(csr::register::MIP, csr::bits::MEIP_BIT, false);
 
-        return Some(Interrupt::MachineExternal);
+        irq = Some(Interrupt::MachineExternal);
     } else if (pending & csr::bits::MSIP) != 0 {
         cpu.csr
             .write_bit(csr::register::MIP, csr::bits::MSIP_BIT, false);
 
-        return Some(Interrupt::MachineSoftware);
+        irq = Some(Interrupt::MachineSoftware);
     } else if (pending & csr::bits::MTIP) != 0 {
         cpu.csr
             .write_bit(csr::register::MIP, csr::bits::MTIP_BIT, false);
 
-        return Some(Interrupt::MachineTimer);
+        irq = Some(Interrupt::MachineTimer);
     } else if (pending & csr::bits::SEIP) != 0 {
         cpu.csr
             .write_bit(csr::register::MIP, csr::bits::SSIP_BIT, false);
 
-        return Some(Interrupt::SupervisorExternal);
+        irq = Some(Interrupt::SupervisorExternal);
     } else if (pending & csr::bits::SSIP) != 0 {
         cpu.csr
             .write_bit(csr::register::MIP, csr::bits::SSIP_BIT, false);
 
-        return Some(Interrupt::SupervisorSoftware);
+        irq = Some(Interrupt::SupervisorSoftware);
     } else if (pending & csr::bits::STIP) != 0 {
         cpu.csr
             .write_bit(csr::register::MIP, csr::bits::STIP_BIT, false);
 
-        return Some(Interrupt::SupervisorTimer);
+        irq = Some(Interrupt::SupervisorTimer);
+    } else {
+        irq = None;
     }
 
-    None
+    if irq.is_some() {
+        cpu.has_pending_interrupt
+            .store(1, std::sync::atomic::Ordering::Release);
+
+        cpu.pending_interrupt = irq;
+    }
+
+    irq
 }
 
-pub fn handle_interrupt(int_val: Interrupt) {
+pub fn handle_interrupt(int_val: Interrupt, cpu: &mut cpu::Cpu) {
     assert!(int_val != Interrupt::None);
 
-    let cpu = cpu::get_cpu();
+    cpu.has_pending_interrupt
+        .store(0, std::sync::atomic::Ordering::Release);
+    cpu.pending_interrupt = None;
 
     let mode = cpu.mode;
 
@@ -93,7 +102,7 @@ pub fn handle_interrupt(int_val: Interrupt) {
         false
     };
 
-    let pc = (cpu.c_exception_pc) as CpuReg;
+    let pc = cpu.c_exception_pc as CpuReg;
 
     if mideleg_flag & (mode == MppMode::Supervisor || mode == MppMode::User) {
         cpu.mode = MppMode::Supervisor;
@@ -144,9 +153,7 @@ pub fn handle_interrupt(int_val: Interrupt) {
     }
 }
 
-pub fn handle_exception() {
-    let cpu = cpu::get_cpu();
-
+pub fn handle_exception(cpu: &mut cpu::Cpu) {
     assert!(cpu.exception < Exception::None);
 
     let pc = cpu.c_exception_pc as CpuReg;

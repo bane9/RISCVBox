@@ -1,3 +1,4 @@
+use crate::cpu;
 use crate::window::window_common::Ps2Key;
 use crate::{bus::bus::*, cpu::Exception};
 
@@ -194,4 +195,8 @@ impl BusDevice for PS2Keyboard {
     }
 
     fn tick_from_main_thread(&mut self) {}
+
+    fn tick_async(&mut self, _cpu: &mut cpu::Cpu) -> bool {
+        false
+    }
 }

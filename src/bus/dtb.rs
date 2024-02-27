@@ -1,4 +1,8 @@
-use crate::{bus::bus::*, cpu::Exception, util};
+use crate::{
+    bus::bus::*,
+    cpu::{self, Exception},
+    util,
+};
 
 pub const DTB_SIZE: usize = util::size_mib(2);
 pub const DTB_BEGIN_ADDR: BusType = 0x1000;
@@ -66,4 +70,8 @@ impl BusDevice for Dtb {
     }
 
     fn tick_from_main_thread(&mut self) {}
+
+    fn tick_async(&mut self, _cpu: &mut cpu::Cpu) -> bool {
+        false
+    }
 }

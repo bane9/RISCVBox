@@ -2,7 +2,9 @@ use crate::bus::*;
 use crate::cpu::*;
 use crate::frontend::exec_core::INSN_SIZE;
 use crate::util;
-use std::cell::RefCell;
+use lazy_static::lazy_static;
+use std::collections::HashMap;
+use std::sync::Mutex;
 
 pub const CLINT_ADDR: BusType = 0x2000000;
 const CLINT_END: BusType = CLINT_ADDR + 0x10000;
@@ -30,12 +32,24 @@ impl ClintData {
     }
 }
 
-thread_local! {
-    static CLINT: RefCell<ClintData> = RefCell::new(ClintData::new());
+lazy_static! {
+    static ref CLINTS: Mutex<HashMap<usize, ClintData>> = Mutex::new(HashMap::new());
 }
 
-fn get_clint() -> &'static mut ClintData {
-    CLINT.with(|clint| unsafe { &mut *clint.as_ptr() })
+fn get_clint(thread_id: usize) -> &'static mut ClintData {
+    let mut map = CLINTS.lock().unwrap();
+
+    if !map.contains_key(&thread_id) {
+        let clint = ClintData::new();
+        map.insert(thread_id, clint);
+    }
+
+    unsafe {
+        let clint = map.get_mut(&thread_id).unwrap();
+        let clint = clint as *mut ClintData;
+
+        &mut *clint
+    }
 }
 
 pub struct Clint;
@@ -46,7 +60,7 @@ impl Clint {
     }
 
     pub fn get_remaining_time_ms() -> u64 {
-        let clint = get_clint();
+        let clint = get_clint(cpu::get_cpu().core_id as usize);
 
         let mtime = util::ms_since_program_start() as BusType;
 
@@ -58,11 +72,34 @@ impl Clint {
             diff as u64
         }
     }
+
+    pub fn tick(clint_data: &mut ClintData, cpu: &mut cpu::Cpu) -> bool {
+        let mtime = util::ms_since_program_start() as BusType;
+
+        if (clint_data.msip & 1) != 0 {
+            cpu.csr
+                .write_bit(csr::register::MIP, csr::bits::MSIP_BIT, true);
+
+            return true;
+        }
+
+        if mtime >= clint_data.mtimecmp {
+            cpu.csr
+                .write_bit(csr::register::MIP, csr::bits::MTIP_BIT, true);
+
+            return true;
+        }
+
+        cpu.csr
+            .write_bit(csr::register::MIP, csr::bits::MTIP_BIT, false);
+
+        false
+    }
 }
 
 impl BusDevice for Clint {
     fn load(&mut self, addr: BusType, size: BusType) -> Result<BusType, Exception> {
-        let clint = get_clint();
+        let clint = get_clint(cpu::get_cpu().core_id as usize);
 
         let mut out = 0 as BusType;
 
@@ -99,7 +136,7 @@ impl BusDevice for Clint {
     }
 
     fn store(&mut self, addr: BusType, data: BusType, size: BusType) -> Result<(), Exception> {
-        let clint = get_clint();
+        let clint = get_clint(cpu::get_cpu().core_id as usize);
 
         match addr {
             MSIP..=MSIP_END => unsafe {
@@ -136,23 +173,9 @@ impl BusDevice for Clint {
     }
 
     fn tick_core_local(&mut self) {
-        let cpu = get_cpu();
-        let clint = get_clint();
+        let clint = get_clint(cpu::get_cpu().core_id as usize);
 
-        let mtime = util::ms_since_program_start() as BusType;
-
-        if (clint.msip & 1) != 0 {
-            cpu.csr
-                .write_bit(csr::register::MIP, csr::bits::MSIP_BIT, true);
-        }
-
-        if mtime >= clint.mtimecmp {
-            cpu.csr
-                .write_bit(csr::register::MIP, csr::bits::MTIP_BIT, true);
-        } else {
-            cpu.csr
-                .write_bit(csr::register::MIP, csr::bits::MTIP_BIT, false);
-        }
+        Self::tick(clint, cpu::get_cpu());
     }
 
     fn get_ptr(&mut self, _addr: BusType) -> Result<*mut u8, Exception> {
@@ -160,4 +183,11 @@ impl BusDevice for Clint {
     }
 
     fn tick_from_main_thread(&mut self) {}
+
+    fn tick_async(&mut self, cpu: &mut cpu::Cpu) -> bool {
+        // This mandates syncrhonization/atomics but I'll hope it'll be fine for now
+        let clint = get_clint(cpu.core_id as usize);
+
+        Self::tick(clint, cpu)
+    }
 }

@@ -54,6 +54,13 @@ fn emit_jmp_relative(jump_cond: JumpCond, reg1: CpuReg, reg2: CpuReg, imm: i32) 
     let jmp_insn_offset: u32;
 
     let mut insn = HostEncodedInsn::new();
+
+    let mut ret_insn = HostEncodedInsn::new();
+    let exception_pc = &cpu.c_exception_pc as *const _ as usize;
+    emit_mov_reg_imm_auto!(ret_insn, amd64_reg::RAX, exception_pc);
+    emit_mov_dword_ptr_imm!(ret_insn, amd64_reg::RAX, cpu.current_gpfn_offset as usize);
+    emit_ret!(ret_insn);
+
     let target_host_addr: usize;
 
     if jump_cond == JumpCond::Always {
@@ -65,8 +72,26 @@ fn emit_jmp_relative(jump_cond: JumpCond, reg1: CpuReg, reg2: CpuReg, imm: i32) 
 
         target_host_addr = cpu.jit_current_ptr as usize + insn.size();
 
+        let mut check_insns = HostEncodedInsn::new();
+
+        if imm == 0 {
+            emit_mov_reg_imm_auto!(
+                check_insns,
+                amd64_reg::RAX,
+                &cpu.has_pending_interrupt as *const _ as usize
+            );
+
+            emit_mov_ptr_reg_dword_ptr!(check_insns, amd64_reg::RAX, amd64_reg::RAX);
+
+            emit_cmp_reg_imm!(check_insns, amd64_reg::RAX, 0);
+            emit_jz_imm!(check_insns, ret_insn.size());
+            check_insns.push_slice(ret_insn.as_slice());
+
+            insn.push_slice(check_insns.as_slice());
+        }
+
         emit_jmp_imm32!(insn, 0);
-        jmp_insn_offset = JMP_IMM32_SIZE as u32;
+        jmp_insn_offset = JMP_IMM32_SIZE as u32 + check_insns.size() as u32;
     } else {
         emit_mov_reg_guest_to_host(&mut insn, cpu, amd64_reg::RAX, reg1 as u8);
         emit_mov_reg_guest_to_host(&mut insn, cpu, amd64_reg::RBX, reg2 as u8);

@@ -317,6 +317,8 @@ pub struct Cpu {
     pub atomic_reservations: HashSet<BusType>, // TODO: this probably isn't core local, check later
     pub mmu: Sv32Mmu,
     pub csr: &'static mut csr::Csr,
+    pub has_pending_interrupt: std::sync::atomic::AtomicU32,
+    pub pending_interrupt: Option<Interrupt>,
 }
 
 impl Cpu {
@@ -341,6 +343,8 @@ impl Cpu {
             atomic_reservations: HashSet::new(),
             mmu: Sv32Mmu::new(),
             csr: csr::get_csr(),
+            has_pending_interrupt: std::sync::atomic::AtomicU32::new(0),
+            pending_interrupt: None,
         }
     }
 

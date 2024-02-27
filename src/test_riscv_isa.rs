@@ -61,6 +61,9 @@ impl bus::BusDevice for ToHost {
 
     fn tick_core_local(&mut self) {}
     fn tick_from_main_thread(&mut self) {}
+    fn tick_async(&mut self, _cpu: &mut cpu::Cpu) -> bool {
+        false
+    }
 }
 
 fn init_bus(mut rom: Vec<u8>, ram_size: usize) {
@@ -103,7 +106,7 @@ fn main() {
         timeout_thread();
     }
 
-    // let arg = "testbins/rv32ui/bin/fence_i.bin";
+    // let arg = "testbins/rv32mi/bin/illegal.bin";
     // let rom = util::read_file(arg).unwrap();
 
     init_backend_csr();

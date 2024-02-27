@@ -28,10 +28,14 @@ impl ExecCore {
         let cpu = cpu::get_cpu();
 
         if cpu.exception != cpu::Exception::None {
-            let int = trap::has_pending_interrupt();
+            let int = if cpu.pending_interrupt.is_some() {
+                cpu.pending_interrupt
+            } else {
+                trap::has_pending_interrupt(cpu)
+            };
 
             if int.is_some() {
-                trap::handle_interrupt(int.unwrap());
+                trap::handle_interrupt(int.unwrap(), cpu);
             }
         }
 
@@ -45,7 +49,7 @@ impl ExecCore {
         let next_phys_pc = if next_phys_pc.is_err() {
             cpu.exception = next_phys_pc.err().unwrap();
             cpu.c_exception_pc = cpu.next_pc as usize;
-            trap::handle_exception();
+            trap::handle_exception(cpu);
 
             cpu.current_gpfn = cpu.next_pc >> RV_PAGE_SHIFT as CpuReg;
             cpu.current_guest_page = cpu.next_pc & RV_PAGE_MASK as CpuReg;
@@ -95,7 +99,17 @@ impl ExecCore {
             };
 
             match ret.return_status {
-                ReturnStatus::ReturnOk => {}
+                ReturnStatus::ReturnOk => {
+                    if cpu.c_exception == cpu::Exception::None.to_cpu_reg() as usize
+                        && cpu
+                            .has_pending_interrupt
+                            .load(std::sync::atomic::Ordering::Acquire)
+                            == 1
+                    {
+                        cpu.c_exception = cpu::Exception::None.to_cpu_reg() as usize;
+                        cpu.exception = cpu::Exception::BookkeepingRet;
+                    }
+                }
                 ReturnStatus::ReturnAccessViolation => {
                     let mut guest_exception_pc: Option<&InsnMappingData> = None;
                     let likely_offset = BackendCoreImpl::fastmem_violation_likely_offset();
@@ -182,7 +196,7 @@ impl ExecCore {
                 if pc % INSN_SIZE as CpuReg != 0 {
                     cpu.exception = cpu::Exception::InstructionAddressMisaligned(pc);
                     println!("Forward jump forwarding as {:?}", cpu.exception);
-                    trap::handle_exception();
+                    trap::handle_exception(cpu);
                 } else {
                     cpu.next_pc = pc;
                 }
@@ -199,7 +213,7 @@ impl ExecCore {
             cpu::Exception::Wfi => {
                 // I hate this from the bottom of my heart but the altrenative is making
                 // all csr accesses atomic which is probably worse more so this will have to do
-                if trap::are_interrupts_enabled() {
+                if trap::are_interrupts_enabled(cpu) {
                     let bus = bus::get_bus();
                     std::thread::sleep(std::time::Duration::from_millis(
                         Clint::get_remaining_time_ms(),
@@ -208,7 +222,7 @@ impl ExecCore {
                     loop {
                         bus.tick_core_local();
 
-                        if trap::has_pending_interrupt().is_some() {
+                        if trap::has_pending_interrupt(cpu).is_some() {
                             break;
                         }
 
@@ -230,7 +244,7 @@ impl ExecCore {
                 unreachable!("Exiting jit block without setting an exception is invalid");
             }
             _ => {
-                trap::handle_exception();
+                trap::handle_exception(cpu);
                 if matches!(
                     cpu.exception,
                     cpu::Exception::EnvironmentCallFromSMode(_)
@@ -251,6 +265,21 @@ pub fn exec_core_thread(cpu_core_idx: usize, initial_pc: CpuReg) {
     cpu::init_cpu();
 
     let mut exec_core = ExecCore::new();
+
+    let cpu = cpu::get_cpu() as *mut cpu::Cpu as usize;
+
+    std::thread::spawn(move || {
+        let bus = bus::get_bus();
+        let cpu = unsafe { &mut *(cpu as *mut cpu::Cpu) };
+
+        loop {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+
+            bus.tick_async(cpu);
+
+            trap::has_pending_interrupt(cpu);
+        }
+    });
 
     exec_core.exec_loop(cpu_core_idx as CpuReg, initial_pc);
 }

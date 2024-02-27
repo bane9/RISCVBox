@@ -1,3 +1,4 @@
+use crate::cpu;
 use crate::window::{window_common::Ps2MouseEvent, window_impl, WindowCommon};
 use crate::{bus::bus::*, cpu::Exception};
 
@@ -214,4 +215,8 @@ impl BusDevice for PS2Mouse {
     }
 
     fn tick_from_main_thread(&mut self) {}
+
+    fn tick_async(&mut self, _cpu: &mut cpu::Cpu) -> bool {
+        false
+    }
 }

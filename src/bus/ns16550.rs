@@ -1,6 +1,9 @@
 use std::io::Write;
 
-use crate::{bus::bus::*, cpu::Exception};
+use crate::{
+    bus::bus::*,
+    cpu::{self, Exception},
+};
 
 const UART_BASE_ADDRESS: u64 = 0x10000000;
 const UART_IRQN: u64 = 10;
@@ -126,11 +129,11 @@ impl BusDevice for Ns16550 {
     }
 
     fn get_begin_addr(&self) -> BusType {
-        return UART_BASE_ADDRESS as BusType;
+        UART_BASE_ADDRESS as BusType
     }
 
     fn get_end_addr(&self) -> BusType {
-        return (UART_BASE_ADDRESS + 8) as BusType;
+        (UART_BASE_ADDRESS + 8) as BusType
     }
 
     fn tick_core_local(&mut self) {}
@@ -140,4 +143,8 @@ impl BusDevice for Ns16550 {
     }
 
     fn tick_from_main_thread(&mut self) {}
+
+    fn tick_async(&mut self, _cpu: &mut cpu::Cpu) -> bool {
+        false
+    }
 }

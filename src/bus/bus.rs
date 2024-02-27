@@ -75,6 +75,7 @@ pub trait BusDevice {
     fn get_end_addr(&self) -> BusType;
     fn tick_core_local(&mut self);
     fn tick_from_main_thread(&mut self);
+    fn tick_async(&mut self, cpu: &mut Cpu) -> bool;
     fn get_ptr(&mut self, addr: BusType) -> Result<*mut u8, Exception>;
 }
 
@@ -160,9 +161,9 @@ impl Bus {
         if res.is_err() {
             if !mmu.is_active() {
                 return Err(Exception::InstructionAccessFault(addr));
-            } else {
-                return Err(Exception::InstructionPageFault(addr));
             }
+
+            return Err(Exception::InstructionPageFault(addr));
         }
 
         res
@@ -257,6 +258,18 @@ impl Bus {
         for device in &mut self.devices {
             device.tick_from_main_thread();
         }
+    }
+
+    pub fn tick_async(&mut self, cpu: &mut cpu::Cpu) -> bool {
+        let mut has_interrupt = false;
+
+        for device in &mut self.devices {
+            if device.tick_async(cpu) {
+                has_interrupt = true;
+            }
+        }
+
+        has_interrupt
     }
 
     pub fn get_ptr(&mut self, addr: BusType) -> Result<*mut u8, Exception> {

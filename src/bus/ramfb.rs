@@ -55,4 +55,8 @@ impl BusDevice for RamFB {
     }
 
     fn tick_from_main_thread(&mut self) {}
+
+    fn tick_async(&mut self, _cpu: &mut cpu::Cpu) -> bool {
+        false
+    }
 }
