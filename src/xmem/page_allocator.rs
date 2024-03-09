@@ -114,28 +114,21 @@ pub mod win32_page_allocator {
     }
 }
 
-#[cfg(posix)]
+#[cfg(unix)]
 pub mod posix_page_allocator {
-    use crate::{
-        util,
-        xmem::page_common::{AllocationError, CodePage},
-    };
-    use libc::{
-        mmap, mprotect, munmap, MAP_ANON, MAP_PRIVATE, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE,
-    };
+    use crate::util;
+    use crate::xmem::{AllocationError, PageState};
     use std::ptr;
-
-    use super::PageState;
 
     const PAGE_SIZE: usize = 4096;
 
     pub fn allocate_pages(npages: usize) -> Result<*mut u8, AllocationError> {
         unsafe {
-            let ptr = mmap(
+            let ptr = libc::mmap(
                 ptr::null_mut(),
                 npages * PAGE_SIZE,
-                PROT_READ | PROT_WRITE,
-                MAP_PRIVATE | MAP_ANON,
+                libc::PROT_READ | libc::PROT_WRITE,
+                libc::MAP_PRIVATE | libc::MAP_ANON,
                 -1,
                 0,
             );
@@ -148,7 +141,11 @@ pub mod posix_page_allocator {
         }
     }
 
-    pub fn free_pages(ptr: *mut u8, npages: usize) {}
+    pub fn free_pages(ptr: *mut u8, npages: usize) {
+        unsafe {
+            libc::munmap(ptr as *mut _, npages * PAGE_SIZE);
+        }
+    }
 
     pub fn mark_page(
         ptr: *mut u8,
@@ -156,14 +153,13 @@ pub mod posix_page_allocator {
         pagestate: PageState,
     ) -> Result<(), AllocationError> {
         let size = npages * PAGE_SIZE;
-        let mut old_protect = 0;
         let protect = match pagestate {
-            PageState::ReadWrite => PROT_READ | PROT_WRITE,
-            PageState::ReadExecute => PROT_EXEC | PROT_READ,
-            PageState::Invalid => PROT_NONE,
+            PageState::ReadWrite => libc::PROT_READ | libc::PROT_WRITE,
+            PageState::ReadExecute => libc::PROT_EXEC | libc::PROT_READ,
+            PageState::Invalid => libc::PROT_NONE,
         };
 
-        let result = unsafe { mprotect(ptr as *mut _, size, protect) };
+        let result = unsafe { libc::mprotect(ptr as *mut _, size, protect) };
 
         if result != 0 {
             Err(AllocationError::UnknownError)
@@ -206,5 +202,28 @@ pub mod posix_page_allocator {
 
     pub fn get_page_size() -> usize {
         PAGE_SIZE
+    }
+
+    pub fn allocate_pages_at(address: usize, npages: usize) -> Result<*mut u8, AllocationError> {
+        let ptr = unsafe {
+            libc::mmap(
+                address as *mut _,
+                npages * PAGE_SIZE,
+                libc::PROT_READ | libc::PROT_WRITE,
+                libc::MAP_PRIVATE | libc::MAP_ANON | libc::MAP_FIXED,
+                -1,
+                0,
+            )
+        };
+
+        if ptr != address as *mut libc::c_void {
+            panic!("mmap returned a different address than requested (requested: {:p}, returned: {:p})", address as *mut u8, ptr);
+        }
+
+        if ptr == ptr::null_mut() {
+            Err(AllocationError::UnknownError)
+        } else {
+            Ok(ptr as *mut u8)
+        }
     }
 }

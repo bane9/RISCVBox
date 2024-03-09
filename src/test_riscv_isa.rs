@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 #![feature(thread_local)]
-
+#[allow(arithmetic_overflow)]
 mod backend;
 mod bus;
 mod cpu;

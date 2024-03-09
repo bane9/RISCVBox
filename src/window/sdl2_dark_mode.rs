@@ -75,5 +75,7 @@ pub mod sdl2_dark_mode_win {
 
 #[cfg(not(windows))]
 pub mod sdl2_dark_mode_nop {
-    pub fn enable_dark_mode_for_window_nop(window: &Window) {}
+    use sdl2::video::Window;
+
+    pub fn enable_dark_mode_for_window_nop(_window: &Window) {}
 }
