@@ -53,7 +53,6 @@ macro_rules! PteBitTest {
 pub trait Mmu {
     fn new() -> Self;
 
-    fn translate(&self, addr: BusType, access_type: AccessType) -> Result<BusType, Exception>;
     fn get_pte(&self, addr: BusType, access_type: AccessType) -> Result<Pte, Exception>;
     fn update(&mut self, satp: CsrType);
     fn get_levels(&self) -> BusType;
@@ -64,30 +63,6 @@ pub trait Mmu {
 
     fn get_vpn(&self, addr: BusType, level: BusType) -> Self::PnArr;
     fn get_ppn(&self, pte: BusType, level: BusType) -> Self::PnArr;
-
-    fn create_exeption(addr: BusType, access_type: AccessType) -> Result<BusType, Exception> {
-        match access_type {
-            AccessType::Load => Err(Exception::LoadPageFault(addr)),
-            AccessType::Store => Err(Exception::StorePageFault(addr)),
-            AccessType::Fetch => Err(Exception::InstructionPageFault(addr)),
-        }
-    }
-}
-
-pub struct Sv32Mmu {
-    ppn: BusType,
-    enabled: bool,
-}
-
-impl Mmu for Sv32Mmu {
-    type PnArr = [BusType; 2];
-
-    fn new() -> Self {
-        Sv32Mmu {
-            ppn: 0,
-            enabled: false,
-        }
-    }
 
     fn translate(&self, addr: BusType, access_type: AccessType) -> Result<BusType, Exception> {
         if !self.is_active() {
@@ -173,6 +148,30 @@ impl Mmu for Sv32Mmu {
         }
 
         Ok(pte.phys_base | (addr & RV_PAGE_OFFSET_MASK as BusType))
+    }
+
+    fn create_exeption(addr: BusType, access_type: AccessType) -> Result<BusType, Exception> {
+        match access_type {
+            AccessType::Load => Err(Exception::LoadPageFault(addr)),
+            AccessType::Store => Err(Exception::StorePageFault(addr)),
+            AccessType::Fetch => Err(Exception::InstructionPageFault(addr)),
+        }
+    }
+}
+
+pub struct Sv32Mmu {
+    ppn: BusType,
+    enabled: bool,
+}
+
+impl Mmu for Sv32Mmu {
+    type PnArr = [BusType; 2];
+
+    fn new() -> Self {
+        Sv32Mmu {
+            ppn: 0,
+            enabled: false,
+        }
     }
 
     fn get_pte(&self, addr: BusType, access_type: AccessType) -> Result<Pte, Exception> {
