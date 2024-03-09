@@ -71,20 +71,7 @@ extern "C" {
 const JUMP_BUF_SIZE: usize = 256;
 type JmpBuf = [u8; JUMP_BUF_SIZE];
 
-#[repr(C)]
-struct ProperSiginfo {
-    si_signo: c_int,
-    si_code: c_int,
-    si_value: libc::sigval,
-    si_errno: c_int,
-    si_pid: libc::pid_t,
-    si_uid: libc::uid_t,
-    si_addr: *mut c_void,
-    si_status: c_int,
-    si_band: c_int,
-}
-
-extern "C" fn sigaction_handler(signum: c_int, info: *mut siginfo_t, context: *mut c_void) {
+extern "C" fn sigaction_handler(signum: c_int, _info: *mut siginfo_t, context: *mut c_void) {
     let in_jit_block = IN_JIT_BLOCK.with(|in_jit_block| *in_jit_block.borrow());
 
     if !in_jit_block {
@@ -128,11 +115,8 @@ extern "C" fn sigaction_handler(signum: c_int, info: *mut siginfo_t, context: *m
             *regs_cell.borrow_mut() = regs;
         });
 
-        let fix = info as *mut ProperSiginfo;
-
-        EXCEPTION_ADDR.with(|addr_cell| {
-            *addr_cell.borrow_mut() = (*fix).si_addr as usize;
-        });
+        EXCEPTION_ADDR
+            .with(|addr_cell| *addr_cell.borrow_mut() = host_regs[libc::REG_RIP as usize] as usize);
     }
 
     unsafe {
