@@ -1,5 +1,5 @@
+use crate::bus::bus::*;
 use crate::xmem::PageAllocator;
-use crate::{bus::bus::*, cpu::Exception};
 
 use crate::*;
 
@@ -34,13 +34,13 @@ impl Ram {
 }
 
 impl BusDevice for Ram {
-    fn load(&mut self, addr: BusType, size: BusType) -> Result<BusType, Exception> {
+    fn load(&mut self, addr: BusType, size: BusType) -> Result<BusType, cpu::Exception> {
         let data = ptr_direct_load!(addr as *mut u8, size);
 
         Ok(data)
     }
 
-    fn store(&mut self, addr: BusType, data: BusType, size: BusType) -> Result<(), Exception> {
+    fn store(&mut self, addr: BusType, data: BusType, size: BusType) -> Result<(), cpu::Exception> {
         ptr_direct_store!(addr as *mut u8, data, size);
 
         Ok(())
@@ -56,7 +56,7 @@ impl BusDevice for Ram {
 
     fn tick_core_local(&mut self) {}
 
-    fn get_ptr(&mut self, addr: BusType) -> Result<*mut u8, Exception> {
+    fn get_ptr(&mut self, addr: BusType) -> Result<*mut u8, cpu::Exception> {
         Ok(addr as *mut u8)
     }
 

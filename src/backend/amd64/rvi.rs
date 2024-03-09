@@ -2,7 +2,7 @@ use crate::backend::core::{
     abi_reg, CMP_JMP_IMM32_SIZE, FASTMEM_BLOCK_SIZE, JMP_IMM32_SIZE, MMU_IS_ACTIVE_REG,
 };
 use crate::backend::target::core::{
-    amd64_reg, emit_mov_reg_guest_to_host, emit_mov_reg_host_to_guest, emit_rel_load, BackendCore,
+    amd64_reg, emit_mov_reg_guest_to_host, emit_mov_reg_host_to_guest, emit_rel_load,
     BackendCoreImpl,
 };
 use crate::backend::{common, ReturnableHandler, ReturnableImpl};

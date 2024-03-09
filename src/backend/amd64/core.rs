@@ -6,11 +6,7 @@ use crate::{
     frontend::exec_core::{RV_PAGE_MASK, RV_PAGE_OFFSET_MASK},
     xmem::{PageAllocator, PageState},
 };
-pub use crate::{
-    backend::{BackendCore, JitError},
-    cpu::*,
-    util::EncodedInsn,
-};
+pub use crate::{cpu::*, util::EncodedInsn};
 
 use crate::backend::amd64::rvi::emit_bus_access_raw;
 

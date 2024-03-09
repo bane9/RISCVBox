@@ -1,7 +1,5 @@
 pub use crate::backend::returnable::*;
 
-use microseh;
-
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Register {
