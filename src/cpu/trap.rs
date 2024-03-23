@@ -102,7 +102,7 @@ pub fn handle_interrupt(int_val: Interrupt, cpu: &mut cpu::Cpu) {
         false
     };
 
-    let pc = cpu.c_exception_pc as CpuReg;
+    let pc = cpu.next_pc as CpuReg;
 
     if mideleg_flag & (mode == MppMode::Supervisor || mode == MppMode::User) {
         cpu.mode = MppMode::Supervisor;
@@ -114,15 +114,16 @@ pub fn handle_interrupt(int_val: Interrupt, cpu: &mut cpu::Cpu) {
             int_val as CpuReg * INSN_SIZE as CpuReg
         };
 
+        assert!(stvec_val != 0);
+
         cpu.next_pc = (stvec_val & !1) + vt_offset;
 
         cpu.csr.write(csr::register::SEPC, pc & !1);
         cpu.csr.write(
             csr::register::SCAUSE,
-            cpu.exception.to_cpu_reg() | (1 << (CpuReg::BITS - 1)),
+            int_val.to_cpu_reg() | (1 << (CpuReg::BITS - 1)),
         );
-        cpu.csr
-            .write(csr::register::STVAL, cpu.exception.get_data());
+        cpu.csr.write(csr::register::STVAL, 0);
         cpu.csr
             .write_bit_sstatus(csr::bits::SPIE, cpu.csr.read_bit_sstatus(csr::bits::SIE));
         cpu.csr.write_bit_sstatus(csr::bits::SIE, false);
@@ -137,15 +138,16 @@ pub fn handle_interrupt(int_val: Interrupt, cpu: &mut cpu::Cpu) {
             int_val as CpuReg * INSN_SIZE as CpuReg
         };
 
+        assert!(mtvec_val != 0);
+
         cpu.next_pc = (mtvec_val & !1) + vt_offset;
 
         cpu.csr.write(csr::register::MEPC, pc & !1);
         cpu.csr.write(
             csr::register::MCAUSE,
-            cpu.exception.to_cpu_reg() | (1 << (CpuReg::BITS - 1)),
+            int_val.to_cpu_reg() | (1 << (CpuReg::BITS - 1)),
         );
-        cpu.csr
-            .write(csr::register::MTVAL, cpu.exception.get_data());
+        cpu.csr.write(csr::register::MTVAL, 0);
         cpu.csr
             .write_bit_mstatus(csr::bits::MPIE, cpu.csr.read_bit_mstatus(csr::bits::MIE));
         cpu.csr.write_bit_mstatus(csr::bits::MIE, false);
@@ -196,4 +198,6 @@ pub fn handle_exception(cpu: &mut cpu::Cpu) {
         cpu.csr.write_bit_mstatus(csr::bits::MIE, false);
         cpu.csr.write_mpp_mode(mode);
     }
+
+    assert!(cpu.next_pc != 0);
 }

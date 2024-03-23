@@ -139,6 +139,23 @@ pub enum Interrupt {
     None = 0xff,
 }
 
+impl Interrupt {
+    pub fn to_cpu_reg(&self) -> CpuReg {
+        match self {
+            Interrupt::UserSoftware => 0,
+            Interrupt::SupervisorSoftware => 1,
+            Interrupt::MachineSoftware => 3,
+            Interrupt::UserTimer => 4,
+            Interrupt::SupervisorTimer => 5,
+            Interrupt::MachineTimer => 7,
+            Interrupt::UserExternal => 8,
+            Interrupt::SupervisorExternal => 9,
+            Interrupt::MachineExternal => 11,
+            Interrupt::None => 0xff,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone, Copy, Eq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum Exception {
