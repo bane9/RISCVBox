@@ -234,7 +234,7 @@ impl Mmu for Sv32Mmu {
 
         match i {
             0 => {
-                pte.phys_base = ppn[0] << 12;
+                pte.phys_base = (ppn[1] << 22) | (ppn[0] << 12);
             }
             1 => {
                 pte.phys_base = (ppn[1] << 22) | (vpn[0] << 12);
