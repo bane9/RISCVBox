@@ -104,7 +104,7 @@ pub fn handle_interrupt(int_val: Interrupt, cpu: &mut cpu::Cpu) {
 
     let pc = cpu.next_pc as CpuReg;
 
-    if mideleg_flag & (mode == MppMode::Supervisor || mode == MppMode::User) {
+    if mideleg_flag && (mode == MppMode::Supervisor || mode == MppMode::User) {
         cpu.mode = MppMode::Supervisor;
 
         let stvec_val = cpu.csr.read(csr::register::STVEC);
@@ -165,7 +165,7 @@ pub fn handle_exception(cpu: &mut cpu::Cpu) {
 
     let medeleg_flag = ((cpu.csr.read(csr::register::MEDELEG) >> exc_val as usize) & 1) != 0;
 
-    if medeleg_flag & (mode == MppMode::Supervisor || mode == MppMode::User) {
+    if medeleg_flag && (mode == MppMode::Supervisor || mode == MppMode::User) {
         cpu.mode = MppMode::Supervisor;
 
         let stvec_val = cpu.csr.read(csr::register::STVEC);

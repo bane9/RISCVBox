@@ -96,7 +96,12 @@ fn main() {
     //     None
     // };
 
-    let rom = util::read_file("buildroot/doomgeneric.bin").unwrap();
+    let mut rom = util::read_file("buildroot/images4/fw_jump.bin").unwrap();
+
+    rom.resize(util::size_mib(4), 0);
+    let mut kernel = util::read_file("buildroot/images4/Image").unwrap();
+    rom.append(&mut kernel);
+
     let dtb = Some(util::read_file("buildroot/images/dtb.dtb").unwrap());
 
     init_backend_csr();
@@ -110,7 +115,7 @@ fn main() {
     let exec_thread_pool = ExecCoreThreadPool::new(RAM_BEGIN_ADDR, 1);
 
     let mut window =
-        window::window_impl::new(width, height, bpp, "RISCVBox", init_data.fb_ptr, false);
+        window::window_impl::new(width, height, bpp, "RISCVBox", init_data.fb_ptr, true);
 
     window.event_loop();
 

@@ -35,7 +35,13 @@ impl ExecCore {
             };
 
             if int.is_some() {
-                trap::handle_interrupt(int.unwrap(), cpu);
+                let int = int.unwrap();
+
+                trap::handle_interrupt(int, cpu);
+
+                bus::get_bus()
+                    .get_plic()
+                    .update_pending(int.to_cpu_reg() as u64);
             }
         }
 

@@ -1,8 +1,9 @@
 use crate::bus::mmu::*;
 use crate::cpu::*;
 use crate::frontend::exec_core::RV_PAGE_MASK;
-use crate::xmem::{PageAllocator, PageState};
+use crate::xmem::PageState;
 
+use super::plic::{Plic, PLIC_BASE};
 use super::ram::RAM_BEGIN_ADDR;
 use super::ramfb::RAMFB_BEGIN_ADDR;
 
@@ -88,6 +89,8 @@ pub struct Bus {
 
     fb_ptr: *mut u8,
     fb_end_addr: usize,
+
+    plic_ptr: *mut Plic,
 }
 
 impl Bus {
@@ -99,10 +102,16 @@ impl Bus {
 
             fb_ptr: std::ptr::null_mut(),
             fb_end_addr: 0,
+
+            plic_ptr: std::ptr::null_mut(),
         }
     }
 
     pub fn add_device(&mut self, device: Box<dyn BusDevice>) {
+        if device.get_begin_addr() == PLIC_BASE {
+            self.plic_ptr = device.as_ref() as *const dyn BusDevice as *mut Plic;
+        }
+
         self.devices.push(device);
     }
 
@@ -239,7 +248,9 @@ impl Bus {
             let gpfn_state = cpu.gpfn_state.get_gpfn_state_mut(gpfn);
 
             if gpfn_state.is_none() {
-                return Ok(()); // Oops ?
+                ptr_direct_store!(addr as *mut u8, data, size);
+
+                return Ok(());
             }
 
             let gpfn_state = gpfn_state.unwrap();
@@ -306,6 +317,10 @@ impl Bus {
         }
 
         Err(Exception::LoadAccessFault(addr))
+    }
+
+    pub fn get_plic(&mut self) -> &'static mut Plic {
+        return unsafe { &mut *self.plic_ptr };
     }
 }
 
