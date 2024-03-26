@@ -83,7 +83,7 @@ impl Clint {
             return true;
         }
 
-        if mtime >= clint_data.mtimecmp {
+        if clint_data.mtimecmp != 0 && mtime >= clint_data.mtimecmp {
             cpu.csr
                 .write_bit(csr::register::MIP, csr::bits::MTIP_BIT, true);
 
