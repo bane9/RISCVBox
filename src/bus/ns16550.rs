@@ -97,7 +97,7 @@ impl BusDevice for Ns16550 {
                 if self.lsr & LSR_DR != 0 {
                     self.lsr &= !LSR_DR;
                 }
-                Ok(0 as u32) // Todo: async(?) read
+                Ok(self.val as BusType)
             }
             IER => return Ok(self.ier as BusType),
             ISR => return Ok(self.isr as BusType),
@@ -167,16 +167,17 @@ impl BusDevice for Ns16550 {
         println!("tick_from_main_thread");
     }
 
-    fn tick_async(&mut self, _cpu: &mut cpu::Cpu) -> bool {
+    fn tick_async(&mut self, _cpu: &mut cpu::Cpu) -> Option<u32> {
         let c = unsafe { READ_CHAR.load(std::sync::atomic::Ordering::Acquire) };
+
         if c != 0 {
             self.lsr |= LSR_DR;
             self.val = c;
             unsafe { READ_CHAR.store(0, std::sync::atomic::Ordering::Release) };
 
-            return true;
+            return Some(UART_IRQN as u32);
         }
 
-        false
+        None
     }
 }

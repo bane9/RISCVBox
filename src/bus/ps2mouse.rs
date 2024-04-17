@@ -216,7 +216,7 @@ impl BusDevice for PS2Mouse {
 
     fn tick_from_main_thread(&mut self) {}
 
-    fn tick_async(&mut self, _cpu: &mut cpu::Cpu) -> bool {
-        false
+    fn tick_async(&mut self, _cpu: &mut cpu::Cpu) -> Option<u32> {
+        None
     }
 }

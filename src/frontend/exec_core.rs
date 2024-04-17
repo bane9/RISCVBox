@@ -287,13 +287,15 @@ pub fn exec_core_thread(cpu_core_idx: usize, initial_pc: CpuReg) {
         let cpu = unsafe { &mut *(cpu as *mut cpu::Cpu) };
 
         loop {
-            std::thread::sleep(std::time::Duration::from_millis(2));
+            std::thread::sleep(std::time::Duration::from_millis(100));
 
-            if bus.tick_async(cpu) {
-                cpu.csr
-                    .write_bit(csr::register::MIP, csr::bits::MTIP_BIT, true);
+            if let Some(irqn) = bus.tick_async(cpu) {
+                if irqn != 0 {
+                    cpu.csr
+                        .write_bit(csr::register::MIP, csr::bits::SEIP_BIT, true);
 
-                cpu.pending_interrupt_number = 0 as CpuReg;
+                    cpu.pending_interrupt_number = irqn;
+                }
             }
 
             trap::has_pending_interrupt(cpu);

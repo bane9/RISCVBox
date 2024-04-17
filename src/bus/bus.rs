@@ -75,7 +75,7 @@ pub trait BusDevice {
     fn get_end_addr(&self) -> BusType;
     fn tick_core_local(&mut self);
     fn tick_from_main_thread(&mut self);
-    fn tick_async(&mut self, cpu: &mut Cpu) -> bool;
+    fn tick_async(&mut self, cpu: &mut Cpu) -> Option<u32>;
     fn get_ptr(&mut self, addr: BusType) -> Result<*mut u8, Exception>;
 }
 
@@ -252,16 +252,14 @@ impl Bus {
         }
     }
 
-    pub fn tick_async(&mut self, cpu: &mut cpu::Cpu) -> bool {
-        let mut has_interrupt = false;
-
+    pub fn tick_async(&mut self, cpu: &mut cpu::Cpu) -> Option<u32> {
         for device in &mut self.devices {
-            if device.tick_async(cpu) {
-                has_interrupt = true;
+            if let Some(irqn) = device.tick_async(cpu) {
+                Some(irqn);
             }
         }
 
-        has_interrupt
+        None
     }
 
     pub fn get_ptr(&mut self, addr: BusType) -> Result<*mut u8, Exception> {

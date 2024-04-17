@@ -154,22 +154,16 @@ impl BusDevice for Clint {
                 );
             },
             MTIMECMP..=MTIMECMP_END => unsafe {
-                if data == 0 {
-                    return Ok(());
-                }
-
                 clint.mtimecmp = 0;
                 let dst = &mut clint.mtimecmp as *mut BusType as *mut u8;
-                println!("Setting mtimecmp to {}", data);
+
                 std::ptr::copy_nonoverlapping(
                     &data as *const u32 as *const u8,
                     dst,
                     size as usize / 8,
                 );
             },
-            MTIME..=MTIME_END => {
-                println!("Ignoring write to MTIME")
-            }
+            MTIME..=MTIME_END => {}
             _ => return Err(Exception::StoreAccessFault(addr)),
         };
 
@@ -196,10 +190,14 @@ impl BusDevice for Clint {
 
     fn tick_from_main_thread(&mut self) {}
 
-    fn tick_async(&mut self, cpu: &mut cpu::Cpu) -> bool {
+    fn tick_async(&mut self, cpu: &mut cpu::Cpu) -> Option<u32> {
         // This mandates syncrhonization/atomics but I'll hope it'll be fine for now
         let clint = get_clint(cpu.core_id as usize);
 
-        Self::tick(clint, cpu)
+        if Self::tick(clint, cpu) {
+            Some(CLINT_IRQN as u32)
+        } else {
+            None
+        }
     }
 }
