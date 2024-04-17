@@ -336,6 +336,7 @@ pub struct Cpu {
     pub csr: &'static mut csr::Csr,
     pub has_pending_interrupt: std::sync::atomic::AtomicU32,
     pub pending_interrupt: Option<Interrupt>,
+    pub pending_interrupt_number: CpuReg,
 }
 
 impl Cpu {
@@ -362,6 +363,7 @@ impl Cpu {
             csr: csr::get_csr(),
             has_pending_interrupt: std::sync::atomic::AtomicU32::new(0),
             pending_interrupt: None,
+            pending_interrupt_number: 0,
         }
     }
 

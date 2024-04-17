@@ -40,7 +40,7 @@ pub fn has_pending_interrupt(cpu: &mut cpu::Cpu) -> Option<Interrupt> {
     if pending == 0 {
         return None;
     }
-
+    println!("pending: {:#x}\n\n\n\n", pending);
     let irq: Option<Interrupt>;
 
     if (pending & csr::bits::MEIP) != 0 {

@@ -46,12 +46,18 @@ impl ParseCore {
 
     pub fn invalidate(&mut self, gpfn: CpuReg) {
         let cpu = cpu::get_cpu();
+        let bus = bus::get_bus();
 
-        cpu.gpfn_state.remove_gpfn(gpfn << RV_PAGE_SHIFT);
+        let phys_gpfn = bus
+            .translate(gpfn << RV_PAGE_SHIFT, &cpu.mmu, AccessType::Load)
+            .expect("Failed to translate gpfn for invalidation")
+            >> RV_PAGE_SHIFT as CpuReg;
+
+        cpu.gpfn_state.remove_gpfn(phys_gpfn << RV_PAGE_SHIFT);
 
         let idx: usize = cpu
             .insn_map
-            .get_by_guest_idx(gpfn << RV_PAGE_SHIFT)
+            .get_by_guest_idx(phys_gpfn << RV_PAGE_SHIFT)
             .unwrap()
             .jit_block_idx;
 
@@ -83,7 +89,7 @@ impl ParseCore {
         }
 
         let base_addr = bus
-            .translate(gpfn << RV_PAGE_SHIFT, &cpu.mmu, AccessType::Fetch)
+            .translate(gpfn << RV_PAGE_SHIFT, &cpu.mmu, AccessType::Load)
             .unwrap() as BusType;
 
         cpu.gpfn_state.add_gpfn(base_addr as CpuReg);

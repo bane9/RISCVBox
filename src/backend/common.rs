@@ -128,7 +128,6 @@ impl UsizeConversions for BusAccessCond {
     }
 }
 
-#[inline(always)]
 fn do_jump(guest_address: CpuReg, current_guest_pc: CpuReg, rd: *mut CpuReg) -> usize {
     let cpu = cpu::get_cpu();
 
@@ -402,7 +401,6 @@ pub extern "C" fn c_lhu_cb(rd: usize, rs1: usize, imm: usize, guest_pc: usize) {
     }
 }
 
-#[inline(always)]
 fn do_store(rs1: *mut CpuReg, rs2: *mut CpuReg, imm: i32, guest_pc: CpuReg, store_size: u8) {
     let cpu = cpu::get_cpu();
 
@@ -436,11 +434,8 @@ fn do_store(rs1: *mut CpuReg, rs2: *mut CpuReg, imm: i32, guest_pc: CpuReg, stor
             gpfn_state.set_state(PageState::ReadExecute);
 
             if !result.is_err() {
-                cpu.set_exception(
-                    Exception::InvalidateJitBlock(gpfn >> RV_PAGE_SHIFT as CpuReg),
-                    guest_pc,
-                );
-
+                cpu.set_exception(Exception::InvalidateJitBlock(gpfn), guest_pc);
+                println!("lol123\n\n\n");
                 ReturnableImpl::throw();
             }
         }
@@ -449,6 +444,14 @@ fn do_store(rs1: *mut CpuReg, rs2: *mut CpuReg, imm: i32, guest_pc: CpuReg, stor
             cpu.set_exception(result.err().unwrap(), guest_pc);
 
             ReturnableImpl::throw();
+        } else {
+            let result = bus.store(addr, data, store_size as BusType, &cpu.mmu);
+
+            if result.is_err() {
+                cpu.set_exception(result.err().unwrap(), guest_pc);
+
+                ReturnableImpl::throw();
+            }
         }
 
         return;

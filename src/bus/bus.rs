@@ -1,11 +1,8 @@
 use crate::bus::mmu::*;
 use crate::cpu::*;
-use crate::frontend::exec_core::RV_PAGE_MASK;
-use crate::xmem::PageState;
 
 use super::plic::{Plic, PLIC_BASE};
 use super::ram::RAM_BEGIN_ADDR;
-use super::ramfb::RAMFB_BEGIN_ADDR;
 
 pub type BusType = u32;
 
@@ -219,12 +216,6 @@ impl Bus {
     }
 
     pub fn fetch_nommu(&mut self, addr: BusType, size: BusType) -> Result<BusType, Exception> {
-        if addr >= RAM_BEGIN_ADDR && addr < self.ram_end_addr as u32 {
-            let data = ptr_direct_load!(addr as *mut u8, size);
-
-            return Ok(data);
-        }
-
         let res = self.load_nommu(addr, size);
 
         if res.is_err() {
@@ -240,42 +231,6 @@ impl Bus {
         data: BusType,
         size: BusType,
     ) -> Result<(), Exception> {
-        if addr >= RAM_BEGIN_ADDR && addr < self.ram_end_addr as u32 {
-            let cpu = cpu::get_cpu();
-
-            let gpfn = addr & RV_PAGE_MASK as CpuReg;
-
-            let gpfn_state = cpu.gpfn_state.get_gpfn_state_mut(gpfn);
-
-            if gpfn_state.is_none() {
-                ptr_direct_store!(addr as *mut u8, data, size);
-
-                return Ok(());
-            }
-
-            let gpfn_state = gpfn_state.unwrap();
-
-            let mut was_rx = false;
-
-            if gpfn_state.get_state() == PageState::ReadExecute {
-                was_rx = true;
-
-                gpfn_state.set_state(PageState::ReadWrite);
-            }
-
-            ptr_direct_store!(addr as *mut u8, data, size);
-
-            if was_rx {
-                gpfn_state.set_state(PageState::ReadExecute);
-            }
-
-            return Ok(());
-        } else if addr >= RAMFB_BEGIN_ADDR as u32 && addr < self.fb_end_addr as u32 {
-            ptr_direct_store!(addr as *mut u8, data, size);
-
-            return Ok(());
-        }
-
         for device in &mut self.devices {
             if addr >= device.get_begin_addr() && addr < device.get_end_addr() {
                 return device.store(addr, data, size);
@@ -321,6 +276,14 @@ impl Bus {
 
     pub fn get_plic(&mut self) -> &'static mut Plic {
         return unsafe { &mut *self.plic_ptr };
+    }
+
+    pub fn get_ram_end_addr(&self) -> usize {
+        self.ram_end_addr
+    }
+
+    pub fn is_dram_addr(&self, addr: BusType) -> bool {
+        addr >= RAM_BEGIN_ADDR && addr < self.ram_end_addr as u32
     }
 }
 

@@ -1,13 +1,14 @@
 use std::collections::HashMap;
 
 use crate::{
-    cpu::CpuReg,
+    bus,
+    cpu::{self, CpuReg},
     frontend::exec_core::RV_PAGE_OFFSET_MASK,
     xmem::{PageAllocator, PageState},
 };
 
 pub struct GpfnState {
-    addr: CpuReg,
+    pub addr: CpuReg,
     state: PageState,
 }
 
@@ -69,6 +70,17 @@ impl GpfnStateSet {
     }
 
     pub fn get_gpfn_state_mut(&mut self, gpfn: CpuReg) -> Option<&mut GpfnState> {
+        let cpu = cpu::get_cpu();
+        let bus = bus::get_bus();
+
+        let phys_gpfn = bus.translate(gpfn, &cpu.mmu, bus::mmu::AccessType::Load);
+
+        let gpfn = if let Ok(phys_gpfn) = phys_gpfn {
+            phys_gpfn
+        } else {
+            gpfn
+        };
+
         self.gpfn_set.get_mut(&gpfn)
     }
 

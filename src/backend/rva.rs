@@ -97,7 +97,7 @@ macro_rules! gpfn_write_check_part_2 {
             let cpu = cpu::get_cpu();
 
             cpu.set_exception(Exception::InvalidateJitBlock(gpfn), $guest_pc as CpuReg);
-
+            println!("lol14213\n\n\n");
             ReturnableImpl::throw();
         }
     }};

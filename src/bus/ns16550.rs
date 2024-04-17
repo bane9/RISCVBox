@@ -49,11 +49,24 @@ pub struct Ns16550 {
     msr: u8,
     scr: u8,
     val: u8,
+
+    read_thread: Option<std::thread::JoinHandle<()>>,
+}
+
+static mut READ_CHAR: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+fn read_thread() {
+    loop {
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input).unwrap();
+
+        unsafe { READ_CHAR.store(input.as_bytes()[0], std::sync::atomic::Ordering::Release) };
+    }
 }
 
 impl Ns16550 {
     pub fn new() -> Self {
-        Self {
+        let mut this = Self {
             dll: 0,
             dlm: 0,
             isr: 0,
@@ -65,7 +78,13 @@ impl Ns16550 {
             msr: 0,
             scr: 0,
             val: 0,
-        }
+
+            read_thread: None,
+        };
+
+        this.read_thread = Some(std::thread::spawn(read_thread));
+
+        this
     }
 }
 
@@ -97,7 +116,9 @@ impl BusDevice for Ns16550 {
         match adj_addr as u64 {
             THR => {
                 let c = data as u8 as char;
-                print!("{}", c);
+                if c.is_ascii() {
+                    print!("{}", c);
+                }
                 // println!("printing u8: {} as char: {}", data as u8, c);
                 if c == '\n' {
                     let _ = std::io::stdout().flush();
@@ -142,9 +163,20 @@ impl BusDevice for Ns16550 {
         Ok(std::ptr::null_mut())
     }
 
-    fn tick_from_main_thread(&mut self) {}
+    fn tick_from_main_thread(&mut self) {
+        println!("tick_from_main_thread");
+    }
 
     fn tick_async(&mut self, _cpu: &mut cpu::Cpu) -> bool {
+        let c = unsafe { READ_CHAR.load(std::sync::atomic::Ordering::Acquire) };
+        if c != 0 {
+            self.lsr |= LSR_DR;
+            self.val = c;
+            unsafe { READ_CHAR.store(0, std::sync::atomic::Ordering::Release) };
+
+            return true;
+        }
+
         false
     }
 }

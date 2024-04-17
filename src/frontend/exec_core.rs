@@ -6,7 +6,7 @@ use crate::bus::clint::Clint;
 use crate::bus::dtb::DTB_BEGIN_ADDR;
 use crate::bus::mmu::{AccessType, Mmu};
 use crate::bus::{self, BusType};
-use crate::cpu::{self, CpuReg};
+use crate::cpu::{self, csr, CpuReg};
 use crate::cpu::{trap, RegName};
 pub use crate::frontend::parse_core::*;
 use crate::xmem::PageState;
@@ -41,7 +41,7 @@ impl ExecCore {
 
                 bus::get_bus()
                     .get_plic()
-                    .update_pending(int.to_cpu_reg() as u64);
+                    .update_pending(cpu.pending_interrupt_number as u64);
             }
         }
 
@@ -157,7 +157,6 @@ impl ExecCore {
                         .unwrap();
 
                     if handling_type == FastmemHandleType::Manual {
-                        cpu.exception = cpu::Exception::InvalidateJitBlock(cpu.current_gpfn);
                         cpu.c_exception_pc =
                             (guest_exception_pc.guest_idx & RV_PAGE_OFFSET_MASK as CpuReg) as usize;
                     } else {
@@ -286,9 +285,14 @@ pub fn exec_core_thread(cpu_core_idx: usize, initial_pc: CpuReg) {
         let cpu = unsafe { &mut *(cpu as *mut cpu::Cpu) };
 
         loop {
-            std::thread::sleep(std::time::Duration::from_millis(100));
+            std::thread::sleep(std::time::Duration::from_millis(2));
 
-            bus.tick_async(cpu);
+            if bus.tick_async(cpu) {
+                cpu.csr
+                    .write_bit(csr::register::MIP, csr::bits::MTIP_BIT, true);
+
+                cpu.pending_interrupt_number = 0 as CpuReg;
+            }
 
             trap::has_pending_interrupt(cpu);
         }

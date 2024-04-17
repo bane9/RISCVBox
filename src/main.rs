@@ -96,10 +96,10 @@ fn main() {
     //     None
     // };
 
-    let mut rom = util::read_file("buildroot/images4/fw_jump.bin").unwrap();
+    let mut rom = util::read_file("buildroot/images1/fw_jump.bin").unwrap();
 
     rom.resize(util::size_mib(4), 0);
-    let mut kernel = util::read_file("buildroot/images4/Image").unwrap();
+    let mut kernel = util::read_file("buildroot/images1/Image").unwrap();
     rom.append(&mut kernel);
 
     let dtb = Some(util::read_file("buildroot/images/dtb.dtb").unwrap());
@@ -110,7 +110,7 @@ fn main() {
     let height = 600;
     let bpp = 32;
 
-    let init_data = init_bus(rom.clone(), ram_size, dtb, width, height, bpp);
+    let init_data = init_bus(rom, ram_size, dtb, width, height, bpp);
 
     let exec_thread_pool = ExecCoreThreadPool::new(RAM_BEGIN_ADDR, 1);
 

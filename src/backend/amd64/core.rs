@@ -3,7 +3,7 @@
 use crate::{
     backend::*,
     bus::{self, BusType},
-    frontend::exec_core::{RV_PAGE_MASK, RV_PAGE_OFFSET_MASK},
+    frontend::exec_core::{RV_PAGE_MASK, RV_PAGE_OFFSET_MASK, RV_PAGE_SHIFT},
     xmem::{PageAllocator, PageState},
 };
 pub use crate::{cpu::*, util::EncodedInsn};
@@ -1437,32 +1437,43 @@ impl BackendCore for BackendCoreImpl {
             let dst_addr =
                 unsafe { std::ptr::read_unaligned(reg1 as *const CpuReg) as i64 + imm as i64 };
 
+            let idk = dst_addr as CpuReg >> RV_PAGE_SHIFT as CpuReg;
+            let idk = idk << RV_PAGE_SHIFT as CpuReg;
+            if idk == 2650783744 {
+                println!("dst_addr: {:x}", dst_addr);
+            }
+
             let gpfn_state = cpu
                 .gpfn_state
                 .get_gpfn_state_mut(dst_addr as CpuReg & RV_PAGE_MASK as CpuReg);
 
-            if gpfn_state.is_some() {
-                let gpfn_state = gpfn_state.unwrap();
-
-                if gpfn_state.get_state() == PageState::ReadExecute {
-                    let src_val = unsafe { std::ptr::read_unaligned(reg2 as *const CpuReg) };
-
-                    let bus = bus::get_bus();
-
-                    gpfn_state.set_state(PageState::ReadWrite);
-
-                    bus.store(
-                        dst_addr as BusType,
-                        src_val as BusType,
-                        access_size as BusType,
-                        &cpu.mmu,
+            if let Some(gpfn_state) = gpfn_state {
+                if gpfn_state.get_state() != PageState::ReadExecute {
+                    panic!(
+                        "While manually handling fastmem violation: page not in read-execute state"
                     )
-                    .expect("Bus error while manually handling fastmem violation");
-
-                    gpfn_state.set_state(PageState::ReadExecute);
-
-                    return FastmemHandleType::Manual;
                 }
+
+                let src_val = unsafe { std::ptr::read_unaligned(reg2 as *const CpuReg) };
+
+                let bus = bus::get_bus();
+
+                gpfn_state.set_state(PageState::ReadWrite);
+
+                bus.store(
+                    dst_addr as BusType,
+                    src_val as BusType,
+                    access_size as BusType,
+                    &cpu.mmu,
+                )
+                .expect("Bus error while manually handling fastmem violation");
+
+                gpfn_state.set_state(PageState::ReadExecute);
+
+                cpu.exception =
+                    Exception::InvalidateJitBlock(dst_addr as CpuReg >> RV_PAGE_SHIFT as CpuReg);
+                //println!("lolasdsad\n\n\n");
+                return FastmemHandleType::Manual;
             }
         }
 

@@ -4,6 +4,7 @@ use crate::frontend::exec_core::INSN_SIZE;
 use crate::util;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
+use std::sync::atomic::AtomicUsize;
 use std::sync::Mutex;
 
 pub const CLINT_ADDR: BusType = 0x2000000;
@@ -17,6 +18,8 @@ const MTIMECMP_END: BusType = MTIMECMP + INSN_SIZE as BusType;
 
 const MTIME: BusType = CLINT_ADDR + 0xbff8;
 const MTIME_END: BusType = MTIME + INSN_SIZE as BusType;
+
+const CLINT_IRQN: usize = 0;
 
 pub struct ClintData {
     pub msip: BusType,
@@ -51,7 +54,7 @@ fn get_clint(thread_id: usize) -> &'static mut ClintData {
         &mut *clint
     }
 }
-
+static mut ATOMIC_CNT: AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 pub struct Clint;
 
 impl Clint {
@@ -83,9 +86,11 @@ impl Clint {
             return true;
         }
 
-        if clint_data.mtimecmp != 0 && mtime >= clint_data.mtimecmp {
+        if mtime >= clint_data.mtimecmp {
             cpu.csr
                 .write_bit(csr::register::MIP, csr::bits::MTIP_BIT, true);
+
+            cpu.pending_interrupt_number = CLINT_IRQN as CpuReg;
 
             return true;
         }
@@ -149,15 +154,22 @@ impl BusDevice for Clint {
                 );
             },
             MTIMECMP..=MTIMECMP_END => unsafe {
+                if data == 0 {
+                    return Ok(());
+                }
+
                 clint.mtimecmp = 0;
                 let dst = &mut clint.mtimecmp as *mut BusType as *mut u8;
+                println!("Setting mtimecmp to {}", data);
                 std::ptr::copy_nonoverlapping(
                     &data as *const u32 as *const u8,
                     dst,
                     size as usize / 8,
                 );
             },
-            MTIME..=MTIME_END => {}
+            MTIME..=MTIME_END => {
+                println!("Ignoring write to MTIME")
+            }
             _ => return Err(Exception::StoreAccessFault(addr)),
         };
 
