@@ -7,39 +7,6 @@ use super::ram::RAM_BEGIN_ADDR;
 pub type BusType = u32;
 
 #[macro_export]
-#[cfg(feature = "no_unaligned_mem_access")]
-macro_rules! ptr_direct_load {
-    ($ptr:expr, $size:expr) => {{
-        let ret: u32 = 0;
-
-        unsafe {
-            std::ptr::copy_nonoverlapping(
-                $ptr,
-                &ret as *const u32 as *mut u8,
-                ($size as usize) / 8,
-            );
-        }
-
-        ret
-    }};
-}
-
-#[macro_export]
-#[cfg(feature = "no_unaligned_mem_access")]
-macro_rules! ptr_direct_store {
-    ($ptr:expr, $data:expr, $size:expr) => {{
-        unsafe {
-            std::ptr::copy_nonoverlapping(
-                &$data as *const u32 as *const u8,
-                $ptr,
-                ($size as usize) / 8,
-            );
-        }
-    }};
-}
-
-#[macro_export]
-#[cfg(not(feature = "no_unaligned_mem_access"))]
 macro_rules! ptr_direct_load {
     ($ptr:expr, $size:expr) => {
         unsafe {
@@ -54,7 +21,6 @@ macro_rules! ptr_direct_load {
 }
 
 #[macro_export]
-#[cfg(not(feature = "no_unaligned_mem_access"))]
 macro_rules! ptr_direct_store {
     ($ptr:expr, $data:expr, $size:expr) => {
         unsafe {

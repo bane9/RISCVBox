@@ -69,11 +69,15 @@ impl GpfnStateSet {
         self.gpfn_set.get(&gpfn)
     }
 
-    pub fn get_gpfn_state_mut(&mut self, gpfn: CpuReg) -> Option<&mut GpfnState> {
+    pub fn get_gpfn_state_mut(
+        &mut self,
+        gpfn: CpuReg,
+        translate_method: bus::mmu::AccessType,
+    ) -> Option<&mut GpfnState> {
         let cpu = cpu::get_cpu();
         let bus = bus::get_bus();
 
-        let phys_gpfn = bus.translate(gpfn, &cpu.mmu, bus::mmu::AccessType::Load);
+        let phys_gpfn = bus.translate(gpfn, &cpu.mmu, translate_method);
 
         let gpfn = if let Ok(phys_gpfn) = phys_gpfn {
             phys_gpfn

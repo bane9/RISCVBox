@@ -417,7 +417,7 @@ fn do_store(rs1: *mut CpuReg, rs2: *mut CpuReg, imm: i32, guest_pc: CpuReg, stor
 
     let gpfn = addr & RV_PAGE_MASK as CpuReg;
 
-    let gpfn_state = cpu.gpfn_state.get_gpfn_state_mut(gpfn);
+    let gpfn_state = cpu.gpfn_state.get_gpfn_state_mut(gpfn, AccessType::Store);
 
     if let Some(gpfn_state) = gpfn_state {
         let mut was_rx = false;
@@ -435,7 +435,7 @@ fn do_store(rs1: *mut CpuReg, rs2: *mut CpuReg, imm: i32, guest_pc: CpuReg, stor
             gpfn_state.set_state(PageState::ReadExecute);
 
             if !result.is_err() {
-                cpu.set_exception(Exception::InvalidateJitBlock(gpfn), guest_pc);
+                cpu.set_exception(Exception::InvalidateJitBlock(gpfn, true), guest_pc);
                 ReturnableImpl::throw();
             }
         }

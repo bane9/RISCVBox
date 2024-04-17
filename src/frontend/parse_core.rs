@@ -44,27 +44,33 @@ impl ParseCore {
         }
     }
 
-    pub fn invalidate(&mut self, gpfn: CpuReg) {
+    pub fn invalidate(&mut self, gpfn: CpuReg, should_reparse: bool) {
         let cpu = cpu::get_cpu();
         let bus = bus::get_bus();
 
         let phys_gpfn = bus
-            .translate(gpfn << RV_PAGE_SHIFT, &cpu.mmu, AccessType::Load)
-            .expect("Failed to translate gpfn for invalidation")
-            >> RV_PAGE_SHIFT as CpuReg;
+            .translate(gpfn << RV_PAGE_SHIFT, &cpu.mmu, AccessType::Fetch)
+            .expect("Failed to translate gpfn for invalidation");
 
-        cpu.gpfn_state.remove_gpfn(phys_gpfn << RV_PAGE_SHIFT);
+        cpu.gpfn_state.remove_gpfn(phys_gpfn);
 
         let idx: usize = cpu
             .insn_map
-            .get_by_guest_idx(phys_gpfn << RV_PAGE_SHIFT)
+            .get_by_guest_idx(phys_gpfn)
             .unwrap()
             .jit_block_idx;
 
         self.code_pages.remove_code_page(idx);
 
-        self.parse_gpfn(Some(gpfn))
-            .expect("Failed to parse page after invalidation");
+        cpu.insn_map.remove_by_guest_page(phys_gpfn);
+
+        if should_reparse {
+            self.parse_gpfn(Some(gpfn))
+                .expect("Failed to parse page after invalidation");
+        } else {
+            crate::xmem::PageAllocator::mark_page(phys_gpfn as *mut u8, 1, PageState::ReadWrite)
+                .expect("Failed to mark guest page as readwrite after invalidation");
+        }
     }
 
     pub fn parse_gpfn(&mut self, gpfn: Option<BusType>) -> Result<(), JitCommon::JitError> {

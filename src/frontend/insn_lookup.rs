@@ -1,6 +1,8 @@
 use crate::bus::BusType;
 use hashbrown::HashMap;
 
+use super::exec_core::{RV_PAGE_MASK, RV_PAGE_SIZE};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct InsnMappingData {
     pub host_ptr: *mut u8,
@@ -52,5 +54,12 @@ impl InsnData {
         for i in guest_start..guest_end {
             self.remove_by_guest_idx(i);
         }
+    }
+
+    pub fn remove_by_guest_page(&mut self, guest_idx: BusType) {
+        let page_start = guest_idx & RV_PAGE_MASK as BusType;
+        let page_end = page_start + RV_PAGE_SIZE as BusType;
+
+        self.remove_by_guest_region(page_start, page_end);
     }
 }

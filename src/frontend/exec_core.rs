@@ -208,8 +208,8 @@ impl ExecCore {
                     cpu.next_pc = pc;
                 }
             }
-            cpu::Exception::InvalidateJitBlock(gpfn) => {
-                self.parse_core.invalidate(gpfn);
+            cpu::Exception::InvalidateJitBlock(gpfn, should_reparse) => {
+                self.parse_core.invalidate(gpfn, should_reparse);
                 cpu.next_pc = cpu.c_exception_pc as CpuReg + INSN_SIZE as CpuReg;
             }
             cpu::Exception::FastmemViolation => {}

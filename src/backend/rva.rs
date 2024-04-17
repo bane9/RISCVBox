@@ -78,7 +78,7 @@ fn gpfn_write_check_part_1(addr: CpuReg) -> Option<CpuReg> {
 
     let gpfn = addr & RV_PAGE_MASK as CpuReg;
 
-    let gpfn_state = cpu.gpfn_state.get_gpfn_state_mut(gpfn);
+    let gpfn_state = cpu.gpfn_state.get_gpfn_state_mut(gpfn, AccessType::Store);
 
     if let Some(gpfn_state) = gpfn_state {
         if gpfn_state.get_state() == PageState::ReadExecute {
@@ -96,8 +96,11 @@ macro_rules! gpfn_write_check_part_2 {
         if let Some(gpfn) = $part_1_result {
             let cpu = cpu::get_cpu();
 
-            cpu.set_exception(Exception::InvalidateJitBlock(gpfn), $guest_pc as CpuReg);
-            println!("lol14213\n\n\n");
+            cpu.set_exception(
+                Exception::InvalidateJitBlock(gpfn, true),
+                $guest_pc as CpuReg,
+            );
+
             ReturnableImpl::throw();
         }
     }};
