@@ -40,7 +40,7 @@ pub fn has_pending_interrupt(cpu: &mut cpu::Cpu) -> Option<Interrupt> {
     if pending == 0 {
         return None;
     }
-    println!("pending: {:#x}\n\n\n\n", pending);
+
     let irq: Option<Interrupt>;
 
     if (pending & csr::bits::MEIP) != 0 {
@@ -127,7 +127,12 @@ pub fn handle_interrupt(int_val: Interrupt, cpu: &mut cpu::Cpu) {
         cpu.csr
             .write_bit_sstatus(csr::bits::SPIE, cpu.csr.read_bit_sstatus(csr::bits::SIE));
         cpu.csr.write_bit_sstatus(csr::bits::SIE, false);
-        cpu.csr.write_mpp_mode(mode);
+
+        if mode == MppMode::User {
+            cpu.csr.write_bit_sstatus(csr::bits::SPP, false);
+        } else {
+            cpu.csr.write_bit_sstatus(csr::bits::SPP, true);
+        }
     } else {
         cpu.mode = MppMode::Machine;
 

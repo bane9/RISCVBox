@@ -39,9 +39,11 @@ impl ExecCore {
 
                 trap::handle_interrupt(int, cpu);
 
-                bus::get_bus()
-                    .get_plic()
-                    .update_pending(cpu.pending_interrupt_number as u64);
+                if cpu.pending_interrupt_number as u64 != 0 {
+                    bus::get_bus()
+                        .get_plic()
+                        .update_pending(cpu.pending_interrupt_number as u64);
+                }
             }
         }
 

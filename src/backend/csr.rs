@@ -170,17 +170,22 @@ extern "C" fn sret_handler_cb(pc: usize) {
     }
 
     cpu.next_pc = cpu.csr.read(csr::register::SEPC);
-    cpu.mode = cpu.csr.read_mpp_mode();
 
-    if cpu.mode == MppMode::User {
+    if cpu.csr.read_bit_sstatus(csr::bits::SPP) {
+        cpu.mode = MppMode::Supervisor;
+    } else {
+        cpu.mode = MppMode::User;
+    }
+
+    if cpu.mode == MppMode::Supervisor {
         cpu.csr.write_bit_mstatus(csr::bits::MPRV, false);
     }
 
     cpu.csr
-        .write_bit_mstatus(csr::bits::SIE, cpu.csr.read_bit_mstatus(csr::bits::SPIE));
+        .write_bit_sstatus(csr::bits::SIE, cpu.csr.read_bit_sstatus(csr::bits::SPIE));
 
-    cpu.csr.write_bit_mstatus(csr::bits::SPIE, true);
-    cpu.csr.write_mpp_mode(MppMode::User);
+    cpu.csr.write_bit_sstatus(csr::bits::SPIE, true);
+    cpu.csr.write_bit_sstatus(csr::bits::SPP, false);
 
     cpu.set_exception(Exception::Sret, pc as CpuReg);
 }
