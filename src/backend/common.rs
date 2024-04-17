@@ -423,6 +423,7 @@ fn do_store(rs1: *mut CpuReg, rs2: *mut CpuReg, imm: i32, guest_pc: CpuReg, stor
         let mut was_rx = false;
 
         if gpfn_state.get_state() == PageState::ReadExecute {
+            println!("PageState::ReadExecute -> PageState::ReadWrite\n\n\n");
             was_rx = true;
 
             gpfn_state.set_state(PageState::ReadWrite);
@@ -435,7 +436,6 @@ fn do_store(rs1: *mut CpuReg, rs2: *mut CpuReg, imm: i32, guest_pc: CpuReg, stor
 
             if !result.is_err() {
                 cpu.set_exception(Exception::InvalidateJitBlock(gpfn), guest_pc);
-                println!("lol123\n\n\n");
                 ReturnableImpl::throw();
             }
         }

@@ -185,7 +185,12 @@ pub fn handle_exception(cpu: &mut cpu::Cpu) {
         cpu.csr
             .write_bit_sstatus(csr::bits::SPIE, cpu.csr.read_bit_sstatus(csr::bits::SIE));
         cpu.csr.write_bit_sstatus(csr::bits::SIE, false);
-        cpu.csr.write_mpp_mode(mode);
+
+        if mode == MppMode::User {
+            cpu.csr.write_bit_sstatus(csr::bits::SPP, false);
+        } else {
+            cpu.csr.write_bit_sstatus(csr::bits::SPP, true);
+        }
     } else {
         cpu.mode = MppMode::Machine;
 

@@ -200,12 +200,6 @@ impl Bus {
     }
 
     pub fn load_nommu(&mut self, addr: BusType, size: BusType) -> Result<BusType, Exception> {
-        if addr >= RAM_BEGIN_ADDR && addr < self.ram_end_addr as u32 {
-            let data = ptr_direct_load!(addr as *mut u8, size);
-
-            return Ok(data);
-        }
-
         for device in &mut self.devices {
             if addr >= device.get_begin_addr() && addr < device.get_end_addr() {
                 return device.load(addr, size);
