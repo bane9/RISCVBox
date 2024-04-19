@@ -215,7 +215,7 @@ impl Bus {
     pub fn tick_async(&mut self, cpu: &mut cpu::Cpu) -> Option<u32> {
         for device in &mut self.devices {
             if let Some(irqn) = device.tick_async(cpu) {
-                Some(irqn);
+                return Some(irqn);
             }
         }
 

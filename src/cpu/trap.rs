@@ -32,6 +32,22 @@ pub fn has_pending_interrupt(cpu: &mut cpu::Cpu) -> Option<Interrupt> {
         return None;
     }
 
+    if cpu
+        .has_pending_interrupt
+        .load(std::sync::atomic::Ordering::Acquire)
+        == 1
+    {
+        let pending = cpu.pending_interrupt;
+        cpu.has_pending_interrupt
+            .store(0, std::sync::atomic::Ordering::Release);
+
+        cpu.pending_interrupt = None;
+
+        println!("Pending interrupt: {:?}", pending);
+
+        return pending;
+    }
+
     let mie = cpu.csr.read(csr::register::MIE);
     let mip = cpu.csr.read(csr::register::MIP);
 

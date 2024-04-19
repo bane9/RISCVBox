@@ -1,9 +1,17 @@
-use std::io::Write;
+use std::io::{Read, Write};
 
 use crate::{
     bus::bus::*,
     cpu::{self, Exception},
 };
+
+extern crate winapi;
+extern crate windows;
+
+use winapi::um::fileapi::GetFileType;
+use winapi::um::handleapi::INVALID_HANDLE_VALUE;
+use winapi::um::processenv::GetStdHandle;
+use winapi::um::wincon::{ENABLE_ECHO_INPUT, ENABLE_LINE_INPUT /*, ENABLE_PROCESSED_INPUT*/};
 
 const UART_BASE_ADDRESS: u64 = 0x10000000;
 const UART_IRQN: u64 = 10;
@@ -57,15 +65,49 @@ static mut READ_CHAR: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8:
 
 fn read_thread() {
     loop {
-        let mut input = String::new();
-        std::io::stdin().read_line(&mut input).unwrap();
+        let mut input = [0u8];
+        std::io::stdin().read(&mut input).unwrap();
 
-        unsafe { READ_CHAR.store(input.as_bytes()[0], std::sync::atomic::Ordering::Release) };
+        unsafe { READ_CHAR.store(input[0], std::sync::atomic::Ordering::Release) };
     }
+}
+
+extern "C" {
+    #[link_name = "SetConsoleMode"]
+    fn SetConsoleMode(
+        handle: winapi::um::winnt::HANDLE,
+        mode: winapi::shared::minwindef::DWORD,
+    ) -> winapi::shared::minwindef::BOOL;
+    #[link_name = "GetConsoleMode"]
+    fn GetConsoleMode(
+        handle: winapi::um::winnt::HANDLE,
+        mode: *mut winapi::shared::minwindef::DWORD,
+    ) -> winapi::shared::minwindef::BOOL;
 }
 
 impl Ns16550 {
     pub fn new() -> Self {
+        unsafe {
+            // Get the handle for the standard input
+            let handle = GetStdHandle(winapi::um::winbase::STD_INPUT_HANDLE);
+            if handle == INVALID_HANDLE_VALUE || GetFileType(handle) != 0x0002 {
+                panic!("Failed to get standard input handle")
+            }
+
+            // Get the current console mode
+            let mut mode: winapi::shared::minwindef::DWORD = 0;
+            if GetConsoleMode(handle, &mut mode) == 0 {
+                panic!("Failed to get console mode")
+            }
+
+            // Modify the console mode to disable echo and enable raw input
+            let new_mode =
+                mode & !(ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT/*| ENABLE_PROCESSED_INPUT*/);
+            if SetConsoleMode(handle, new_mode) == 0 {
+                //panic!("Failed to set console mode")
+            }
+        }
+
         let mut this = Self {
             dll: 0,
             dlm: 0,
@@ -88,13 +130,25 @@ impl Ns16550 {
     }
 }
 
+fn dispatch_irq(uart: &mut Ns16550) -> bool {
+    uart.isr |= 0xc0;
+
+    if ((uart.ier & IER_RDI) != 0) && ((uart.lsr & LSR_DR) != 0) {
+        return true;
+    } else if ((uart.ier & IER_THRI) != 0) && ((uart.lsr & LSR_TEMT) != 0) {
+        return true;
+    }
+
+    false
+}
+
 impl BusDevice for Ns16550 {
     fn load(&mut self, addr: BusType, _size: BusType) -> Result<BusType, Exception> {
         let adj_addr = (addr as usize) - (self.get_begin_addr() as usize);
 
         match adj_addr as u64 {
             THR => {
-                if self.lsr & LSR_DR != 0 {
+                if (self.lsr & LSR_DR) != 0 {
                     self.lsr &= !LSR_DR;
                 }
                 Ok(self.val as BusType)
@@ -118,6 +172,7 @@ impl BusDevice for Ns16550 {
                 let c = data as u8 as char;
                 if c.is_ascii() {
                     print!("{}", c);
+                    let _ = std::io::stdout().flush();
                 }
                 // println!("printing u8: {} as char: {}", data as u8, c);
                 if c == '\n' {
@@ -168,16 +223,22 @@ impl BusDevice for Ns16550 {
     }
 
     fn tick_async(&mut self, _cpu: &mut cpu::Cpu) -> Option<u32> {
+        if dispatch_irq(self) {
+            return Some(UART_IRQN as u32);
+        }
+
         let c = unsafe { READ_CHAR.load(std::sync::atomic::Ordering::Acquire) };
 
         if c != 0 {
             self.lsr |= LSR_DR;
             self.val = c;
             unsafe { READ_CHAR.store(0, std::sync::atomic::Ordering::Release) };
-
-            return Some(UART_IRQN as u32);
         }
 
-        None
+        if dispatch_irq(self) {
+            Some(UART_IRQN as u32)
+        } else {
+            None
+        }
     }
 }

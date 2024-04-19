@@ -1,6 +1,5 @@
 use crate::bus::bus::BusType;
 use crate::bus::mmu::{Mmu, Sv32Mmu};
-use crate::cpu;
 use crate::cpu::csr;
 use crate::frontend::gpfn_state::GpfnStateSet;
 use crate::frontend::insn_lookup::InsnData;
@@ -259,9 +258,9 @@ impl Exception {
             Exception::LoadAccessFault(data) => *data,
             Exception::StoreAddressMisaligned(data) => *data,
             Exception::StoreAccessFault(data) => *data,
-            Exception::EnvironmentCallFromUMode(_data) => cpu::get_cpu().c_exception_pc as CpuReg,
-            Exception::EnvironmentCallFromSMode(_data) => cpu::get_cpu().c_exception_pc as CpuReg,
-            Exception::EnvironmentCallFromMMode(_data) => cpu::get_cpu().c_exception_pc as CpuReg,
+            Exception::EnvironmentCallFromUMode(data) => *data,
+            Exception::EnvironmentCallFromSMode(data) => *data,
+            Exception::EnvironmentCallFromMMode(data) => *data,
             Exception::InstructionPageFault(data) => *data,
             Exception::LoadPageFault(data) => *data,
             Exception::StorePageFault(data) => *data,

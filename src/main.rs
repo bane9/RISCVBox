@@ -49,10 +49,6 @@ fn init_bus(
 
     bus.add_device(Box::new(ramfb));
 
-    let clint = bus::clint::Clint::new();
-
-    bus.add_device(Box::new(clint));
-
     let ns16550 = bus::ns16550::Ns16550::new();
 
     bus.add_device(Box::new(ns16550));
@@ -68,6 +64,10 @@ fn init_bus(
     let ps2keyboard = ps2keyboard::PS2Keyboard::new();
 
     bus.add_device(Box::new(ps2keyboard));
+
+    let clint = bus::clint::Clint::new();
+
+    bus.add_device(Box::new(clint));
 
     if let Some(dtb) = dtb {
         let dtb = bus::dtb::Dtb::new(&dtb);
@@ -99,7 +99,7 @@ fn main() {
     let mut rom = util::read_file("buildroot/images1/fw_jump.bin").unwrap();
 
     rom.resize(util::size_mib(4), 0);
-    let mut kernel = util::read_file("buildroot/images1/Image").unwrap();
+    let mut kernel = util::read_file("buildroot/ImageRFS").unwrap();
     rom.append(&mut kernel);
 
     let dtb = Some(util::read_file("buildroot/images/dtb.dtb").unwrap());

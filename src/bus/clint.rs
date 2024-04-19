@@ -91,7 +91,6 @@ impl Clint {
                 .write_bit(csr::register::MIP, csr::bits::MTIP_BIT, true);
 
             cpu.pending_interrupt_number = CLINT_IRQN as CpuReg;
-
             return true;
         }
 

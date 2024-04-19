@@ -2,11 +2,10 @@ use crate::backend::target::core::BackendCoreImpl;
 use crate::backend::{
     BackendCore, FastmemHandleType, ReturnStatus, ReturnableHandler, ReturnableImpl,
 };
-use crate::bus::clint::Clint;
 use crate::bus::dtb::DTB_BEGIN_ADDR;
 use crate::bus::mmu::{AccessType, Mmu};
 use crate::bus::{self, BusType};
-use crate::cpu::{self, csr, CpuReg};
+use crate::cpu::{self, CpuReg};
 use crate::cpu::{trap, RegName};
 pub use crate::frontend::parse_core::*;
 use crate::xmem::PageState;
@@ -220,29 +219,29 @@ impl ExecCore {
             cpu::Exception::Wfi => {
                 // I hate this from the bottom of my heart but the altrenative is making
                 // all csr accesses atomic which is probably worse more so this will have to do
-                if trap::are_interrupts_enabled(cpu) {
-                    let bus = bus::get_bus();
-                    std::thread::sleep(std::time::Duration::from_millis(
-                        Clint::get_remaining_time_ms(),
-                    ));
+                // if trap::are_interrupts_enabled(cpu) {
+                //     let bus = bus::get_bus();
+                //     std::thread::sleep(std::time::Duration::from_millis(
+                //         Clint::get_remaining_time_ms(),
+                //     ));
 
-                    loop {
-                        bus.tick_core_local();
+                //     loop {
+                //         bus.tick_core_local();
 
-                        if cpu
-                            .has_pending_interrupt
-                            .load(std::sync::atomic::Ordering::Acquire)
-                            == 1
-                        {
-                            cpu.has_pending_interrupt
-                                .store(0, std::sync::atomic::Ordering::Release);
-                            cpu.pending_interrupt = None;
-                            break;
-                        }
+                //         if cpu
+                //             .has_pending_interrupt
+                //             .load(std::sync::atomic::Ordering::Acquire)
+                //             == 1
+                //         {
+                //             cpu.has_pending_interrupt
+                //                 .store(0, std::sync::atomic::Ordering::Release);
+                //             cpu.pending_interrupt = None;
+                //             break;
+                //         }
 
-                        std::thread::sleep(std::time::Duration::from_millis(50));
-                    }
-                }
+                //         std::thread::sleep(std::time::Duration::from_millis(50));
+                //     }
+                // }
 
                 cpu.next_pc = cpu.c_exception_pc as CpuReg + INSN_SIZE as CpuReg;
             }
@@ -265,10 +264,10 @@ impl ExecCore {
                         | cpu::Exception::IllegalInstruction(_)
                 ) {
                 } else {
-                    println!(
-                        "ret_status: {:#x?} with pc 0x{:x} cpu.next_pc {:x} gp {}",
-                        cpu.exception, cpu.c_exception_pc, cpu.next_pc, cpu.regs[3]
-                    );
+                    // println!(
+                    //     "ret_status: {:#x?} with pc 0x{:x} cpu.next_pc {:x} gp {}",
+                    //     cpu.exception, cpu.c_exception_pc, cpu.next_pc, cpu.regs[3]
+                    // );
                 }
             }
         }
@@ -287,18 +286,16 @@ pub fn exec_core_thread(cpu_core_idx: usize, initial_pc: CpuReg) {
         let cpu = unsafe { &mut *(cpu as *mut cpu::Cpu) };
 
         loop {
-            std::thread::sleep(std::time::Duration::from_millis(100));
+            std::thread::sleep(std::time::Duration::from_millis(15));
 
             if let Some(irqn) = bus.tick_async(cpu) {
                 if irqn != 0 {
-                    cpu.csr
-                        .write_bit(csr::register::MIP, csr::bits::SEIP_BIT, true);
-
                     cpu.pending_interrupt_number = irqn;
+                    cpu.pending_interrupt = Some(cpu::Interrupt::SupervisorExternal);
+                    cpu.has_pending_interrupt
+                        .store(1, std::sync::atomic::Ordering::Release);
                 }
             }
-
-            trap::has_pending_interrupt(cpu);
         }
     });
 
