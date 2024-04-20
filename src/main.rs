@@ -9,13 +9,148 @@ mod util;
 mod window;
 mod xmem;
 
+use std::io::Write;
+
 use backend::csr::init_backend_csr;
 use bus::ram::RAM_BEGIN_ADDR;
 use frontend::exec_core::ExecCoreThreadPool;
 
 use crate::bus::BusDevice;
 
-fn init_bus(mut rom: Vec<u8>, ram_size: usize, dtb: Option<Vec<u8>>) {
+use vm_fdt::FdtWriter;
+
+fn create_dtb(ram_origin: u32, ram_size: u32) -> Vec<u8> {
+    let mut fdt = FdtWriter::new().unwrap();
+
+    let root_node = fdt.begin_node("").unwrap();
+    fdt.property_u32("#address-cells", 0x2).unwrap();
+    fdt.property_u32("#size-cells", 0x2).unwrap();
+    fdt.property_string("compatible", "riscv-virtio").unwrap();
+    fdt.property_string("model", "riscv-virtio,qemu").unwrap();
+
+    let chosen_node = fdt.begin_node("chosen").unwrap();
+    fdt.property_string("bootargs", "earlycon=sbi console=ttyS0")
+        .unwrap();
+    fdt.end_node(chosen_node).unwrap();
+
+    let fdt_memory_node = fdt.begin_node("memory@80000000").unwrap();
+    fdt.property_string("device_type", "memory").unwrap();
+    fdt.property_array_u32("reg", &[0x00, ram_origin as u32, 0x00, ram_size as u32])
+        .unwrap();
+    fdt.end_node(fdt_memory_node).unwrap();
+
+    let cpus_node = fdt.begin_node("cpus").unwrap();
+    fdt.property_u32("#address-cells", 0x1).unwrap();
+    fdt.property_u32("#size-cells", 0x0).unwrap();
+    fdt.property_u32("timebase-frequency", 0xf4240).unwrap();
+
+    let cpu_node = fdt.begin_node("cpu@0").unwrap();
+    fdt.property_u32("phandle", 0x1).unwrap();
+    fdt.property_string("device_type", "cpu").unwrap();
+    fdt.property_u32("reg", 0x0).unwrap();
+    fdt.property_string("status", "okay").unwrap();
+    fdt.property_string("compatible", "riscv").unwrap();
+    fdt.property_string("riscv,isa", "rv32imasu").unwrap();
+    fdt.property_string("mmu-type", "riscv,sv32").unwrap();
+
+    // Begin interrupt controller node
+    let cpu0_intc_phandle = 0x02u32;
+
+    let cpu0_intc_node = fdt.begin_node("cpu0_intc").unwrap();
+    fdt.property_u32("#interrupt-cells", 0x01).unwrap();
+    fdt.property_u32("#address-cells", 0x00).unwrap();
+    fdt.property_null("interrupt-controller").unwrap();
+    fdt.property_string("compatible", "riscv,cpu-intc").unwrap();
+    fdt.property_u32("phandle", cpu0_intc_phandle).unwrap();
+    fdt.end_node(cpu0_intc_node).unwrap();
+    // End interrupt controller node
+
+    fdt.end_node(cpu_node).unwrap();
+    fdt.end_node(cpus_node).unwrap();
+
+    // Begin cpu-map node
+    let cpu_map_node = fdt.begin_node("cpu-map").unwrap();
+    let cluster0_node = fdt.begin_node("cluster0").unwrap();
+    let core0_node = fdt.begin_node("core0").unwrap();
+    fdt.property_u32("cpu", 0x01).unwrap();
+    fdt.end_node(core0_node).unwrap();
+    fdt.end_node(cluster0_node).unwrap();
+    fdt.end_node(cpu_map_node).unwrap();
+    // End cpu-map node
+
+    let soc_node = fdt.begin_node("soc").unwrap();
+    fdt.property_u32("#address-cells", 0x2).unwrap();
+    fdt.property_u32("#size-cells", 0x2).unwrap();
+    fdt.property_string("compatible", "simple-bus").unwrap();
+    fdt.property_null("ranges").unwrap();
+
+    // Begin plic node
+    let plic_phandle = 0x03u32;
+
+    let plic_node = fdt.begin_node("plic@c000000").unwrap();
+    fdt.property_u32("phandle", plic_phandle).unwrap();
+    fdt.property_u32("riscv,ndev", 0x60).unwrap();
+    fdt.property_array_u32("reg", &[0x00, 0xc000000, 0x00, 0x600000])
+        .unwrap();
+    fdt.property_array_u32(
+        "interrupts-extended",
+        &[cpu0_intc_phandle, 0x0b, cpu0_intc_phandle, 0x09],
+    )
+    .unwrap();
+    fdt.property_string_list(
+        "compatible",
+        vec!["sifive,plic-1.0.0".into(), "riscv,plic0".into()],
+    )
+    .unwrap();
+    fdt.property_null("interrupt-controller").unwrap();
+    fdt.property_u32("#interrupt-cells", 0x01).unwrap();
+    fdt.property_u32("#address-cells", 0x00).unwrap();
+    fdt.end_node(plic_node).unwrap();
+    // End plic node
+
+    // Begin serial node
+    let serial_node = fdt.begin_node("serial@10000000").unwrap();
+    fdt.property_u32("interrupts", 0x0a).unwrap();
+    fdt.property_u32("interrupt-parent", plic_phandle).unwrap();
+    fdt.property_string("clock-frequency", "115200").unwrap();
+    fdt.property_array_u32("reg", &[0x00, 0x10000000, 0x00, 0x8])
+        .unwrap();
+    fdt.property_string("compatible", "ns16550a").unwrap();
+    fdt.end_node(serial_node).unwrap();
+    // End serial node
+
+    // Begin clint node
+    let clint_node = fdt.begin_node("clint@2000000").unwrap();
+    fdt.property_array_u32(
+        "interrupts-extended",
+        &[cpu0_intc_phandle, plic_phandle, cpu0_intc_phandle, 0x07],
+    )
+    .unwrap();
+    fdt.property_array_u32("reg", &[0x00, 0x2000000, 0x00, 0x10000])
+        .unwrap();
+    fdt.property_string_list(
+        "compatible",
+        vec!["sifive,clint0".into(), "riscv,clint0".into()],
+    )
+    .unwrap();
+    fdt.end_node(clint_node).unwrap();
+
+    // End clint node
+
+    fdt.end_node(soc_node).unwrap();
+
+    fdt.end_node(root_node).unwrap();
+
+    let res = fdt.finish().unwrap();
+
+    // dump the result to a file
+    let mut f = std::fs::File::create("buildroot/images/dtb_dump.dtb").unwrap();
+    f.write_all(&res).unwrap();
+
+    res
+}
+
+fn init_bus(mut rom: Vec<u8>, ram_size: usize) {
     assert!(ram_size >= rom.len());
     // There are roughly sorted by expected frequency of access
 
@@ -42,11 +177,11 @@ fn init_bus(mut rom: Vec<u8>, ram_size: usize, dtb: Option<Vec<u8>>) {
 
     bus.add_device(Box::new(clint));
 
-    if let Some(dtb) = dtb {
-        let dtb = bus::dtb::Dtb::new(&dtb);
+    let dtb = create_dtb(RAM_BEGIN_ADDR, ram_size as u32);
 
-        bus.add_device(Box::new(dtb));
-    }
+    let dtb = bus::dtb::Dtb::new(&dtb);
+
+    bus.add_device(Box::new(dtb));
 }
 
 fn main() {
@@ -70,16 +205,14 @@ fn main() {
     let mut rom = util::read_file("buildroot/images1/fw_jump.bin").unwrap();
 
     rom.resize(util::size_mib(4), 0);
-    let mut kernel = util::read_file("buildroot/ImageRFS").unwrap();
+    let mut kernel = util::read_file("buildroot/ImageRFS1").unwrap();
     rom.append(&mut kernel);
-
-    let dtb = Some(util::read_file("buildroot/images/dtb.dtb").unwrap());
 
     init_backend_csr();
 
     window::ConsoleSettings::set_interactive_console();
 
-    init_bus(rom, ram_size, dtb);
+    init_bus(rom, ram_size);
 
     let exec_thread_pool = ExecCoreThreadPool::new(RAM_BEGIN_ADDR, 1);
 
