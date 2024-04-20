@@ -12,9 +12,8 @@ mod xmem;
 use backend::csr::init_backend_csr;
 use bus::ram::RAM_BEGIN_ADDR;
 use frontend::exec_core::ExecCoreThreadPool;
-use window::WindowCommon;
 
-use crate::bus::{ps2keyboard, ps2mouse, BusDevice};
+use crate::bus::BusDevice;
 
 struct InitData {
     fb_ptr: *mut u8,
@@ -56,14 +55,6 @@ fn init_bus(
     let plic = bus::plic::Plic::new();
 
     bus.add_device(Box::new(plic));
-
-    let ps2mouse = ps2mouse::PS2Mouse::new();
-
-    bus.add_device(Box::new(ps2mouse));
-
-    let ps2keyboard = ps2keyboard::PS2Keyboard::new();
-
-    bus.add_device(Box::new(ps2keyboard));
 
     let clint = bus::clint::Clint::new();
 
@@ -113,11 +104,6 @@ fn main() {
     let init_data = init_bus(rom, ram_size, dtb, width, height, bpp);
 
     let exec_thread_pool = ExecCoreThreadPool::new(RAM_BEGIN_ADDR, 1);
-
-    let mut window =
-        window::window_impl::new(width, height, bpp, "RISCVBox", init_data.fb_ptr, true);
-
-    window.event_loop();
 
     exec_thread_pool.join();
 }
