@@ -92,9 +92,9 @@ impl Bus {
     }
 
     pub fn translate(
-        &self,
+        &mut self,
         addr: BusType,
-        mmu: &Sv32Mmu,
+        mmu: &mut Sv32Mmu,
         access_type: AccessType,
     ) -> Result<BusType, Exception> {
         return mmu.translate(addr, access_type);
@@ -104,7 +104,7 @@ impl Bus {
         &mut self,
         addr: BusType,
         size: BusType,
-        mmu: &Sv32Mmu,
+        mmu: &mut Sv32Mmu,
     ) -> Result<BusType, Exception> {
         if !mmu.is_active() {
             return self.load_nommu(addr, size);
@@ -125,7 +125,7 @@ impl Bus {
         &mut self,
         addr: BusType,
         size: BusType,
-        mmu: &Sv32Mmu,
+        mmu: &mut Sv32Mmu,
     ) -> Result<BusType, Exception> {
         if !mmu.is_active() {
             return self.fetch_nommu(addr, size);
@@ -151,7 +151,7 @@ impl Bus {
         addr: BusType,
         data: BusType,
         size: BusType,
-        mmu: &Sv32Mmu,
+        mmu: &mut Sv32Mmu,
     ) -> Result<(), Exception> {
         if !mmu.is_active() {
             return self.store_nommu(addr, data, size);

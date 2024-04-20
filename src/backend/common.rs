@@ -134,7 +134,7 @@ fn do_jump(guest_address: CpuReg, current_guest_pc: CpuReg, rd: *mut CpuReg) -> 
     let guest_address_phys = if cpu.mmu.is_active() {
         let bus = bus::get_bus();
 
-        let guest_address_phys = bus.translate(guest_address, &cpu.mmu, AccessType::Fetch);
+        let guest_address_phys = bus.translate(guest_address, &mut cpu.mmu, AccessType::Fetch);
 
         if guest_address_phys.is_err() {
             cpu.set_exception(guest_address_phys.err().unwrap(), current_guest_pc);
@@ -349,7 +349,7 @@ macro_rules! do_load {
         let addr = unsafe { *$rs1 } as i64;
         let addr = (addr.wrapping_add($imm as i64)) as CpuReg;
 
-        let data = bus::get_bus().load(addr, $load_size as BusType, &cpu.mmu);
+        let data = bus::get_bus().load(addr, $load_size as BusType, &mut cpu.mmu);
 
         if data.is_err() {
             cpu.set_exception(data.err().unwrap(), $guest_pc as CpuReg);
@@ -429,7 +429,7 @@ fn do_store(rs1: *mut CpuReg, rs2: *mut CpuReg, imm: i32, guest_pc: CpuReg, stor
             gpfn_state.set_state(PageState::ReadWrite);
         }
 
-        let result = bus.store(addr, data, store_size as BusType, &cpu.mmu);
+        let result = bus.store(addr, data, store_size as BusType, &mut cpu.mmu);
 
         if was_rx {
             gpfn_state.set_state(PageState::ReadExecute);
@@ -445,7 +445,7 @@ fn do_store(rs1: *mut CpuReg, rs2: *mut CpuReg, imm: i32, guest_pc: CpuReg, stor
 
             ReturnableImpl::throw();
         } else {
-            let result = bus.store(addr, data, store_size as BusType, &cpu.mmu);
+            let result = bus.store(addr, data, store_size as BusType, &mut cpu.mmu);
 
             if result.is_err() {
                 cpu.set_exception(result.err().unwrap(), guest_pc);
@@ -457,7 +457,7 @@ fn do_store(rs1: *mut CpuReg, rs2: *mut CpuReg, imm: i32, guest_pc: CpuReg, stor
         return;
     }
 
-    let result = bus.store(addr, data, store_size as BusType, &cpu.mmu);
+    let result = bus.store(addr, data, store_size as BusType, &mut cpu.mmu);
 
     if result.is_err() {
         cpu.set_exception(result.err().unwrap(), guest_pc);

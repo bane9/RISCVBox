@@ -45,7 +45,7 @@ fn create_dtb(ram_origin: u32, ram_size: u32) -> Vec<u8> {
     let cpus_node = fdt.begin_node("cpus").unwrap();
     fdt.property_u32("#address-cells", 0x1).unwrap();
     fdt.property_u32("#size-cells", 0x0).unwrap();
-    fdt.property_u32("timebase-frequency", 100000000).unwrap();
+    fdt.property_u32("timebase-frequency", 0x989680).unwrap();
 
     let cpu_node = fdt.begin_node("cpu@0").unwrap();
     fdt.property_u32("phandle", 0x1).unwrap();
@@ -172,7 +172,7 @@ fn main() {
     let width = 800;
     let height = 600;
     let bpp = 32;
-    let using_fb = true;
+    let using_fb = false;
 
     init_bus(rom, ram_size, width, height, bpp, using_fb);
 

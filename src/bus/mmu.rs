@@ -1,6 +1,8 @@
 use crate::cpu::*;
 use crate::frontend::exec_core::{RV_PAGE_OFFSET_MASK, RV_PAGE_SIZE};
 use crate::{cpu::csr::*, util::read_bit};
+use rand::rngs::SmallRng;
+use rand::{Rng, SeedableRng};
 
 use super::{bus, BusType};
 
@@ -22,6 +24,7 @@ pub enum PteBitVal {
     Dirty = 7,
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct Pte {
     pte: BusType,
     phys_base: BusType,
@@ -53,7 +56,7 @@ macro_rules! PteBitTest {
 pub trait Mmu {
     fn new() -> Self;
 
-    fn get_pte(&self, addr: BusType, access_type: AccessType) -> Result<Pte, Exception>;
+    fn get_pte(&mut self, addr: BusType, access_type: AccessType) -> Result<Pte, Exception>;
     fn update(&mut self, satp: CsrType);
     fn get_levels(&self) -> BusType;
     fn get_pte_size(&self) -> BusType;
@@ -64,7 +67,7 @@ pub trait Mmu {
     fn get_vpn(&self, addr: BusType, level: BusType) -> Self::PnArr;
     fn get_ppn(&self, pte: BusType, level: BusType) -> Self::PnArr;
 
-    fn translate(&self, addr: BusType, access_type: AccessType) -> Result<BusType, Exception> {
+    fn translate(&mut self, addr: BusType, access_type: AccessType) -> Result<BusType, Exception> {
         if !self.is_active() {
             return Ok(addr);
         }
@@ -159,9 +162,62 @@ pub trait Mmu {
     }
 }
 
+struct TLB {
+    addresses: Vec<BusType>,
+    pte_entires: Vec<Pte>,
+    in_use: Vec<bool>,
+    max_entries: usize,
+    rng: SmallRng,
+}
+
+impl TLB {
+    pub fn new(max_entries: usize) -> Self {
+        TLB {
+            addresses: vec![0; max_entries],
+            pte_entires: vec![Pte::default(); max_entries],
+            in_use: vec![false; max_entries],
+            max_entries,
+            rng: SmallRng::from_entropy(),
+        }
+    }
+
+    pub fn get(&mut self, addr: BusType) -> Option<Pte> {
+        for i in 0..self.max_entries {
+            if self.in_use[i] && self.addresses[i] == addr {
+                return Some(self.pte_entires[i]);
+            }
+        }
+
+        None
+    }
+
+    pub fn insert(&mut self, addr: BusType, pte: Pte) {
+        self.in_use[self.rng.gen_range(0..self.max_entries)] = false;
+
+        for i in 0..self.max_entries {
+            if !self.in_use[i] {
+                self.addresses[i] = addr;
+                self.pte_entires[i] = pte;
+                self.in_use[i] = true;
+
+                return;
+            }
+        }
+    }
+
+    pub fn clear(&mut self) {
+        for in_use in self.in_use.iter_mut() {
+            *in_use = false;
+        }
+    }
+}
+
+const TLB_MAX_ENTRIES: usize = 4;
+
 pub struct Sv32Mmu {
     ppn: BusType,
     enabled: bool,
+    tlb: TLB,
 }
 
 impl Mmu for Sv32Mmu {
@@ -171,10 +227,15 @@ impl Mmu for Sv32Mmu {
         Sv32Mmu {
             ppn: 0,
             enabled: false,
+            tlb: TLB::new(TLB_MAX_ENTRIES),
         }
     }
 
-    fn get_pte(&self, addr: BusType, access_type: AccessType) -> Result<Pte, Exception> {
+    fn get_pte(&mut self, addr: BusType, access_type: AccessType) -> Result<Pte, Exception> {
+        if let Some(pte) = self.tlb.get(addr) {
+            return Ok(pte);
+        }
+
         let bus_instance = bus::get_bus();
 
         let levels = self.get_levels();
@@ -244,6 +305,8 @@ impl Mmu for Sv32Mmu {
             }
         }
 
+        self.tlb.insert(addr, pte);
+
         Ok(pte)
     }
 
@@ -251,6 +314,8 @@ impl Mmu for Sv32Mmu {
         self.ppn = (satp & 0x3fffff) * RV_PAGE_SIZE as CpuReg;
 
         self.enabled = read_bit(satp, 31);
+
+        self.tlb.clear();
     }
 
     fn get_levels(&self) -> BusType {

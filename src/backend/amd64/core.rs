@@ -1459,7 +1459,7 @@ impl BackendCore for BackendCoreImpl {
                     dst_addr as BusType,
                     src_val as BusType,
                     access_size as BusType,
-                    &cpu.mmu,
+                    &mut cpu.mmu,
                 )
                 .expect("Bus error while manually handling fastmem violation");
 

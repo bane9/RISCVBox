@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::{
     bus,
     cpu::{self, CpuReg},
@@ -37,13 +35,13 @@ impl GpfnState {
 }
 
 pub struct GpfnStateSet {
-    gpfn_set: HashMap<CpuReg, GpfnState>,
+    gpfn_set: hashbrown::HashMap<CpuReg, GpfnState>,
 }
 
 impl GpfnStateSet {
     pub fn new() -> GpfnStateSet {
         GpfnStateSet {
-            gpfn_set: HashMap::new(),
+            gpfn_set: hashbrown::HashMap::new(),
         }
     }
 
@@ -77,7 +75,7 @@ impl GpfnStateSet {
         let cpu = cpu::get_cpu();
         let bus = bus::get_bus();
 
-        let phys_gpfn = bus.translate(gpfn, &cpu.mmu, translate_method);
+        let phys_gpfn = bus.translate(gpfn, &mut cpu.mmu, translate_method);
 
         let gpfn = if let Ok(phys_gpfn) = phys_gpfn {
             phys_gpfn

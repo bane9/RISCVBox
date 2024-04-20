@@ -189,7 +189,7 @@ extern "C" fn c_load_mmu_translate_cb(addr: usize, gpfn_offset: usize) -> usize 
 
     let addr = addr as CpuReg;
 
-    let ret = bus.translate(addr, &cpu.mmu, AccessType::Load);
+    let ret = bus.translate(addr, &mut cpu.mmu, AccessType::Load);
 
     if ret.is_err() {
         cpu.set_exception(ret.err().unwrap(), gpfn_offset as CpuReg);
@@ -283,7 +283,7 @@ extern "C" fn c_store_mmu_translate_cb(addr: usize, gpfn_offset: usize) -> usize
 
     let addr = addr as CpuReg;
 
-    let ret = bus.translate(addr, &cpu.mmu, AccessType::Store);
+    let ret = bus.translate(addr, &mut cpu.mmu, AccessType::Store);
 
     if ret.is_err() {
         cpu.set_exception(ret.err().unwrap(), gpfn_offset as CpuReg);

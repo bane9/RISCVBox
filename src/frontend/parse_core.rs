@@ -49,7 +49,7 @@ impl ParseCore {
         let bus = bus::get_bus();
 
         let phys_gpfn = bus
-            .translate(gpfn << RV_PAGE_SHIFT, &cpu.mmu, AccessType::Fetch)
+            .translate(gpfn << RV_PAGE_SHIFT, &mut cpu.mmu, AccessType::Fetch)
             .expect("Failed to translate gpfn for invalidation");
 
         cpu.gpfn_state.remove_gpfn(phys_gpfn);
@@ -95,7 +95,7 @@ impl ParseCore {
         }
 
         let base_addr = bus
-            .translate(gpfn << RV_PAGE_SHIFT, &cpu.mmu, AccessType::Load)
+            .translate(gpfn << RV_PAGE_SHIFT, &mut cpu.mmu, AccessType::Load)
             .unwrap() as BusType;
 
         cpu.gpfn_state.add_gpfn(base_addr as CpuReg);

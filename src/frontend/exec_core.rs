@@ -51,7 +51,7 @@ impl ExecCore {
 
         let bus = bus::get_bus();
 
-        let next_phys_pc = bus.translate(cpu.next_pc, &cpu.mmu, AccessType::Fetch);
+        let next_phys_pc = bus.translate(cpu.next_pc, &mut cpu.mmu, AccessType::Fetch);
 
         let next_phys_pc = if next_phys_pc.is_err() {
             cpu.exception = next_phys_pc.err().unwrap();
@@ -61,7 +61,7 @@ impl ExecCore {
             cpu.current_gpfn = cpu.next_pc >> RV_PAGE_SHIFT as CpuReg;
             cpu.current_guest_page = cpu.next_pc & RV_PAGE_MASK as CpuReg;
 
-            bus.translate(cpu.next_pc, &cpu.mmu, AccessType::Fetch)
+            bus.translate(cpu.next_pc, &mut cpu.mmu, AccessType::Fetch)
                 .expect("Failed to translate pc after exception")
         } else {
             next_phys_pc.unwrap()

@@ -24,7 +24,7 @@ macro_rules! fetch_ptr {
             return 1; // 1 is failure, 0 is success
         }
 
-        let phys_addr = $bus.translate($addr, &cpu::get_cpu().mmu, AccessType::Load);
+        let phys_addr = $bus.translate($addr, &mut cpu::get_cpu().mmu, AccessType::Load);
 
         if phys_addr.is_err() {
             $cpu.set_exception(phys_addr.err().unwrap(), $pc as CpuReg);
