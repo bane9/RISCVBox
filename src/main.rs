@@ -15,18 +15,7 @@ use frontend::exec_core::ExecCoreThreadPool;
 
 use crate::bus::BusDevice;
 
-struct InitData {
-    fb_ptr: *mut u8,
-}
-
-fn init_bus(
-    mut rom: Vec<u8>,
-    ram_size: usize,
-    dtb: Option<Vec<u8>>,
-    fb_width: usize,
-    fb_height: usize,
-    fb_bpp: usize,
-) -> InitData {
+fn init_bus(mut rom: Vec<u8>, ram_size: usize, dtb: Option<Vec<u8>>) {
     assert!(ram_size >= rom.len());
     // There are roughly sorted by expected frequency of access
 
@@ -40,13 +29,6 @@ fn init_bus(
     bus.set_ram_ptr(ram_ptr, ram.get_end_addr() as usize);
 
     bus.add_device(Box::new(ram));
-
-    let mut ramfb = bus::ramfb::RamFB::new(fb_width, fb_height, fb_bpp);
-    let fb_ptr = ramfb.get_fb_ptr();
-
-    bus.set_fb_ptr(fb_ptr, ramfb.get_end_addr() as usize);
-
-    bus.add_device(Box::new(ramfb));
 
     let ns16550 = bus::ns16550::Ns16550::new();
 
@@ -65,8 +47,6 @@ fn init_bus(
 
         bus.add_device(Box::new(dtb));
     }
-
-    InitData { fb_ptr }
 }
 
 fn main() {
@@ -97,17 +77,11 @@ fn main() {
 
     init_backend_csr();
 
-    let width = 800;
-    let height = 600;
-    let bpp = 32;
+    window::ConsoleSettings::set_interactive_console();
 
-    let init_data = init_bus(rom, ram_size, dtb, width, height, bpp);
+    init_bus(rom, ram_size, dtb);
 
     let exec_thread_pool = ExecCoreThreadPool::new(RAM_BEGIN_ADDR, 1);
-
-    let mut window = window::window::Window::new(init_data.fb_ptr, width, height);
-
-    window.event_loop();
 
     exec_thread_pool.join();
 }

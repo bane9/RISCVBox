@@ -177,7 +177,7 @@ extern "C" fn sret_handler_cb(pc: usize) {
         cpu.mode = MppMode::User;
     }
 
-    if cpu.mode == MppMode::Supervisor {
+    if cpu.mode == MppMode::User {
         cpu.csr.write_bit_mstatus(csr::bits::MPRV, false);
     }
 
@@ -228,6 +228,10 @@ extern "C" fn ecall_cb(pc: usize) {
             );
         }
         MppMode::User => {
+            if cpu.regs[cpu::RegName::A7 as usize] == 407 {
+                cpu.regs[cpu::RegName::A7 as usize] = 77;
+            }
+
             cpu.set_exception(
                 Exception::EnvironmentCallFromUMode(
                     (cpu.current_gpfn << RV_PAGE_SHIFT) | pc as CpuReg,

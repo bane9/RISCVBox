@@ -64,19 +64,6 @@ fn read_thread() {
     }
 }
 
-extern "C" {
-    #[link_name = "SetConsoleMode"]
-    fn SetConsoleMode(
-        handle: winapi::um::winnt::HANDLE,
-        mode: winapi::shared::minwindef::DWORD,
-    ) -> winapi::shared::minwindef::BOOL;
-    #[link_name = "GetConsoleMode"]
-    fn GetConsoleMode(
-        handle: winapi::um::winnt::HANDLE,
-        mode: *mut winapi::shared::minwindef::DWORD,
-    ) -> winapi::shared::minwindef::BOOL;
-}
-
 impl Ns16550 {
     pub fn new() -> Self {
         let mut this = Self {

@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 #![feature(thread_local)]
+#![allow(unused_imports)]
 #[allow(arithmetic_overflow)]
 mod backend;
 mod bus;
