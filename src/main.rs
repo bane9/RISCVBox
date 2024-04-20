@@ -105,5 +105,9 @@ fn main() {
 
     let exec_thread_pool = ExecCoreThreadPool::new(RAM_BEGIN_ADDR, 1);
 
+    let mut window = window::window::Window::new(init_data.fb_ptr, width, height);
+
+    window.event_loop();
+
     exec_thread_pool.join();
 }

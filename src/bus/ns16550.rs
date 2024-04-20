@@ -5,14 +5,6 @@ use crate::{
     cpu::{self, Exception},
 };
 
-extern crate winapi;
-extern crate windows;
-
-use winapi::um::fileapi::GetFileType;
-use winapi::um::handleapi::INVALID_HANDLE_VALUE;
-use winapi::um::processenv::GetStdHandle;
-use winapi::um::wincon::{ENABLE_ECHO_INPUT, ENABLE_LINE_INPUT /*, ENABLE_PROCESSED_INPUT*/};
-
 const UART_BASE_ADDRESS: u64 = 0x10000000;
 const UART_IRQN: u64 = 10;
 
@@ -87,27 +79,6 @@ extern "C" {
 
 impl Ns16550 {
     pub fn new() -> Self {
-        unsafe {
-            // Get the handle for the standard input
-            let handle = GetStdHandle(winapi::um::winbase::STD_INPUT_HANDLE);
-            if handle == INVALID_HANDLE_VALUE || GetFileType(handle) != 0x0002 {
-                panic!("Failed to get standard input handle")
-            }
-
-            // Get the current console mode
-            let mut mode: winapi::shared::minwindef::DWORD = 0;
-            if GetConsoleMode(handle, &mut mode) == 0 {
-                panic!("Failed to get console mode")
-            }
-
-            // Modify the console mode to disable echo and enable raw input
-            let new_mode =
-                mode & !(ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT/*| ENABLE_PROCESSED_INPUT*/);
-            if SetConsoleMode(handle, new_mode) == 0 {
-                //panic!("Failed to set console mode")
-            }
-        }
-
         let mut this = Self {
             dll: 0,
             dlm: 0,

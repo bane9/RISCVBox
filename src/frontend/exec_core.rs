@@ -217,31 +217,8 @@ impl ExecCore {
                 unimplemented!()
             }
             cpu::Exception::Wfi => {
-                // I hate this from the bottom of my heart but the altrenative is making
-                // all csr accesses atomic which is probably worse more so this will have to do
-                // if trap::are_interrupts_enabled(cpu) {
-                //     let bus = bus::get_bus();
-                //     std::thread::sleep(std::time::Duration::from_millis(
-                //         Clint::get_remaining_time_ms(),
-                //     ));
-
-                //     loop {
-                //         bus.tick_core_local();
-
-                //         if cpu
-                //             .has_pending_interrupt
-                //             .load(std::sync::atomic::Ordering::Acquire)
-                //             == 1
-                //         {
-                //             cpu.has_pending_interrupt
-                //                 .store(0, std::sync::atomic::Ordering::Release);
-                //             cpu.pending_interrupt = None;
-                //             break;
-                //         }
-
-                //         std::thread::sleep(std::time::Duration::from_millis(50));
-                //     }
-                // }
+                // lol
+                std::thread::sleep(std::time::Duration::from_millis(20));
 
                 cpu.next_pc = cpu.c_exception_pc as CpuReg + INSN_SIZE as CpuReg;
             }

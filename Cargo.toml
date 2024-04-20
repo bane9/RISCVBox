@@ -6,9 +6,8 @@ default-run = "rv32jit"
 rust-version = "1.78"
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3.9", features = ["winuser", "memoryapi", "dwmapi", "wincon", "processenv"] }
-microseh = "1.0.0"
-windows = {version = "0.56.0", features = ["Win32", "Win32_System", "Win32_System_Console"] }
+winapi = { version = "0.3.9", features = ["winuser", "memoryapi"] }
+microseh = "1.0.3"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.153"
@@ -21,8 +20,8 @@ path = "src/main.rs"
 name = "test_riscv_isa"
 path = "src/test_riscv_isa.rs"
 
-[profile.release] 
-debug = true
+[profile.release.package.minifb]
+opt-level = 0 # For some reason (at least on Windows) minifb only shows a white screen when compiled with optimizations
 
 [dependencies]
 minifb = "0.25.0"
