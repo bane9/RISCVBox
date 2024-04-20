@@ -1,5 +1,9 @@
 use std::io::{Read, Write};
 
+use lazy_static::lazy_static;
+use multiqueue::{broadcast_queue, BroadcastReceiver, BroadcastSender};
+use std::sync::Mutex;
+
 use crate::{
     bus::bus::*,
     cpu::{self, Exception},
@@ -53,14 +57,29 @@ pub struct Ns16550 {
     read_thread: Option<std::thread::JoinHandle<()>>,
 }
 
-static mut READ_CHAR: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+lazy_static! {
+    static ref CHARBUF: Mutex<(BroadcastSender<u8>, BroadcastReceiver<u8>)> = {
+        let (sender, receiver) = broadcast_queue::<u8>(1024);
+        Mutex::new((sender, receiver))
+    };
+}
+
+pub fn write_char_cb(c: u8) {
+    let (sender, _) = &*CHARBUF.lock().unwrap();
+    let _ = sender.try_send(c);
+}
+
+pub fn charbuf_read_data() -> Option<u8> {
+    let (_, receiver) = &*CHARBUF.lock().unwrap();
+    receiver.try_recv().ok()
+}
 
 fn read_thread() {
     loop {
         let mut input = [0u8];
         std::io::stdin().read(&mut input).unwrap();
 
-        unsafe { READ_CHAR.store(input[0], std::sync::atomic::Ordering::Release) };
+        write_char_cb(input[0]);
     }
 }
 
@@ -185,12 +204,11 @@ impl BusDevice for Ns16550 {
             return Some(UART_IRQN as u32);
         }
 
-        let c = unsafe { READ_CHAR.load(std::sync::atomic::Ordering::Acquire) };
+        let c = charbuf_read_data();
 
-        if c != 0 {
+        if let Some(c) = c {
             self.lsr |= LSR_DR;
             self.val = c;
-            unsafe { READ_CHAR.store(0, std::sync::atomic::Ordering::Release) };
         }
 
         if dispatch_irq(self) {

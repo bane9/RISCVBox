@@ -263,7 +263,7 @@ pub fn exec_core_thread(cpu_core_idx: usize, initial_pc: CpuReg) {
         let cpu = unsafe { &mut *(cpu as *mut cpu::Cpu) };
 
         loop {
-            std::thread::sleep(std::time::Duration::from_millis(15));
+            std::thread::sleep(std::time::Duration::from_millis(25));
 
             if let Some(irqn) = bus.tick_async(cpu) {
                 if irqn != 0 {

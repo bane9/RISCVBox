@@ -1,4 +1,13 @@
+use crate::bus::ns16550::write_char_cb;
 use minifb;
+
+struct UartCB;
+
+impl minifb::InputCallback for UartCB {
+    fn add_char(&mut self, c: u32) {
+        write_char_cb(c as u8);
+    }
+}
 
 pub struct Window {
     window: minifb::Window,
@@ -19,6 +28,8 @@ impl Window {
 
         let fb_slice =
             unsafe { std::slice::from_raw_parts(fb_ptr as *const u32, width * height + 1) };
+
+        window.set_input_callback(Box::new(UartCB {}));
 
         Self {
             window,
@@ -45,5 +56,7 @@ impl Window {
                 .update_with_buffer(&self.framebuffer, self.width, self.height)
                 .unwrap();
         }
+
+        std::process::exit(0);
     }
 }
