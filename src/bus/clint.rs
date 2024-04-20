@@ -7,8 +7,11 @@ use std::collections::HashMap;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Mutex;
 
+use self::plic::PLIC_PHANDLE;
+
 pub const CLINT_ADDR: BusType = 0x2000000;
-const CLINT_END: BusType = CLINT_ADDR + 0x10000;
+const CLINT_SIZE: BusType = 0x10000;
+const CLINT_END: BusType = CLINT_ADDR + CLINT_SIZE;
 
 const MSIP: BusType = CLINT_ADDR;
 const MSIP_END: BusType = MSIP + INSN_SIZE as BusType;
@@ -198,5 +201,24 @@ impl BusDevice for Clint {
         } else {
             None
         }
+    }
+
+    fn describe_fdt(&self, fdt: &mut vm_fdt::FdtWriter) {
+        let clint_node = fdt
+            .begin_node(&util::fdt_node_addr_helper("clint", CLINT_ADDR))
+            .unwrap();
+        fdt.property_array_u32(
+            "interrupts-extended",
+            &[CPU_INTC_PHANDLE, PLIC_PHANDLE, CPU_INTC_PHANDLE, 0x07],
+        )
+        .unwrap();
+        fdt.property_array_u32("reg", &[0x00, CLINT_ADDR, 0x00, CLINT_SIZE])
+            .unwrap();
+        fdt.property_string_list(
+            "compatible",
+            vec!["sifive,clint0".into(), "riscv,clint0".into()],
+        )
+        .unwrap();
+        fdt.end_node(clint_node).unwrap();
     }
 }

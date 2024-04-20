@@ -74,4 +74,6 @@ impl BusDevice for Dtb {
     fn tick_async(&mut self, _cpu: &mut cpu::Cpu) -> Option<u32> {
         None
     }
+
+    fn describe_fdt(&self, _fdt: &mut vm_fdt::FdtWriter) {}
 }

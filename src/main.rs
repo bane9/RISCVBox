@@ -9,26 +9,17 @@ mod util;
 mod window;
 mod xmem;
 
-use std::io::Write;
-
 use backend::csr::init_backend_csr;
 use bus::{ram::RAM_BEGIN_ADDR, ramfb::RAMFB_BEGIN_ADDR};
+use cpu::CPU_INTC_PHANDLE;
 use frontend::exec_core::ExecCoreThreadPool;
 
 use crate::bus::BusDevice;
 
 use vm_fdt::FdtWriter;
 
-fn create_dtb(
-    ram_origin: u32,
-    ram_size: u32,
-    width: usize,
-    height: usize,
-    bpp: usize,
-    using_fb: bool,
-) -> Vec<u8> {
-    //TODO: make devices describe themselves
-    let mut fdt = FdtWriter::new().unwrap();
+fn create_dtb(ram_origin: u32, ram_size: u32) -> Vec<u8> {
+    let mut fdt: FdtWriter = FdtWriter::new().unwrap();
 
     let root_node = fdt.begin_node("").unwrap();
     fdt.property_u32("#address-cells", 0x2).unwrap();
@@ -66,14 +57,12 @@ fn create_dtb(
     fdt.property_string("mmu-type", "riscv,sv32").unwrap();
 
     // Begin interrupt controller node
-    let cpu0_intc_phandle = 0x02u32;
-
     let cpu0_intc_node = fdt.begin_node("cpu0_intc").unwrap();
     fdt.property_u32("#interrupt-cells", 0x01).unwrap();
     fdt.property_u32("#address-cells", 0x00).unwrap();
     fdt.property_null("interrupt-controller").unwrap();
     fdt.property_string("compatible", "riscv,cpu-intc").unwrap();
-    fdt.property_u32("phandle", cpu0_intc_phandle).unwrap();
+    fdt.property_u32("phandle", CPU_INTC_PHANDLE).unwrap();
     fdt.end_node(cpu0_intc_node).unwrap();
     // End interrupt controller node
 
@@ -96,96 +85,13 @@ fn create_dtb(
     fdt.property_string("compatible", "simple-bus").unwrap();
     fdt.property_null("ranges").unwrap();
 
-    // Begin plic node
-    let plic_phandle = 0x03u32;
-
-    let plic_node = fdt.begin_node("plic@c000000").unwrap();
-    fdt.property_u32("phandle", plic_phandle).unwrap();
-    fdt.property_u32("riscv,ndev", 0x60).unwrap();
-    fdt.property_array_u32("reg", &[0x00, 0xc000000, 0x00, 0x600000])
-        .unwrap();
-    fdt.property_array_u32(
-        "interrupts-extended",
-        &[cpu0_intc_phandle, 0x0b, cpu0_intc_phandle, 0x09],
-    )
-    .unwrap();
-    fdt.property_string_list(
-        "compatible",
-        vec!["sifive,plic-1.0.0".into(), "riscv,plic0".into()],
-    )
-    .unwrap();
-    fdt.property_null("interrupt-controller").unwrap();
-    fdt.property_u32("#interrupt-cells", 0x01).unwrap();
-    fdt.property_u32("#address-cells", 0x00).unwrap();
-    fdt.end_node(plic_node).unwrap();
-    // End plic node
-
-    // Begin serial node
-    let serial_node = fdt.begin_node("serial@10000000").unwrap();
-    fdt.property_u32("interrupts", 0x0a).unwrap();
-    fdt.property_u32("interrupt-parent", plic_phandle).unwrap();
-    fdt.property_string("clock-frequency", "115200").unwrap();
-    fdt.property_array_u32("reg", &[0x00, 0x10000000, 0x00, 0x8])
-        .unwrap();
-    fdt.property_string("compatible", "ns16550a").unwrap();
-    fdt.end_node(serial_node).unwrap();
-    // End serial node
-
-    // Begin clint node
-    let clint_node = fdt.begin_node("clint@2000000").unwrap();
-    fdt.property_array_u32(
-        "interrupts-extended",
-        &[cpu0_intc_phandle, plic_phandle, cpu0_intc_phandle, 0x07],
-    )
-    .unwrap();
-    fdt.property_array_u32("reg", &[0x00, 0x2000000, 0x00, 0x10000])
-        .unwrap();
-    fdt.property_string_list(
-        "compatible",
-        vec!["sifive,clint0".into(), "riscv,clint0".into()],
-    )
-    .unwrap();
-    fdt.end_node(clint_node).unwrap();
-    // End clint node
-
-    // Begin framebuffer node
-    if using_fb {
-        let bytes_per_pixel = bpp / 8;
-
-        let framebuffer_node = fdt.begin_node("framebuffer@1d380000").unwrap();
-        fdt.property_string("compatible", "simple-framebuffer")
-            .unwrap();
-        fdt.property_array_u32(
-            "reg",
-            &[
-                0x00,
-                0x1d380000,
-                0x00,
-                (width * height * bytes_per_pixel) as u32,
-            ],
-        )
-        .unwrap();
-        fdt.property_u32("width", width as u32).unwrap();
-        fdt.property_u32("height", height as u32).unwrap();
-        fdt.property_u32("stride", (width * bytes_per_pixel) as u32)
-            .unwrap();
-        fdt.property_string("format", "a8b8g8r8").unwrap();
-
-        fdt.end_node(framebuffer_node).unwrap();
-    }
-    // End framebuffer node
+    bus::get_bus().describe_fdts(&mut fdt);
 
     fdt.end_node(soc_node).unwrap();
 
     fdt.end_node(root_node).unwrap();
 
-    let res = fdt.finish().unwrap();
-
-    // dump the result to a file
-    let mut f = std::fs::File::create("buildroot/images/dtb_dump.dtb").unwrap();
-    f.write_all(&res).unwrap();
-
-    res
+    fdt.finish().unwrap()
 }
 
 fn init_bus(
@@ -197,7 +103,6 @@ fn init_bus(
     using_fb: bool,
 ) {
     assert!(ram_size >= rom.len());
-    // There are roughly sorted by expected frequency of access
 
     let bus = bus::bus::get_bus();
 
@@ -222,21 +127,14 @@ fn init_bus(
 
     bus.add_device(Box::new(clint));
 
-    let mut ramfb = bus::ramfb::RamFB::new(width, height, bpp);
+    let mut ramfb = bus::ramfb::RamFB::new(width, height, bpp, using_fb);
     let fb_ptr = ramfb.get_fb_ptr();
 
     bus.set_fb_ptr(fb_ptr, ramfb.get_end_addr() as usize);
 
     bus.add_device(Box::new(ramfb));
 
-    let dtb = create_dtb(
-        RAM_BEGIN_ADDR,
-        ram_size as u32,
-        width,
-        height,
-        bpp,
-        using_fb,
-    );
+    let dtb = create_dtb(RAM_BEGIN_ADDR, ram_size as u32);
 
     let dtb = bus::dtb::Dtb::new(&dtb);
 
@@ -274,7 +172,7 @@ fn main() {
     let width = 800;
     let height = 600;
     let bpp = 32;
-    let using_fb = false;
+    let using_fb = true;
 
     init_bus(rom, ram_size, width, height, bpp, using_fb);
 

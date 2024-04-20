@@ -6,6 +6,8 @@ use super::ram::RAM_BEGIN_ADDR;
 
 pub type BusType = u32;
 
+use vm_fdt::FdtWriter;
+
 #[macro_export]
 macro_rules! ptr_direct_load {
     ($ptr:expr, $size:expr) => {
@@ -43,6 +45,7 @@ pub trait BusDevice {
     fn tick_from_main_thread(&mut self);
     fn tick_async(&mut self, cpu: &mut Cpu) -> Option<u32>;
     fn get_ptr(&mut self, addr: BusType) -> Result<*mut u8, Exception>;
+    fn describe_fdt(&self, fdt: &mut FdtWriter);
 }
 
 pub struct Bus {
@@ -242,6 +245,12 @@ impl Bus {
 
     pub fn is_dram_addr(&self, addr: BusType) -> bool {
         addr >= RAM_BEGIN_ADDR && addr < self.ram_end_addr as u32
+    }
+
+    pub fn describe_fdts(&self, fdt: &mut FdtWriter) {
+        for device in &self.devices {
+            device.describe_fdt(fdt);
+        }
     }
 }
 

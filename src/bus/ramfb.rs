@@ -6,10 +6,14 @@ pub const RAMFB_BEGIN_ADDR: BusType = 0x1d380000;
 pub struct RamFB {
     pub mem: *mut u8,
     len: usize,
+    enabled: bool,
+    width: usize,
+    height: usize,
+    bpp: usize,
 }
 
 impl RamFB {
-    pub fn new(width: usize, height: usize, bpp: usize) -> Self {
+    pub fn new(width: usize, height: usize, bpp: usize, enabled: bool) -> Self {
         let fb_len = width * height * (bpp / 8);
         let fb_len = util::align_up(fb_len, PageAllocator::get_page_size());
 
@@ -19,7 +23,14 @@ impl RamFB {
         )
         .unwrap();
 
-        Self { mem, len: fb_len }
+        Self {
+            mem,
+            len: fb_len,
+            enabled,
+            width,
+            height,
+            bpp,
+        }
     }
 
     pub fn get_fb_ptr(&mut self) -> *mut u8 {
@@ -58,5 +69,40 @@ impl BusDevice for RamFB {
 
     fn tick_async(&mut self, _cpu: &mut cpu::Cpu) -> Option<u32> {
         None
+    }
+
+    fn describe_fdt(&self, fdt: &mut vm_fdt::FdtWriter) {
+        if !self.enabled {
+            return;
+        }
+
+        let width = self.width as u32;
+        let height = self.height as u32;
+        let bpp = self.bpp as u32;
+
+        let bytes_per_pixel = bpp / 8;
+
+        let framebuffer_node = fdt
+            .begin_node(&util::fdt_node_addr_helper("framebuffer", RAMFB_BEGIN_ADDR))
+            .unwrap();
+        fdt.property_string("compatible", "simple-framebuffer")
+            .unwrap();
+        fdt.property_array_u32(
+            "reg",
+            &[
+                0x00,
+                RAMFB_BEGIN_ADDR,
+                0x00,
+                width * height * bytes_per_pixel,
+            ],
+        )
+        .unwrap();
+        fdt.property_u32("width", width as u32).unwrap();
+        fdt.property_u32("height", height as u32).unwrap();
+        fdt.property_u32("stride", (width * bytes_per_pixel) as u32)
+            .unwrap();
+        fdt.property_string("format", "a8b8g8r8").unwrap();
+
+        fdt.end_node(framebuffer_node).unwrap();
     }
 }

@@ -7,26 +7,31 @@ use std::sync::Mutex;
 use crate::{
     bus::bus::*,
     cpu::{self, Exception},
+    util,
 };
 
-const UART_BASE_ADDRESS: u64 = 0x10000000;
-const UART_IRQN: u64 = 10;
+use super::plic::PLIC_PHANDLE;
 
-const RHR: u64 = 0;
-const THR: u64 = 0;
-const DLL: u64 = 0;
+const UART_ADDR: BusType = 0x10000000;
+const UART_SIZE: BusType = 8;
+const UART_END_ADDR: BusType = UART_ADDR + UART_SIZE;
+const UART_IRQN: BusType = 10;
 
-const IER: u64 = 1;
-const DLM: u64 = 1;
+const RHR: BusType = 0;
+const THR: BusType = 0;
+const DLL: BusType = 0;
 
-const ISR: u64 = 2;
-const FCR: u64 = 2;
+const IER: BusType = 1;
+const DLM: BusType = 1;
 
-const LCR: u64 = 3;
-const MCR: u64 = 4;
-const LSR: u64 = 5;
-const MSR: u64 = 6;
-const SCR: u64 = 7;
+const ISR: BusType = 2;
+const FCR: BusType = 2;
+
+const LCR: BusType = 3;
+const MCR: BusType = 4;
+const LSR: BusType = 5;
+const MSR: BusType = 6;
+const SCR: BusType = 7;
 
 const LSR_DR: u8 = 0x1;
 const LSR_THRE: u8 = 0x20;
@@ -123,7 +128,7 @@ impl BusDevice for Ns16550 {
     fn load(&mut self, addr: BusType, _size: BusType) -> Result<BusType, Exception> {
         let adj_addr = (addr as usize) - (self.get_begin_addr() as usize);
 
-        match adj_addr as u64 {
+        match adj_addr as BusType {
             THR => {
                 if (self.lsr & LSR_DR) != 0 {
                     self.lsr &= !LSR_DR;
@@ -144,7 +149,7 @@ impl BusDevice for Ns16550 {
     fn store(&mut self, addr: BusType, data: BusType, _size: BusType) -> Result<(), Exception> {
         let adj_addr = (addr as usize) - (self.get_begin_addr() as usize);
 
-        match adj_addr as u64 {
+        match adj_addr as BusType {
             THR => {
                 let c = data as u8 as char;
                 if c.is_ascii() {
@@ -182,11 +187,11 @@ impl BusDevice for Ns16550 {
     }
 
     fn get_begin_addr(&self) -> BusType {
-        UART_BASE_ADDRESS as BusType
+        UART_ADDR
     }
 
     fn get_end_addr(&self) -> BusType {
-        (UART_BASE_ADDRESS + 8) as BusType
+        UART_END_ADDR
     }
 
     fn tick_core_local(&mut self) {}
@@ -216,5 +221,18 @@ impl BusDevice for Ns16550 {
         } else {
             None
         }
+    }
+
+    fn describe_fdt(&self, fdt: &mut vm_fdt::FdtWriter) {
+        let serial_node = fdt
+            .begin_node(&util::fdt_node_addr_helper("serial", UART_ADDR))
+            .unwrap();
+        fdt.property_u32("interrupts", 0x0a).unwrap();
+        fdt.property_u32("interrupt-parent", PLIC_PHANDLE).unwrap();
+        fdt.property_string("clock-frequency", "115200").unwrap();
+        fdt.property_array_u32("reg", &[0x00, UART_ADDR, 0x00, UART_SIZE])
+            .unwrap();
+        fdt.property_string("compatible", "ns16550a").unwrap();
+        fdt.end_node(serial_node).unwrap();
     }
 }

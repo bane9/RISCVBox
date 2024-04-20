@@ -90,3 +90,7 @@ pub fn ms_since_program_start() -> u64 {
         .expect("Time went backwards");
     duration_since_start.as_millis() as u64
 }
+
+pub fn fdt_node_addr_helper(name: &str, addr: u32) -> String {
+    format!("{}@{:x}", name, addr)
+}

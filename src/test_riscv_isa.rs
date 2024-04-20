@@ -65,6 +65,8 @@ impl bus::BusDevice for ToHost {
     fn tick_async(&mut self, _cpu: &mut cpu::Cpu) -> Option<u32> {
         None
     }
+
+    fn describe_fdt(&self, _fdt: &mut vm_fdt::FdtWriter) {}
 }
 
 fn init_bus(mut rom: Vec<u8>, ram_size: usize) {

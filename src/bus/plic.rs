@@ -1,8 +1,10 @@
 use crate::bus::*;
 use crate::cpu::*;
+use crate::util;
 
 pub const PLIC_BASE: BusType = 0xc000000;
-const PLIC_END: BusType = PLIC_BASE + 0x208000;
+const PLIC_SIZE: BusType = 0x600000;
+const PLIC_END: BusType = PLIC_BASE + PLIC_SIZE;
 
 const SOURCE_PRIORITY: BusType = PLIC_BASE;
 const SOURCE_PRIORITY_END: BusType = PLIC_BASE + 0xfff;
@@ -19,6 +21,8 @@ const THRESHOLD_AND_CLAIM_END: BusType = PLIC_BASE + 0x201007;
 const WORD_SIZE: BusType = 0x4;
 const CONTEXT_OFFSET: BusType = 0x1000;
 const SOURCE_NUM: BusType = 1024;
+
+pub const PLIC_PHANDLE: u32 = 0x03;
 
 pub struct Plic {
     priority: [u32; SOURCE_NUM as usize],
@@ -171,5 +175,29 @@ impl BusDevice for Plic {
 
     fn tick_async(&mut self, _cpu: &mut cpu::Cpu) -> Option<u32> {
         None
+    }
+
+    fn describe_fdt(&self, fdt: &mut vm_fdt::FdtWriter) {
+        let plic_node = fdt
+            .begin_node(&util::fdt_node_addr_helper("plic", PLIC_BASE))
+            .unwrap();
+        fdt.property_u32("phandle", PLIC_PHANDLE).unwrap();
+        fdt.property_u32("riscv,ndev", 0x60).unwrap();
+        fdt.property_array_u32("reg", &[0x00, PLIC_BASE, 0x00, PLIC_SIZE])
+            .unwrap();
+        fdt.property_array_u32(
+            "interrupts-extended",
+            &[CPU_INTC_PHANDLE, 0x0b, CPU_INTC_PHANDLE, 0x09],
+        )
+        .unwrap();
+        fdt.property_string_list(
+            "compatible",
+            vec!["sifive,plic-1.0.0".into(), "riscv,plic0".into()],
+        )
+        .unwrap();
+        fdt.property_null("interrupt-controller").unwrap();
+        fdt.property_u32("#interrupt-cells", 0x01).unwrap();
+        fdt.property_u32("#address-cells", 0x00).unwrap();
+        fdt.end_node(plic_node).unwrap();
     }
 }
