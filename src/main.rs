@@ -12,14 +12,14 @@ mod xmem;
 use std::io::Write;
 
 use backend::csr::init_backend_csr;
-use bus::ram::RAM_BEGIN_ADDR;
+use bus::{ram::RAM_BEGIN_ADDR, ramfb::RAMFB_BEGIN_ADDR};
 use frontend::exec_core::ExecCoreThreadPool;
 
 use crate::bus::BusDevice;
 
 use vm_fdt::FdtWriter;
 
-fn create_dtb(ram_origin: u32, ram_size: u32) -> Vec<u8> {
+fn create_dtb(ram_origin: u32, ram_size: u32, width: usize, height: usize, bpp: usize) -> Vec<u8> {
     let mut fdt = FdtWriter::new().unwrap();
 
     let root_node = fdt.begin_node("").unwrap();
@@ -29,8 +29,12 @@ fn create_dtb(ram_origin: u32, ram_size: u32) -> Vec<u8> {
     fdt.property_string("model", "riscv-virtio,qemu").unwrap();
 
     let chosen_node = fdt.begin_node("chosen").unwrap();
-    fdt.property_string("bootargs", "earlycon=sbi console=ttyS0")
-        .unwrap();
+    fdt.property_string(
+        "bootargs",
+        "earlycon=sbi random.trust_bootloader=on fbcon=nodefer fbcon=map:0 console=ttyS0",
+    )
+    .unwrap();
+    fdt.property_u32("rng-seed", 0x4).unwrap();
     fdt.end_node(chosen_node).unwrap();
 
     let fdt_memory_node = fdt.begin_node("memory@80000000").unwrap();
@@ -42,7 +46,7 @@ fn create_dtb(ram_origin: u32, ram_size: u32) -> Vec<u8> {
     let cpus_node = fdt.begin_node("cpus").unwrap();
     fdt.property_u32("#address-cells", 0x1).unwrap();
     fdt.property_u32("#size-cells", 0x0).unwrap();
-    fdt.property_u32("timebase-frequency", 0xf4240).unwrap();
+    fdt.property_u32("timebase-frequency", 100000000).unwrap();
 
     let cpu_node = fdt.begin_node("cpu@0").unwrap();
     fdt.property_u32("phandle", 0x1).unwrap();
@@ -134,8 +138,32 @@ fn create_dtb(ram_origin: u32, ram_size: u32) -> Vec<u8> {
     )
     .unwrap();
     fdt.end_node(clint_node).unwrap();
-
     // End clint node
+
+    // Begin framebuffer node
+    let bytes_per_pixel = bpp / 8;
+
+    let framebuffer_node = fdt.begin_node("framebuffer@1d380000").unwrap();
+    fdt.property_string("compatible", "simple-framebuffer")
+        .unwrap();
+    fdt.property_array_u32(
+        "reg",
+        &[
+            0x00,
+            0x1d380000,
+            0x00,
+            (width * height * bytes_per_pixel) as u32,
+        ],
+    )
+    .unwrap();
+    fdt.property_u32("width", width as u32).unwrap();
+    fdt.property_u32("height", height as u32).unwrap();
+    fdt.property_u32("stride", (width * bytes_per_pixel) as u32)
+        .unwrap();
+    fdt.property_string("format", "a8b8g8r8").unwrap();
+
+    fdt.end_node(framebuffer_node).unwrap();
+    // End framebuffer node
 
     fdt.end_node(soc_node).unwrap();
 
@@ -150,7 +178,7 @@ fn create_dtb(ram_origin: u32, ram_size: u32) -> Vec<u8> {
     res
 }
 
-fn init_bus(mut rom: Vec<u8>, ram_size: usize) {
+fn init_bus(mut rom: Vec<u8>, ram_size: usize, width: usize, height: usize, bpp: usize) {
     assert!(ram_size >= rom.len());
     // There are roughly sorted by expected frequency of access
 
@@ -177,7 +205,14 @@ fn init_bus(mut rom: Vec<u8>, ram_size: usize) {
 
     bus.add_device(Box::new(clint));
 
-    let dtb = create_dtb(RAM_BEGIN_ADDR, ram_size as u32);
+    let mut ramfb = bus::ramfb::RamFB::new(width, height, bpp);
+    let fb_ptr = ramfb.get_fb_ptr();
+
+    bus.set_fb_ptr(fb_ptr, ramfb.get_end_addr() as usize);
+
+    bus.add_device(Box::new(ramfb));
+
+    let dtb = create_dtb(RAM_BEGIN_ADDR, ram_size as u32, width, height, bpp);
 
     let dtb = bus::dtb::Dtb::new(&dtb);
 
@@ -212,9 +247,17 @@ fn main() {
 
     window::ConsoleSettings::set_interactive_console();
 
-    init_bus(rom, ram_size);
+    let width = 800;
+    let height = 600;
+    let bpp = 32;
+
+    init_bus(rom, ram_size, width, height, bpp);
 
     let exec_thread_pool = ExecCoreThreadPool::new(RAM_BEGIN_ADDR, 1);
+
+    let mut window = window::window::Window::new(RAMFB_BEGIN_ADDR as *mut u8, width, height);
+
+    window.event_loop();
 
     exec_thread_pool.join();
 }
