@@ -212,7 +212,7 @@ impl TLB {
     }
 }
 
-const TLB_MAX_ENTRIES: usize = 4;
+const TLB_MAX_ENTRIES: usize = 1;
 
 pub struct Sv32Mmu {
     ppn: BusType,
@@ -232,8 +232,11 @@ impl Mmu for Sv32Mmu {
     }
 
     fn get_pte(&mut self, addr: BusType, access_type: AccessType) -> Result<Pte, Exception> {
-        if let Some(pte) = self.tlb.get(addr) {
-            return Ok(pte);
+        #[cfg(feature = "tlb")]
+        {
+            if let Some(pte) = self.tlb.get(addr) {
+                return Ok(pte);
+            }
         }
 
         let bus_instance = bus::get_bus();
@@ -305,7 +308,10 @@ impl Mmu for Sv32Mmu {
             }
         }
 
-        self.tlb.insert(addr, pte);
+        #[cfg(feature = "tlb")]
+        {
+            self.tlb.insert(addr, pte);
+        }
 
         Ok(pte)
     }
