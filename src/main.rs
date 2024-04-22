@@ -162,7 +162,7 @@ fn main() {
     let mut rom = util::read_file("buildroot/images1/fw_jump.bin").unwrap();
 
     rom.resize(util::size_mib(4), 0);
-    let mut kernel = util::read_file("buildroot/ImageRFS1").unwrap();
+    let mut kernel = util::read_file("buildroot/ImageRFS2").unwrap();
     rom.append(&mut kernel);
 
     init_backend_csr();
@@ -172,7 +172,7 @@ fn main() {
     let width = 800;
     let height = 600;
     let bpp = 32;
-    let using_fb = false;
+    let using_fb = true;
 
     init_bus(rom, ram_size, width, height, bpp, using_fb);
 

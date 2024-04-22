@@ -165,7 +165,6 @@ pub trait Mmu {
 struct TLB {
     addresses: Vec<BusType>,
     pte_entires: Vec<Pte>,
-    in_use: Vec<bool>,
     max_entries: usize,
     rng: SmallRng,
 }
@@ -175,7 +174,6 @@ impl TLB {
         TLB {
             addresses: vec![0; max_entries],
             pte_entires: vec![Pte::default(); max_entries],
-            in_use: vec![false; max_entries],
             max_entries,
             rng: SmallRng::from_entropy(),
         }
@@ -183,7 +181,7 @@ impl TLB {
 
     pub fn get(&mut self, addr: BusType) -> Option<Pte> {
         for i in 0..self.max_entries {
-            if self.in_use[i] && self.addresses[i] == addr {
+            if self.addresses[i] == addr {
                 return Some(self.pte_entires[i]);
             }
         }
@@ -192,22 +190,15 @@ impl TLB {
     }
 
     pub fn insert(&mut self, addr: BusType, pte: Pte) {
-        self.in_use[self.rng.gen_range(0..self.max_entries)] = false;
+        let i = self.rng.gen_range(0..self.max_entries);
 
-        for i in 0..self.max_entries {
-            if !self.in_use[i] {
-                self.addresses[i] = addr;
-                self.pte_entires[i] = pte;
-                self.in_use[i] = true;
-
-                return;
-            }
-        }
+        self.addresses[i] = addr;
+        self.pte_entires[i] = pte;
     }
 
     pub fn clear(&mut self) {
-        for in_use in self.in_use.iter_mut() {
-            *in_use = false;
+        for i in 0..self.max_entries {
+            self.addresses[i] = 0;
         }
     }
 }

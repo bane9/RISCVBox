@@ -1,8 +1,7 @@
 use std::io::{Read, Write};
 
+use crossbeam::queue::ArrayQueue;
 use lazy_static::lazy_static;
-use multiqueue::{broadcast_queue, BroadcastReceiver, BroadcastSender};
-use std::sync::Mutex;
 
 use crate::{
     bus::bus::*,
@@ -13,7 +12,7 @@ use crate::{
 use super::plic::PLIC_PHANDLE;
 
 const UART_ADDR: BusType = 0x10000000;
-const UART_SIZE: BusType = 8;
+const UART_SIZE: BusType = 10;
 const UART_END_ADDR: BusType = UART_ADDR + UART_SIZE;
 const UART_IRQN: BusType = 10;
 
@@ -32,6 +31,8 @@ const MCR: BusType = 4;
 const LSR: BusType = 5;
 const MSR: BusType = 6;
 const SCR: BusType = 7;
+const DOOM: BusType = 8;
+const DOOM_FLUSH: BusType = 8;
 
 const LSR_DR: u8 = 0x1;
 const LSR_THRE: u8 = 0x20;
@@ -63,20 +64,32 @@ pub struct Ns16550 {
 }
 
 lazy_static! {
-    static ref CHARBUF: Mutex<(BroadcastSender<u8>, BroadcastReceiver<u8>)> = {
-        let (sender, receiver) = broadcast_queue::<u8>(1024);
-        Mutex::new((sender, receiver))
-    };
+    static ref CHARBUF: ArrayQueue<u8> = ArrayQueue::new(1024);
+    static ref CHARBUF_KBD: ArrayQueue<u8> = ArrayQueue::new(8); // This is mainly meant for DOOM so it can detect key release events
 }
 
 pub fn write_char_cb(c: u8) {
-    let (sender, _) = &*CHARBUF.lock().unwrap();
-    let _ = sender.try_send(c);
+    let _ = CHARBUF.push(c);
+}
+
+pub fn write_char_kbd(c: u8) {
+    let _ = CHARBUF_KBD.push(c);
 }
 
 pub fn charbuf_read_data() -> Option<u8> {
-    let (_, receiver) = &*CHARBUF.lock().unwrap();
-    receiver.try_recv().ok()
+    CHARBUF.pop()
+}
+
+fn charbuf_kbd_read_data() -> Option<u8> {
+    CHARBUF_KBD.pop()
+}
+
+fn charkbd_flush() {
+    while let Some(_) = CHARBUF_KBD.pop() {}
+}
+
+fn charbuf_has_data() -> bool {
+    !CHARBUF.is_empty()
 }
 
 fn read_thread() {
@@ -130,10 +143,13 @@ impl BusDevice for Ns16550 {
 
         match adj_addr as BusType {
             THR => {
-                if (self.lsr & LSR_DR) != 0 {
-                    self.lsr &= !LSR_DR;
-                }
-                Ok(self.val as BusType)
+                let c = charbuf_read_data();
+
+                let c = if let Some(c) = c { c } else { 0 };
+
+                self.lsr &= !LSR_DR;
+
+                Ok(c as BusType)
             }
             IER => return Ok(self.ier as BusType),
             ISR => return Ok(self.isr as BusType),
@@ -142,6 +158,14 @@ impl BusDevice for Ns16550 {
             LSR => return Ok(self.lsr as BusType),
             MSR => return Ok(self.msr as BusType),
             SCR => return Ok(self.scr as BusType),
+            DOOM => {
+                let c = charbuf_kbd_read_data();
+
+                self.val = if let Some(c) = c { c } else { self.val };
+
+                Ok(self.val as BusType)
+            }
+
             _ => Err(Exception::LoadAccessFault(addr)),
         }
     }
@@ -182,6 +206,10 @@ impl BusDevice for Ns16550 {
                 self.scr = data as u8;
                 Ok(())
             }
+            DOOM_FLUSH => {
+                charkbd_flush();
+                Ok(())
+            }
             _ => Err(Exception::StoreAccessFault(addr)),
         }
     }
@@ -209,18 +237,12 @@ impl BusDevice for Ns16550 {
             return Some(UART_IRQN as u32);
         }
 
-        let c = charbuf_read_data();
-
-        if let Some(c) = c {
+        if charbuf_has_data() {
             self.lsr |= LSR_DR;
-            self.val = c;
+            return Some(UART_IRQN as u32);
         }
 
-        if dispatch_irq(self) {
-            Some(UART_IRQN as u32)
-        } else {
-            None
-        }
+        None
     }
 
     fn describe_fdt(&self, fdt: &mut vm_fdt::FdtWriter) {

@@ -6,7 +6,7 @@ default-run = "rv32jit"
 rust-version = "1.78"
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3.9", features = ["winuser", "memoryapi", "wincon", "processenv"] }
+winapi = { version = "0.3.9", features = ["winuser", "memoryapi", "wincon", "processenv", "handleapi", "winbase"] }
 microseh = "1.0.3"
 
 [target.'cfg(unix)'.dependencies]
@@ -20,6 +20,10 @@ path = "src/main.rs"
 name = "test_riscv_isa"
 path = "src/test_riscv_isa.rs"
 
+[features]
+# default = ["tlb"]
+# tlb = []
+
 [profile.release.package.minifb]
 opt-level = 0 # For some reason (at least on Windows) minifb only shows a white screen when compiled with optimizations
 
@@ -28,7 +32,7 @@ debug = true
 
 [dependencies]
 minifb = "0.25.0"
-multiqueue = "0.3.2"
+crossbeam = "0.8.4"
 lazy_static = "1.4.0"
 hashbrown = "0.14.3"
 vm-fdt = "0.3.0"

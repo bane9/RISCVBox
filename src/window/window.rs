@@ -1,11 +1,27 @@
-use crate::bus::ns16550::write_char_cb;
-use minifb;
+use crate::bus::ns16550::{write_char_cb, write_char_kbd};
+use minifb::{self, Key};
 
 struct UartCB;
 
 impl minifb::InputCallback for UartCB {
     fn add_char(&mut self, c: u32) {
         write_char_cb(c as u8);
+    }
+
+    fn set_key_state(&mut self, key: Key, state: bool) {
+        if key >= Key::A && key <= Key::Z || key == Key::Space {
+            let mut key = key as u32;
+
+            if key == Key::Space as u32 {
+                key = b' ' as u32;
+            } else {
+                key = key - Key::A as u32 + b'a' as u32;
+            }
+
+            key = if state { key } else { key | 0x80 };
+
+            write_char_kbd(key as u8);
+        }
     }
 }
 
