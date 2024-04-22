@@ -43,3 +43,20 @@ pub mod win32_console_settings {
         }
     }
 }
+
+#[cfg(unix)]
+pub mod posix_console_settings {
+    extern crate termios;
+
+    use termios::{tcsetattr, Termios, TCSAFLUSH};
+
+    pub fn set_interactive_console() {
+        let mut termios = Termios::from_fd(0).unwrap();
+
+        termios.c_lflag &= !(termios::ECHO | termios::ICANON | termios::ISIG | termios::IEXTEN);
+
+        termios.c_iflag &= !(termios::IXON | termios::ICRNL);
+
+        tcsetattr(0, TCSAFLUSH, &termios).unwrap();
+    }
+}

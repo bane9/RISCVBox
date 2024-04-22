@@ -11,6 +11,7 @@ microseh = "1.0.3"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.153"
+termios = "0.3.3"
 
 [[bin]]
 name = "rv32jit"
@@ -26,9 +27,6 @@ path = "src/test_riscv_isa.rs"
 
 [profile.release.package.minifb]
 opt-level = 0 # For some reason (at least on Windows) minifb only shows a white screen when compiled with optimizations
-
-[profile.release]
-debug = true
 
 [dependencies]
 minifb = "0.25.0"
