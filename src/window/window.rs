@@ -47,13 +47,18 @@ impl Window {
 
         window.set_input_callback(Box::new(UartCB {}));
 
-        Self {
+        let mut this = Self {
             window,
             width,
             height,
             fb_slice,
             framebuffer: vec![0; width * height * 4],
-        }
+        };
+
+        this.set_icon();
+        this.set_dark_mode();
+
+        this
     }
 
     pub fn event_loop(&mut self) {
@@ -75,4 +80,75 @@ impl Window {
 
         std::process::exit(0);
     }
+
+    #[cfg(windows)]
+    fn set_icon(&mut self) {
+        use winapi::{
+            shared::{ntdef::PCWSTR, windef::HWND},
+            um::{
+                libloaderapi::GetModuleHandleW,
+                winuser::{
+                    LoadImageW, SendMessageW, ICON_BIG, ICON_SMALL, IMAGE_ICON, LR_DEFAULTSIZE,
+                    WM_SETICON,
+                },
+            },
+        };
+
+        let _icon = unsafe {
+            let handle = GetModuleHandleW(std::ptr::null());
+
+            if handle.is_null() {
+                return;
+            }
+
+            let res = LoadImageW(handle, 1 as PCWSTR, IMAGE_ICON, 0, 0, LR_DEFAULTSIZE);
+
+            if res.is_null() {
+                return;
+            }
+
+            SendMessageW(
+                self.window.get_window_handle() as HWND,
+                WM_SETICON,
+                ICON_SMALL as usize,
+                res as isize,
+            );
+
+            SendMessageW(
+                self.window.get_window_handle() as HWND,
+                WM_SETICON,
+                ICON_BIG as usize,
+                res as isize,
+            );
+        };
+    }
+
+    #[cfg(windows)]
+    fn set_dark_mode(&mut self) {
+        use winapi::shared::minwindef::{BOOL, DWORD};
+        use winapi::shared::windef::HWND;
+        use winapi::um::dwmapi::DwmSetWindowAttribute;
+
+        const DWMWA_USE_IMMERSIVE_DARK_MODE: DWORD = 20;
+        const DWMWA_CAPTION_COLOR: DWORD = 35;
+
+        let hwnd = self.window.get_window_handle();
+
+        unsafe {
+            let mut value = 1 as BOOL;
+
+            DwmSetWindowAttribute(
+                hwnd as HWND,
+                DWMWA_USE_IMMERSIVE_DARK_MODE,
+                &mut value as *mut _ as *mut _,
+                std::mem::size_of_val(&value) as u32,
+            );
+        }
+    }
+
+    #[cfg(not(windows))]
+    fn set_dark_mode(&mut self) {}
+
+    #[cfg(not(windows))]
+    fn set_icon(&mut self) {}
 }
