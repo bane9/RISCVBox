@@ -169,6 +169,13 @@ impl Bus {
     }
 
     pub fn load_nommu(&mut self, addr: BusType, size: BusType) -> Result<BusType, Exception> {
+        if self.is_dram_addr(addr) {
+            let offset = addr - RAM_BEGIN_ADDR;
+            let ptr = unsafe { self.ram_ptr.add(offset as usize) };
+
+            return Ok(ptr_direct_load!(ptr, size));
+        }
+
         for device in &mut self.devices {
             if addr >= device.get_begin_addr() && addr < device.get_end_addr() {
                 return device.load(addr, size);
@@ -194,6 +201,15 @@ impl Bus {
         data: BusType,
         size: BusType,
     ) -> Result<(), Exception> {
+        if self.is_dram_addr(addr) {
+            let offset = addr - RAM_BEGIN_ADDR;
+            let ptr = unsafe { self.ram_ptr.add(offset as usize) };
+
+            ptr_direct_store!(ptr, data, size);
+
+            return Ok(());
+        }
+
         for device in &mut self.devices {
             if addr >= device.get_begin_addr() && addr < device.get_end_addr() {
                 return device.store(addr, data, size);

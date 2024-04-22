@@ -53,6 +53,48 @@ macro_rules! PteBitTest {
     };
 }
 
+const TLB_MAX_ENTRIES: usize = 4;
+
+struct TLB {
+    addresses: [BusType; TLB_MAX_ENTRIES],
+    phys_addresses: [BusType; TLB_MAX_ENTRIES],
+    rng: SmallRng,
+}
+
+impl TLB {
+    pub fn new() -> Self {
+        TLB {
+            addresses: [0; TLB_MAX_ENTRIES],
+            phys_addresses: [0; TLB_MAX_ENTRIES],
+            rng: SmallRng::from_entropy(),
+        }
+    }
+
+    pub fn get(&mut self, addr: BusType) -> Option<BusType> {
+        let offset = addr & RV_PAGE_OFFSET_MASK as BusType;
+        let page = addr & !RV_PAGE_OFFSET_MASK as BusType;
+
+        for (i, &page_entry) in self.addresses.iter().enumerate() {
+            if page_entry == page {
+                return Some(self.phys_addresses[i] | offset);
+            }
+        }
+
+        None
+    }
+
+    pub fn insert(&mut self, addr: BusType, phys_addr: BusType) {
+        let index = self.rng.gen_range(0..TLB_MAX_ENTRIES);
+
+        self.addresses[index] = addr & !RV_PAGE_OFFSET_MASK as BusType;
+        self.phys_addresses[index] = phys_addr;
+    }
+
+    pub fn clear(&mut self) {
+        self.addresses = [0; TLB_MAX_ENTRIES];
+    }
+}
+
 pub trait Mmu {
     fn new() -> Self;
 
@@ -66,6 +108,10 @@ pub trait Mmu {
 
     fn get_vpn(&self, addr: BusType, level: BusType) -> Self::PnArr;
     fn get_ppn(&self, pte: BusType, level: BusType) -> Self::PnArr;
+
+    fn get_tlb_entry(&mut self, addr: BusType) -> Option<BusType>;
+
+    fn put_tlb_entry(&mut self, addr: BusType, phys_addr: BusType);
 
     fn translate(&mut self, addr: BusType, access_type: AccessType) -> Result<BusType, Exception> {
         if !self.is_active() {
@@ -82,6 +128,12 @@ pub trait Mmu {
 
         if mode == MppMode::Machine {
             return Ok(addr);
+        }
+
+        #[cfg(feature = "tlb")]
+        if let Some(phys_addr) = self.get_tlb_entry(addr) {
+            let offset = addr & RV_PAGE_OFFSET_MASK as BusType;
+            return Ok(phys_addr | offset);
         }
 
         let pte = self.get_pte(addr, access_type);
@@ -141,14 +193,14 @@ pub trait Mmu {
                 pte.pte |= PteBit!(PteBitVal::Dirty);
             }
 
-            // TODO: make atomic
-            if bus::get_bus()
-                .store_nommu(pte.pte_addr, pte.pte, self.get_pte_size() * 8)
-                .is_err()
-            {
-                return Self::create_exeption(addr, access_type);
-            }
+            let pte_atomic: &std::sync::atomic::AtomicU32 =
+                unsafe { std::mem::transmute(pte.pte_addr as u64) };
+
+            pte_atomic.store(pte.pte, std::sync::atomic::Ordering::Release);
         }
+
+        #[cfg(feature = "tlb")]
+        self.put_tlb_entry(addr, pte.phys_base);
 
         Ok(pte.phys_base | (addr & RV_PAGE_OFFSET_MASK as BusType))
     }
@@ -161,49 +213,6 @@ pub trait Mmu {
         }
     }
 }
-
-struct TLB {
-    addresses: Vec<BusType>,
-    pte_entires: Vec<Pte>,
-    max_entries: usize,
-    rng: SmallRng,
-}
-
-impl TLB {
-    pub fn new(max_entries: usize) -> Self {
-        TLB {
-            addresses: vec![0; max_entries],
-            pte_entires: vec![Pte::default(); max_entries],
-            max_entries,
-            rng: SmallRng::from_entropy(),
-        }
-    }
-
-    pub fn get(&mut self, addr: BusType) -> Option<Pte> {
-        for i in 0..self.max_entries {
-            if self.addresses[i] == addr {
-                return Some(self.pte_entires[i]);
-            }
-        }
-
-        None
-    }
-
-    pub fn insert(&mut self, addr: BusType, pte: Pte) {
-        let i = self.rng.gen_range(0..self.max_entries);
-
-        self.addresses[i] = addr;
-        self.pte_entires[i] = pte;
-    }
-
-    pub fn clear(&mut self) {
-        for i in 0..self.max_entries {
-            self.addresses[i] = 0;
-        }
-    }
-}
-
-const TLB_MAX_ENTRIES: usize = 1;
 
 pub struct Sv32Mmu {
     ppn: BusType,
@@ -218,20 +227,11 @@ impl Mmu for Sv32Mmu {
         Sv32Mmu {
             ppn: 0,
             enabled: false,
-            tlb: TLB::new(TLB_MAX_ENTRIES),
+            tlb: TLB::new(),
         }
     }
 
     fn get_pte(&mut self, addr: BusType, access_type: AccessType) -> Result<Pte, Exception> {
-        #[cfg(feature = "tlb")]
-        {
-            if let Some(pte) = self.tlb.get(addr) {
-                return Ok(pte);
-            }
-        }
-
-        let bus_instance = bus::get_bus();
-
         let levels = self.get_levels();
         let pte_size = self.get_pte_size();
         let vpn = self.get_vpn(addr, levels);
@@ -240,16 +240,19 @@ impl Mmu for Sv32Mmu {
         let mut i: i32 = (levels - 1) as i32;
 
         let mut pte = Pte::default();
+        let bus = bus::get_bus();
 
         while i >= 0 {
             pte.pte_addr = a + vpn[i as usize] * pte_size;
-            let _pte = bus_instance.load_nommu(pte.pte_addr, pte_size * 8);
 
-            if _pte.is_err() {
+            if !bus.is_dram_addr(pte.pte_addr) {
                 return Err(Self::create_exeption(addr, access_type).err().unwrap());
             }
 
-            pte.pte = _pte.unwrap();
+            let pte_atomic: &std::sync::atomic::AtomicU32 =
+                unsafe { std::mem::transmute(pte.pte_addr as u64) };
+
+            pte.pte = pte_atomic.load(std::sync::atomic::Ordering::Acquire);
 
             let valid = PteBitTest!(pte.pte, PteBitVal::Valid);
 
@@ -299,11 +302,6 @@ impl Mmu for Sv32Mmu {
             }
         }
 
-        #[cfg(feature = "tlb")]
-        {
-            self.tlb.insert(addr, pte);
-        }
-
         Ok(pte)
     }
 
@@ -343,5 +341,13 @@ impl Mmu for Sv32Mmu {
 
     fn is_active(&self) -> bool {
         self.enabled
+    }
+
+    fn get_tlb_entry(&mut self, addr: BusType) -> Option<BusType> {
+        self.tlb.get(addr)
+    }
+
+    fn put_tlb_entry(&mut self, addr: BusType, phys_addr: BusType) {
+        self.tlb.insert(addr, phys_addr)
     }
 }

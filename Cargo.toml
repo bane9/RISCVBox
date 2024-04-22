@@ -22,8 +22,8 @@ name = "test_riscv_isa"
 path = "src/test_riscv_isa.rs"
 
 [features]
-# default = ["tlb"]
-# tlb = []
+default = ["tlb"]
+tlb = []
 
 [profile.release.package.minifb]
 opt-level = 0 # For some reason (at least on Windows) minifb only shows a white screen when compiled with optimizations
