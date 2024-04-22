@@ -9,6 +9,8 @@ mod util;
 mod window;
 mod xmem;
 
+use clap::Parser;
+
 use backend::csr::init_backend_csr;
 use bus::{ram::RAM_BEGIN_ADDR, ramfb::RAMFB_BEGIN_ADDR};
 use cpu::CPU_INTC_PHANDLE;
@@ -141,38 +143,78 @@ fn init_bus(
     bus.add_device(Box::new(dtb));
 }
 
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+struct Args {
+    #[arg(short, long, help = "Path to BIOS (firmware) image")]
+    bios: String,
+
+    #[arg(short, long, default_value = "", help = "Path to Linux kernel image")]
+    kernel: String,
+
+    #[arg(short, long, default_value_t = 64, help = "Memory size in MiB")]
+    memory: usize,
+
+    #[arg(
+        long,
+        default_value_t = false,
+        help = "Disable the graphical output (only output to console)"
+    )]
+    nograpgic: bool,
+
+    #[arg(
+        short,
+        long,
+        default_value_t = 800,
+        help = "Width of the graphical output in pixels"
+    )]
+    width: usize,
+
+    #[arg(
+        short,
+        long,
+        default_value_t = 600,
+        help = "Height of the graphical output in pixels"
+    )]
+    height: usize,
+}
+
 fn main() {
-    let ram_size = util::size_mib(128);
+    let args = Args::parse();
 
-    // let argv = std::env::args().collect::<Vec<String>>();
+    let rom = util::read_file(&args.bios);
 
-    // if argv.len() < 2 {
-    //     println!("Usage: {} <bin> [timeout]", argv[0]);
-    //     std::process::exit(1);
-    // }
+    if rom.is_err() {
+        println!("Failed to read bios file: {}", args.bios);
+        std::process::exit(1);
+    }
 
-    // let rom = util::read_file(&argv[1]).unwrap();
+    let mut rom = rom.unwrap();
 
-    // let dtb = if argv.len() == 3 {
-    //     Some(util::read_file(&argv[2]).unwrap())
-    // } else {
-    //     None
-    // };
+    if !args.kernel.is_empty() {
+        let kernel = util::read_file(&args.kernel);
 
-    let mut rom = util::read_file("buildroot/images1/fw_jump.bin").unwrap();
+        if kernel.is_err() {
+            println!("Failed to read kernel file: {}", args.kernel);
+            std::process::exit(1);
+        }
 
-    rom.resize(util::size_mib(4), 0);
-    let mut kernel = util::read_file("buildroot/ImageRFS2").unwrap();
-    rom.append(&mut kernel);
+        let mut kernel = kernel.unwrap();
+
+        rom.resize(util::size_mib(4), 0);
+        rom.append(&mut kernel);
+    }
+
+    let ram_size = util::size_mib(args.memory);
+    let using_fb = !args.nograpgic;
 
     init_backend_csr();
 
     window::ConsoleSettings::set_interactive_console();
 
-    let width = 800;
-    let height = 600;
+    let width = args.width;
+    let height = args.height;
     let bpp = 32;
-    let using_fb = true;
 
     init_bus(rom, ram_size, width, height, bpp, using_fb);
 

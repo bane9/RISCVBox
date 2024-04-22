@@ -1,8 +1,9 @@
 [package]
-name = "rv32jit"
-version = "0.1.0"
+name = "RISCVBox"
+version = "0.9.0"
 edition = "2021"
-default-run = "rv32jit"
+author="bane9"
+default-run = "RISCVBox"
 rust-version = "1.78"
 build = "build.rs"
 
@@ -18,7 +19,7 @@ libc = "0.2.153"
 termios = "0.3.3"
 
 [[bin]]
-name = "rv32jit"
+name = "RISCVBox"
 path = "src/main.rs"
 
 [[bin]]
@@ -39,3 +40,4 @@ lazy_static = "1.4.0"
 hashbrown = "0.14.3"
 vm-fdt = "0.3.0"
 rand = {version = "0.8.5", features = ["small_rng"]}
+clap = {version = "4.5.4", features = ["derive"]}
