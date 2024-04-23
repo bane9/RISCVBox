@@ -5,7 +5,7 @@ on:
     branches:
       - main
     tags:
-      - 'v*' # Trigger only for tags that start with 'v'
+      - 'v*'
   pull_request:
     branches:
       - main
@@ -33,37 +33,73 @@ jobs:
       run: cargo build --release
 
     - name: Test
-      run: cargo test RISCVBox
+      run: cargo test --release RISCVBox
 
     - name: Zip executables (Windows)
-      if: runner.os == 'windows'
+      if: startsWith(github.ref, 'refs/tags/') && runner.os == 'windows'
       run: |
-        Compress-Archive target\release\* executables.zip;
+        Compress-Archive target\release\RISCVBox.exe RISCVBox.zip;
 
     - name: Zip executables (Linux)
-      if: runner.os == 'Linux'
+      if: startsWith(github.ref, 'refs/tags/') && runner.os == 'Linux'
       run: |
-        zip -r executables.zip target/release/*;
+        zip -r RISCVBox.zip target/release/RISCVBox;
 
-    - name: Create release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.DEPLOY_SECRET }}
+    - name: Upload build artifacts
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: actions/upload-artifact@v2
       with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
-        body: |
-          Release ${{ github.ref }}
-        draft: false
-        prerelease: false
+        name: RISCVBox-${{ matrix.os }}.zip
+        path: RISCVBox.zip
 
-    - name: Upload executables
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.DEPLOY_SECRET }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./executables.zip
-        asset_name: executables-${{ github.ref }}.zip
-        asset_content_type: application/zip
+
+  create_release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Download build artifacts (Ubuntu)
+        uses: actions/download-artifact@v2
+        with:
+          name: RISCVBox-ubuntu-latest.zip
+          path: build-ubuntu
+
+      - name: Download build artifacts (Windows)
+        uses: actions/download-artifact@v2
+        with:
+          name: RISCVBox-windows-latest.zip
+          path: build-windows
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.DEPLOY_SECRET }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset (Ubuntu)
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.DEPLOY_SECRET }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} 
+          asset_path: build-ubuntu/RISCVBox.zip
+          asset_name: RISCVBox-Ubuntu.zip
+          asset_content_type: application/octet-stream
+
+      - name: Upload Release Asset (Windows)
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.DEPLOY_SECRET }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} 
+          asset_path: build-windows/RISCVBox.zip
+          asset_name: RISCVBox-Windows.zip
+          asset_content_type: application/octet-stream
