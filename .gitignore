@@ -28,3 +28,4 @@ buildroot/
 linux/output/
 linux/buildroot/
 
+.vscode/

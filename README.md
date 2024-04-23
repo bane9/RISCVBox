@@ -16,7 +16,7 @@ https://github.com/bane9/RISCVBox/assets/29211832/b21eadb5-bdf1-4c87-a118-d95cf3
 ## Features
 - RV32IMASU RISC-V frontend
 - x86_64 JIT backend
-- SV32 MMU
+- SV32 MMU with TLB
 - Peripherals:
     - PLIC
     - CLINT
