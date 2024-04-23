@@ -273,6 +273,8 @@ pub fn exec_core_thread(cpu_core_idx: usize, initial_pc: CpuReg) {
                         .store(1, std::sync::atomic::Ordering::Release);
                 }
             }
+
+            trap::has_pending_interrupt(cpu);
         }
     });
 

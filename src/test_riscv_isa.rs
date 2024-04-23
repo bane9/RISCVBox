@@ -10,6 +10,7 @@ mod util;
 mod window;
 mod xmem;
 
+use std::io::Write;
 use std::thread;
 use std::time::Duration;
 
@@ -110,9 +111,6 @@ fn main() {
         timeout_thread();
     }
 
-    // let arg = "testbins/rv32mi/bin/illegal.bin";
-    // let rom = util::read_file(arg).unwrap();
-
     init_backend_csr();
 
     init_bus(rom.clone(), ram_size);
@@ -141,7 +139,7 @@ fn run_bin_as_subproccess(bin: &PathBuf) -> Output {
     ]);
 
     if path.is_none() {
-        panic!("Please compile test_riscv_isa as debug or release first")
+        panic!("Please compile test_riscv_isa as release first")
     }
 
     let path = path.unwrap();
@@ -173,21 +171,30 @@ fn list_files_from_directory(dir: &str) -> Vec<PathBuf> {
     files
 }
 
-fn run_tests_from_directory(dir: &str) {
+fn run_tests_from_directory(dir: &str, skip_list: &[&str]) {
     let files = list_files_from_directory(dir);
 
     let total = files.len();
     let mut failed: usize = 0;
 
-    for file in files {
-        println!("\nrunning test: {:}", file.as_path().to_str().unwrap());
+    'test: for file in files {
+        let file_str = file.as_path().to_str().unwrap();
+
+        for skip in skip_list {
+            if file_str.contains(skip) {
+                println!("\nskipping test: {:}", file_str);
+                continue 'test;
+            }
+        }
+
+        println!("\nrunning test: {:}", file_str);
 
         let output = run_bin_as_subproccess(&file);
 
         if !output.status.success() {
             println!(
                 "\x1b[31mtest failed:\x1b[0m {} with status {} and stdout: \n\"\n{}\"",
-                file.file_name().unwrap().to_str().unwrap(),
+                file_str,
                 output.status,
                 String::from_utf8(output.stdout).unwrap()
             );
@@ -206,27 +213,30 @@ fn run_tests_from_directory(dir: &str) {
     std::process::exit(if failed > 0 { 1 } else { 0 });
 }
 
+const NOSKIP: &[&str] = &[""];
+
 #[test]
 fn test_rvi() {
-    run_tests_from_directory("testbins/rv32ui/bin/");
+    run_tests_from_directory("testbins/rv32ui/bin/", NOSKIP);
 }
 
 #[test]
 fn test_rvm() {
-    run_tests_from_directory("testbins/rv32um/bin/");
+    run_tests_from_directory("testbins/rv32um/bin/", NOSKIP);
 }
 
 #[test]
 fn test_rva() {
-    run_tests_from_directory("testbins/rv32ua/bin/");
+    run_tests_from_directory("testbins/rv32ua/bin/", NOSKIP);
 }
 
 #[test]
 fn test_rvmi() {
-    run_tests_from_directory("testbins/rv32mi/bin/");
+    run_tests_from_directory("testbins/rv32mi/bin/", NOSKIP);
 }
 
 #[test]
 fn test_rvsi() {
-    run_tests_from_directory("testbins/rv32si/bin/");
+    // Dirty bit generally won't always be set because of the TLB
+    run_tests_from_directory("testbins/rv32si/bin/", &["dirty"]);
 }

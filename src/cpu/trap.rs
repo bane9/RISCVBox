@@ -43,8 +43,6 @@ pub fn has_pending_interrupt(cpu: &mut cpu::Cpu) -> Option<Interrupt> {
 
         cpu.pending_interrupt = None;
 
-        println!("Pending interrupt: {:?}", pending);
-
         return pending;
     }
 
