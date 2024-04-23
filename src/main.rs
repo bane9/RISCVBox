@@ -160,7 +160,7 @@ struct Args {
         default_value_t = false,
         help = "Disable the graphical output (only output to console)"
     )]
-    nograpgic: bool,
+    nographic: bool,
 
     #[arg(
         short,
@@ -206,7 +206,7 @@ fn main() {
     }
 
     let ram_size = util::size_mib(args.memory);
-    let using_fb = !args.nograpgic;
+    let using_fb = !args.nographic;
 
     init_backend_csr();
 

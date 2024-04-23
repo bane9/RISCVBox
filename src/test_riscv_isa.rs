@@ -17,6 +17,7 @@ use backend::csr::init_backend_csr;
 use bus::{ram::RAM_BEGIN_ADDR, BusType};
 use cpu::Exception;
 use frontend::exec_core::ExecCoreThreadPool;
+use std::path::PathBuf;
 use std::process::Output;
 
 const TOHOSTADDR: BusType = 0x01000000;
@@ -133,7 +134,7 @@ fn get_least_one_file(files: &[&str]) -> Option<String> {
     None
 }
 
-fn run_bin_as_subproccess(bin: &str) -> Output {
+fn run_bin_as_subproccess(bin: &PathBuf) -> Output {
     let path = get_least_one_file(&[
         "target/release/test_riscv_isa",
         "target/release/test_riscv_isa.exe",
@@ -143,7 +144,10 @@ fn run_bin_as_subproccess(bin: &str) -> Output {
         panic!("Please compile test_riscv_isa as debug or release first")
     }
 
-    let child = std::process::Command::new(path.unwrap())
+    let path = path.unwrap();
+    let path = PathBuf::from(path);
+
+    let child = std::process::Command::new(path)
         .arg(bin)
         .arg("timeout")
         .stdout(std::process::Stdio::piped())
@@ -154,7 +158,7 @@ fn run_bin_as_subproccess(bin: &str) -> Output {
     child
 }
 
-fn list_files_from_directory(dir: &str) -> Vec<String> {
+fn list_files_from_directory(dir: &str) -> Vec<PathBuf> {
     let mut files = Vec::new();
 
     for entry in std::fs::read_dir(dir).unwrap() {
@@ -162,7 +166,7 @@ fn list_files_from_directory(dir: &str) -> Vec<String> {
         let path = entry.path();
 
         if path.is_file() {
-            files.push(path.to_str().unwrap().to_owned());
+            files.push(PathBuf::from(path.to_str().unwrap()));
         }
     }
 
@@ -176,14 +180,14 @@ fn run_tests_from_directory(dir: &str) {
     let mut failed: usize = 0;
 
     for file in files {
-        println!("\nrunning test: {}", file);
+        println!("\nrunning test: {:}", file.as_path().to_str().unwrap());
 
         let output = run_bin_as_subproccess(&file);
 
         if !output.status.success() {
             println!(
                 "\x1b[31mtest failed:\x1b[0m {} with status {} and stdout: \n\"\n{}\"",
-                file,
+                file.file_name().unwrap().to_str().unwrap(),
                 output.status,
                 String::from_utf8(output.stdout).unwrap()
             );
