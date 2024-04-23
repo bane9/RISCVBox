@@ -1,5 +1,7 @@
 # RISCVBox: A high-performance RISC-V emulator, JIT-compiled in Rust
 
+[![Rust CI/CD](https://github.com/bane9/RISCVBox/actions/workflows/rust.yml/badge.svg)](https://github.com/bane9/RISCVBox/actions/workflows/rust.yml)
+
 Welcome to the RISCVBox repository! It hosts the source code for the RISC-V box emulator—a rv32ima systems emulator enabling Linux boot by translating the environment to x86_64 assembly.
 
 https://github.com/bane9/RISCVBox/assets/29211832/b21eadb5-bdf1-4c87-a118-d95cf3041788
