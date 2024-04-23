@@ -23,6 +23,8 @@ logs/
 
 temp
 
-buildroot/images/
-
 buildroot/
+
+linux/output/
+linux/buildroot/
+
