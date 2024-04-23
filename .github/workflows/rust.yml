@@ -1,9 +1,11 @@
-name: Rust CI
+name: Rust CI/CD
 
 on:
   push:
     branches:
       - main
+    tags:
+      - 'v*' # Trigger only for tags that start with 'v'
   pull_request:
     branches:
       - main
@@ -32,3 +34,36 @@ jobs:
 
     - name: Test
       run: cargo test RISCVBox
+
+    - name: Zip executables (Windows)
+      if: runner.os == 'windows'
+      run: |
+        Compress-Archive target\release\* executables.zip;
+
+    - name: Zip executables (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        zip -r executables.zip target/release/*;
+
+    - name: Create release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.DEPLOY_SECRET }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        body: |
+          Release ${{ github.ref }}
+        draft: false
+        prerelease: false
+
+    - name: Upload executables
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.DEPLOY_SECRET }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./executables.zip
+        asset_name: executables-${{ github.ref }}.zip
+        asset_content_type: application/zip
