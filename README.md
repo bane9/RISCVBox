@@ -85,7 +85,12 @@ cargo test RISCVBox
 
 If you wan't to utlize riscv-tests, you need to build them first:
 
-First, install the riscv gnu toolchain:
+First, init the riscv-test submodule
+```
+git submodule init riscv-tests
+```
+
+Then, install the riscv gnu toolchain:
 
 **Linux**
 
