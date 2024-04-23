@@ -3,7 +3,7 @@ name = "RISCVBox"
 version = "0.9.0"
 edition = "2021"
 default-run = "RISCVBox"
-rust-version = "1.78"
+rust-version = "1.77.2"
 build = "build.rs"
 
 [target.'cfg(windows)'.dependencies]
