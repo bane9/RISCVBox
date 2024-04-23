@@ -135,9 +135,7 @@ fn get_least_one_file(files: &[&str]) -> Option<String> {
 
 fn run_bin_as_subproccess(bin: &str) -> Output {
     let path = get_least_one_file(&[
-        "target/debug/test_riscv_isa",
         "target/release/test_riscv_isa",
-        "target/debug/test_riscv_isa.exe",
         "target/release/test_riscv_isa.exe",
     ]);
 

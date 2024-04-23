@@ -113,13 +113,13 @@ test_encoded_insn!(
 test_encoded_insn!(
     test_add_rax_32b,
     |enc: &mut HostEncodedInsn| emit_add_reg_imm!(enc, amd64_reg::RAX, 1000000000),
-    [0x48, 0x05, 0x00, 0xCA, 0x9A, 0x3B]
+    [0x05, 0x00, 0xCA, 0x9A, 0x3B]
 );
 
 test_encoded_insn!(
     test_add_rbx_32b,
     |enc: &mut HostEncodedInsn| emit_add_reg_imm!(enc, amd64_reg::RBX, 1000000000),
-    [0x48, 0x81, 0xC3, 0x00, 0xCA, 0x9A, 0x3B]
+    [0x81, 0xC3, 0x00, 0xCA, 0x9A, 0x3B]
 );
 
 test_encoded_insn!(
@@ -161,13 +161,13 @@ test_encoded_insn!(
 test_encoded_insn!(
     test_sub_rax_32b,
     |enc: &mut HostEncodedInsn| emit_sub_reg_imm!(enc, amd64_reg::RAX, 1000000000),
-    [0x48, 0x2D, 0x00, 0xCA, 0x9A, 0x3B]
+    [0x2D, 0x00, 0xCA, 0x9A, 0x3B]
 );
 
 test_encoded_insn!(
     test_sub_rbx_32b,
     |enc: &mut HostEncodedInsn| emit_sub_reg_imm!(enc, amd64_reg::RBX, 1000000000),
-    [0x48, 0x81, 0xEB, 0x00, 0xCA, 0x9A, 0x3B]
+    [0x81, 0xEB, 0x00, 0xCA, 0x9A, 0x3B]
 );
 
 test_encoded_insn!(
@@ -179,19 +179,19 @@ test_encoded_insn!(
 test_encoded_insn!(
     test_sub_rax_rax,
     |enc: &mut HostEncodedInsn| emit_sub_reg_reg!(enc, amd64_reg::RAX, amd64_reg::RAX),
-    [0x48, 0x29, 0xC0]
+    [0x29, 0xC0]
 );
 
 test_encoded_insn!(
     test_sub_rax_rcx,
     |enc: &mut HostEncodedInsn| emit_sub_reg_reg!(enc, amd64_reg::RAX, amd64_reg::RCX),
-    [0x48, 0x29, 0xC8]
+    [0x29, 0xC8]
 );
 
 test_encoded_insn!(
     test_sub_rcx_rax,
     |enc: &mut HostEncodedInsn| emit_sub_reg_reg!(enc, amd64_reg::RCX, amd64_reg::RAX),
-    [0x48, 0x29, 0xC1]
+    [0x29, 0xC1]
 );
 
 test_encoded_insn!(
@@ -364,7 +364,7 @@ test_encoded_insn!(
 test_encoded_insn!(
     test_div_rbx,
     |enc: &mut HostEncodedInsn| emit_mul_reg!(enc, amd64_reg::RBX),
-    [0x48, 0xF7, 0xF3]
+    [0x48, 0xF7, 0xE3]
 );
 
 test_encoded_insn!(
