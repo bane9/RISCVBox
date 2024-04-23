@@ -5,7 +5,7 @@ pub mod win32_console_settings {
     use winapi::um::fileapi::GetFileType;
     use winapi::um::handleapi::INVALID_HANDLE_VALUE;
     use winapi::um::processenv::GetStdHandle;
-    use winapi::um::wincon::{ENABLE_ECHO_INPUT, ENABLE_LINE_INPUT, /* , ENABLE_PROCESSED_INPUT*/};
+    use winapi::um::wincon::{ENABLE_ECHO_INPUT, ENABLE_LINE_INPUT, ENABLE_PROCESSED_INPUT};
 
     extern "C" {
         #[link_name = "SetConsoleMode"]
@@ -34,8 +34,10 @@ pub mod win32_console_settings {
                 return;
             }
 
-            let new_mode =
-                mode & !(ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT/*| ENABLE_PROCESSED_INPUT*/);
+            let new_mode = mode
+                & !(ENABLE_LINE_INPUT
+                    | ENABLE_ECHO_INPUT
+                    | if false { ENABLE_PROCESSED_INPUT } else { 0 });
 
             if SetConsoleMode(handle, new_mode) == 0 {
                 eprintln!("Failed to set console mode");

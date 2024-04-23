@@ -65,22 +65,8 @@ impl Clint {
         Clint {}
     }
 
-    pub fn get_remaining_time_ms() -> u64 {
-        let clint = get_clint(cpu::get_cpu().core_id as usize);
-
-        let mtime = util::ms_since_program_start() as BusType;
-
-        let diff = clint.mtimecmp as i64 - mtime as i64;
-
-        if diff < 0 {
-            0
-        } else {
-            diff as u64
-        }
-    }
-
     pub fn tick(clint_data: &mut ClintData, cpu: &mut cpu::Cpu) -> bool {
-        let mtime = util::ms_since_program_start() as BusType;
+        let mtime = util::timebase_since_program_start() as BusType;
 
         if (clint_data.msip & 1) != 0 {
             cpu.csr
@@ -89,7 +75,7 @@ impl Clint {
             return true;
         }
 
-        if mtime >= clint_data.mtimecmp {
+        if clint_data.mtimecmp != 0 && mtime >= clint_data.mtimecmp {
             cpu.csr
                 .write_bit(csr::register::MIP, csr::bits::MTIP_BIT, true);
 
@@ -128,7 +114,8 @@ impl BusDevice for Clint {
                 );
             },
             MTIME..=MTIME_END => unsafe {
-                let mtime = util::ms_since_program_start() as BusType;
+                let mtime = util::timebase_since_program_start() as BusType;
+                println!("mtime: {}\n\n\n", mtime);
                 let src = &mtime as *const BusType as *const u8;
                 std::ptr::copy_nonoverlapping(
                     src,
@@ -158,14 +145,15 @@ impl BusDevice for Clint {
             MTIMECMP..=MTIMECMP_END => unsafe {
                 clint.mtimecmp = 0;
                 let dst = &mut clint.mtimecmp as *mut BusType as *mut u8;
-
                 std::ptr::copy_nonoverlapping(
                     &data as *const u32 as *const u8,
                     dst,
                     size as usize / 8,
                 );
             },
-            MTIME..=MTIME_END => {}
+            MTIME..=MTIME_END => {
+                println!("mtime store\n\n\n")
+            }
             _ => return Err(Exception::StoreAccessFault(addr)),
         };
 

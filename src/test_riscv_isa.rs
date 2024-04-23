@@ -213,7 +213,7 @@ fn run_tests_from_directory(dir: &str, skip_list: &[&str]) {
     std::process::exit(if failed > 0 { 1 } else { 0 });
 }
 
-const NOSKIP: &[&str] = &[""];
+const NOSKIP: &[&str] = &[];
 
 #[test]
 fn test_rvi() {

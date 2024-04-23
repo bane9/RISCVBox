@@ -8,6 +8,7 @@ use std::collections::HashSet;
 pub type CpuReg = BusType;
 
 pub const CPU_INTC_PHANDLE: u32 = 0x2;
+pub const CPU_TIMEBASE_FREQ: u32 = 1000000;
 
 pub enum RegName {
     Zero = 0,

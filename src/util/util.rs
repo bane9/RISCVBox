@@ -3,6 +3,8 @@ use std::fs::File;
 use std::io::{self, Read};
 use std::time::SystemTime;
 
+use crate::cpu::CPU_TIMEBASE_FREQ;
+
 pub fn read_file(path: &str) -> io::Result<Vec<u8>> {
     let mut file = File::open(path)?;
     let mut buffer = Vec::new();
@@ -82,13 +84,20 @@ lazy_static! {
     static ref START_TIME: SystemTime = SystemTime::now();
 }
 
-pub fn ms_since_program_start() -> u64 {
+pub fn init() {
     let _ = *START_TIME;
+}
+
+pub fn timebase_since_program_start() -> u64 {
     let now = SystemTime::now();
     let duration_since_start = now
         .duration_since(*START_TIME)
         .expect("Time went backwards");
-    duration_since_start.as_millis() as u64
+
+    let millis_since_start = duration_since_start.as_millis() as u64;
+    let time_since_start = (millis_since_start * CPU_TIMEBASE_FREQ as u64) / 1_000;
+
+    time_since_start
 }
 
 pub fn fdt_node_addr_helper(name: &str, addr: u32) -> String {

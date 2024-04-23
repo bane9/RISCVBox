@@ -79,7 +79,7 @@ pub fn has_pending_interrupt(cpu: &mut cpu::Cpu) -> Option<Interrupt> {
         irq = Some(Interrupt::SupervisorExternal);
     } else if (pending & csr::bits::SSIP) != 0 {
         cpu.csr
-            .write_bit(csr::register::MIP, csr::bits::SSIP_BIT, false);
+            .write_bit(csr::register::MIP, csr::bits::SEIP_BIT, false);
 
         irq = Some(Interrupt::SupervisorSoftware);
     } else if (pending & csr::bits::STIP) != 0 {

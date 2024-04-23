@@ -53,11 +53,11 @@ macro_rules! PteBitTest {
     };
 }
 
-const TLB_MAX_ENTRIES: usize = 4;
+const TLB_MAX_ENTRIES: usize = 8;
 
 struct TLB {
     addresses: [BusType; TLB_MAX_ENTRIES],
-    phys_addresses: [BusType; TLB_MAX_ENTRIES],
+    ptes: [Pte; TLB_MAX_ENTRIES],
     rng: SmallRng,
 }
 
@@ -65,29 +65,39 @@ impl TLB {
     pub fn new() -> Self {
         TLB {
             addresses: [0; TLB_MAX_ENTRIES],
-            phys_addresses: [0; TLB_MAX_ENTRIES],
+            ptes: [Pte::default(); TLB_MAX_ENTRIES],
             rng: SmallRng::from_entropy(),
         }
     }
 
-    pub fn get(&mut self, addr: BusType) -> Option<BusType> {
-        let offset = addr & RV_PAGE_OFFSET_MASK as BusType;
+    pub fn get(&mut self, addr: BusType) -> Option<Pte> {
         let page = addr & !RV_PAGE_OFFSET_MASK as BusType;
 
         for (i, &page_entry) in self.addresses.iter().enumerate() {
             if page_entry == page {
-                return Some(self.phys_addresses[i] | offset);
+                return Some(self.ptes[i]);
             }
         }
 
         None
     }
 
-    pub fn insert(&mut self, addr: BusType, phys_addr: BusType) {
+    pub fn insert(&mut self, addr: BusType, pte: Pte) {
         let index = self.rng.gen_range(0..TLB_MAX_ENTRIES);
 
         self.addresses[index] = addr & !RV_PAGE_OFFSET_MASK as BusType;
-        self.phys_addresses[index] = phys_addr;
+        self.ptes[index] = pte;
+    }
+
+    pub fn update(&mut self, addr: BusType, pte: Pte) {
+        let page = addr & !RV_PAGE_OFFSET_MASK as BusType;
+
+        for (i, &page_entry) in self.addresses.iter().enumerate() {
+            if page_entry == page {
+                self.ptes[i] = pte;
+                return;
+            }
+        }
     }
 
     pub fn clear(&mut self) {
@@ -109,9 +119,9 @@ pub trait Mmu {
     fn get_vpn(&self, addr: BusType, level: BusType) -> Self::PnArr;
     fn get_ppn(&self, pte: BusType, level: BusType) -> Self::PnArr;
 
-    fn get_tlb_entry(&mut self, addr: BusType) -> Option<BusType>;
-
-    fn put_tlb_entry(&mut self, addr: BusType, phys_addr: BusType);
+    fn get_tlb_entry(&mut self, addr: BusType) -> Option<Pte>;
+    fn put_tlb_entry(&mut self, addr: BusType, pte: Pte);
+    fn update_entry(&mut self, addr: BusType, pte: Pte);
 
     fn translate(&mut self, addr: BusType, access_type: AccessType) -> Result<BusType, Exception> {
         if !self.is_active() {
@@ -131,18 +141,28 @@ pub trait Mmu {
         }
 
         #[cfg(feature = "tlb")]
-        if let Some(phys_addr) = self.get_tlb_entry(addr) {
-            let offset = addr & RV_PAGE_OFFSET_MASK as BusType;
-            return Ok(phys_addr | offset);
-        }
+        let mut pte = if let Some(pte_entry) = self.get_tlb_entry(addr) {
+            pte_entry
+        } else {
+            let pte = self.get_pte(addr, access_type);
 
-        let pte = self.get_pte(addr, access_type);
+            if pte.is_err() {
+                return Self::create_exeption(addr, access_type);
+            }
 
-        if pte.is_err() {
-            return Self::create_exeption(addr, access_type);
-        }
+            pte.unwrap()
+        };
 
-        let mut pte = pte.unwrap();
+        #[cfg(not(feature = "tlb"))]
+        let mut pte = {
+            let pte = self.get_pte(addr, access_type);
+
+            if pte.is_err() {
+                return Self::create_exeption(addr, access_type);
+            }
+
+            pte.unwrap()
+        };
 
         let mxr = cpu_instance.csr.read_bit_mstatus(csr::bits::MXR);
         let sum = cpu_instance.csr.read_bit_mstatus(csr::bits::SUM);
@@ -197,10 +217,13 @@ pub trait Mmu {
                 unsafe { std::mem::transmute(pte.pte_addr as u64) };
 
             pte_atomic.store(pte.pte, std::sync::atomic::Ordering::Release);
+
+            #[cfg(feature = "tlb")]
+            self.update_entry(addr, pte);
         }
 
         #[cfg(feature = "tlb")]
-        self.put_tlb_entry(addr, pte.phys_base);
+        self.put_tlb_entry(addr, pte);
 
         Ok(pte.phys_base | (addr & RV_PAGE_OFFSET_MASK as BusType))
     }
@@ -343,11 +366,15 @@ impl Mmu for Sv32Mmu {
         self.enabled
     }
 
-    fn get_tlb_entry(&mut self, addr: BusType) -> Option<BusType> {
+    fn get_tlb_entry(&mut self, addr: BusType) -> Option<Pte> {
         self.tlb.get(addr)
     }
 
-    fn put_tlb_entry(&mut self, addr: BusType, phys_addr: BusType) {
-        self.tlb.insert(addr, phys_addr)
+    fn put_tlb_entry(&mut self, addr: BusType, pte: Pte) {
+        self.tlb.insert(addr, pte)
+    }
+
+    fn update_entry(&mut self, addr: BusType, pte: Pte) {
+        self.tlb.update(addr, pte)
     }
 }

@@ -201,8 +201,9 @@ impl ExecCore {
 
                 if pc % INSN_SIZE as CpuReg != 0 {
                     cpu.exception = cpu::Exception::InstructionAddressMisaligned(pc);
-                    println!("Forward jump forwarding as {:?}", cpu.exception);
+
                     trap::handle_exception(cpu);
+                    cpu.exception = cpu::Exception::None;
                 } else {
                     cpu.next_pc = pc;
                 }
@@ -229,23 +230,15 @@ impl ExecCore {
                 // for interrupts
                 cpu.next_pc = cpu.c_exception_pc as CpuReg;
             }
-            cpu::Exception::Mret | cpu::Exception::Sret => {}
+            cpu::Exception::Mret | cpu::Exception::Sret => {
+                cpu.exception = cpu::Exception::None;
+            }
             cpu::Exception::None => {
                 unreachable!("Exiting jit block without setting an exception is invalid");
             }
             _ => {
                 trap::handle_exception(cpu);
-                if matches!(
-                    cpu.exception,
-                    cpu::Exception::EnvironmentCallFromSMode(_)
-                        | cpu::Exception::IllegalInstruction(_)
-                ) {
-                } else {
-                    // println!(
-                    //     "ret_status: {:#x?} with pc 0x{:x} cpu.next_pc {:x} gp {}",
-                    //     cpu.exception, cpu.c_exception_pc, cpu.next_pc, cpu.regs[3]
-                    // );
-                }
+                cpu.exception = cpu::Exception::None;
             }
         }
     }

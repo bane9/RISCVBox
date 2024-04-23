@@ -233,12 +233,12 @@ impl BusDevice for Ns16550 {
     }
 
     fn tick_async(&mut self, _cpu: &mut cpu::Cpu) -> Option<u32> {
-        if dispatch_irq(self) {
+        if charbuf_has_data() {
+            self.lsr |= LSR_DR;
             return Some(UART_IRQN as u32);
         }
 
-        if charbuf_has_data() {
-            self.lsr |= LSR_DR;
+        if dispatch_irq(self) {
             return Some(UART_IRQN as u32);
         }
 

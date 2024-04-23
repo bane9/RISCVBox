@@ -13,7 +13,7 @@ use clap::Parser;
 
 use backend::csr::init_backend_csr;
 use bus::{ram::RAM_BEGIN_ADDR, ramfb::RAMFB_BEGIN_ADDR};
-use cpu::CPU_INTC_PHANDLE;
+use cpu::{CPU_INTC_PHANDLE, CPU_TIMEBASE_FREQ};
 use frontend::exec_core::ExecCoreThreadPool;
 
 use crate::bus::BusDevice;
@@ -32,13 +32,14 @@ fn create_dtb(ram_origin: u32, ram_size: u32) -> Vec<u8> {
     let chosen_node = fdt.begin_node("chosen").unwrap();
     fdt.property_string(
         "bootargs",
-        "earlycon=sbi random.trust_bootloader=on fbcon=nodefer fbcon=map:0 console=ttyS0",
+        "earlycon=sbi fbcon=nodefer fbcon=map:0 console=ttyS0",
     )
     .unwrap();
-    fdt.property_u32("rng-seed", 0x4).unwrap();
     fdt.end_node(chosen_node).unwrap();
 
-    let fdt_memory_node = fdt.begin_node("memory@80000000").unwrap();
+    let fdt_memory_node = fdt
+        .begin_node(&util::fdt_node_addr_helper("memory", ram_origin))
+        .unwrap();
     fdt.property_string("device_type", "memory").unwrap();
     fdt.property_array_u32("reg", &[0x00, ram_origin as u32, 0x00, ram_size as u32])
         .unwrap();
@@ -47,7 +48,8 @@ fn create_dtb(ram_origin: u32, ram_size: u32) -> Vec<u8> {
     let cpus_node = fdt.begin_node("cpus").unwrap();
     fdt.property_u32("#address-cells", 0x1).unwrap();
     fdt.property_u32("#size-cells", 0x0).unwrap();
-    fdt.property_u32("timebase-frequency", 0x989680).unwrap();
+    fdt.property_u32("timebase-frequency", CPU_TIMEBASE_FREQ)
+        .unwrap();
 
     let cpu_node = fdt.begin_node("cpu@0").unwrap();
     fdt.property_u32("phandle", 0x1).unwrap();
@@ -125,16 +127,16 @@ fn init_bus(
 
     bus.add_device(Box::new(plic));
 
-    let clint = bus::clint::Clint::new();
-
-    bus.add_device(Box::new(clint));
-
     let mut ramfb = bus::ramfb::RamFB::new(width, height, bpp, using_fb);
     let fb_ptr = ramfb.get_fb_ptr();
 
     bus.set_fb_ptr(fb_ptr, ramfb.get_end_addr() as usize);
 
     bus.add_device(Box::new(ramfb));
+
+    let clint = bus::clint::Clint::new();
+
+    bus.add_device(Box::new(clint));
 
     let dtb = create_dtb(RAM_BEGIN_ADDR, ram_size as u32);
 
@@ -208,6 +210,7 @@ fn main() {
     let ram_size = util::size_mib(args.memory);
     let using_fb = !args.nographic;
 
+    util::init();
     init_backend_csr();
 
     window::ConsoleSettings::set_interactive_console();
