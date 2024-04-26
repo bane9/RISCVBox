@@ -13,8 +13,6 @@ if [ ! -d "buildroot" ]; then
     mv buildroot-$BUILDROOT_VER buildroot
 fi
 
-mkdir -p overlay/
-
 cd buildroot
 
 make defconfig BR2_DEFCONFIG=../$BUILDROOT_CONFIG

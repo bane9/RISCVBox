@@ -26,23 +26,13 @@ impl ExecCore {
     fn get_jit_ptr(&mut self) -> *mut u8 {
         let cpu = cpu::get_cpu();
 
-        if cpu.exception != cpu::Exception::None {
-            let int = if cpu.pending_interrupt.is_some() {
-                cpu.pending_interrupt
-            } else {
-                trap::has_pending_interrupt(cpu)
-            };
+        if let Some(int) = trap::has_pending_interrupt(cpu) {
+            trap::handle_interrupt(int, cpu);
 
-            if int.is_some() {
-                let int = int.unwrap();
-
-                trap::handle_interrupt(int, cpu);
-
-                if cpu.pending_interrupt_number as u64 != 0 {
-                    bus::get_bus()
-                        .get_plic()
-                        .update_pending(cpu.pending_interrupt_number as u64);
-                }
+            if cpu.pending_interrupt_number as u64 != 0 {
+                bus::get_bus()
+                    .get_plic()
+                    .update_pending(cpu.pending_interrupt_number as u64);
             }
         }
 
@@ -218,8 +208,7 @@ impl ExecCore {
                 unimplemented!()
             }
             cpu::Exception::Wfi => {
-                // lol
-                std::thread::sleep(std::time::Duration::from_millis(20));
+                std::thread::sleep(std::time::Duration::from_millis(1));
 
                 cpu.next_pc = cpu.c_exception_pc as CpuReg + INSN_SIZE as CpuReg;
             }
@@ -230,15 +219,12 @@ impl ExecCore {
                 // for interrupts
                 cpu.next_pc = cpu.c_exception_pc as CpuReg;
             }
-            cpu::Exception::Mret | cpu::Exception::Sret => {
-                cpu.exception = cpu::Exception::None;
-            }
+            cpu::Exception::Mret | cpu::Exception::Sret => {}
             cpu::Exception::None => {
                 unreachable!("Exiting jit block without setting an exception is invalid");
             }
             _ => {
                 trap::handle_exception(cpu);
-                cpu.exception = cpu::Exception::None;
             }
         }
     }
@@ -258,16 +244,7 @@ pub fn exec_core_thread(cpu_core_idx: usize, initial_pc: CpuReg) {
         loop {
             std::thread::sleep(std::time::Duration::from_millis(25));
 
-            if let Some(irqn) = bus.tick_async(cpu) {
-                if irqn != 0 {
-                    cpu.pending_interrupt_number = irqn;
-                    cpu.pending_interrupt = Some(cpu::Interrupt::SupervisorExternal);
-                    cpu.has_pending_interrupt
-                        .store(1, std::sync::atomic::Ordering::Release);
-                }
-            }
-
-            trap::has_pending_interrupt(cpu);
+            bus.tick_async(cpu);
         }
     });
 

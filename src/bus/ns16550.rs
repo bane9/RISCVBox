@@ -5,7 +5,7 @@ use lazy_static::lazy_static;
 
 use crate::{
     bus::bus::*,
-    cpu::{self, Exception},
+    cpu::{self, Exception, CPU_TIMEBASE_FREQ},
     util,
 };
 
@@ -14,7 +14,7 @@ use super::plic::PLIC_PHANDLE;
 const UART_ADDR: BusType = 0x10000000;
 const UART_SIZE: BusType = 10;
 const UART_END_ADDR: BusType = UART_ADDR + UART_SIZE;
-const UART_IRQN: BusType = 10;
+pub const UART_IRQN: BusType = 10;
 
 const RHR: BusType = 0;
 const THR: BusType = 0;
@@ -232,13 +232,22 @@ impl BusDevice for Ns16550 {
         println!("tick_from_main_thread");
     }
 
-    fn tick_async(&mut self, _cpu: &mut cpu::Cpu) -> Option<u32> {
+    fn tick_async(&mut self, cpu: &mut cpu::Cpu) -> Option<u32> {
         if charbuf_has_data() {
             self.lsr |= LSR_DR;
+            cpu.pending_interrupt_number = UART_IRQN;
+            cpu.pending_interrupt = Some(cpu::Interrupt::SupervisorExternal);
+            cpu.has_pending_interrupt
+                .store(1, std::sync::atomic::Ordering::Release);
+
             return Some(UART_IRQN as u32);
         }
 
         if dispatch_irq(self) {
+            cpu.pending_interrupt_number = UART_IRQN;
+            cpu.pending_interrupt = Some(cpu::Interrupt::SupervisorExternal);
+            cpu.has_pending_interrupt
+                .store(1, std::sync::atomic::Ordering::Release);
             return Some(UART_IRQN as u32);
         }
 
@@ -249,9 +258,10 @@ impl BusDevice for Ns16550 {
         let serial_node = fdt
             .begin_node(&util::fdt_node_addr_helper("serial", UART_ADDR))
             .unwrap();
-        fdt.property_u32("interrupts", 0x0a).unwrap();
+        fdt.property_u32("interrupts", UART_IRQN).unwrap();
         fdt.property_u32("interrupt-parent", PLIC_PHANDLE).unwrap();
-        fdt.property_string("clock-frequency", "115200").unwrap();
+        fdt.property_u32("clock-frequency", CPU_TIMEBASE_FREQ)
+            .unwrap();
         fdt.property_array_u32("reg", &[0x00, UART_ADDR, 0x00, UART_SIZE])
             .unwrap();
         fdt.property_string("compatible", "ns16550a").unwrap();
