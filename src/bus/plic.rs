@@ -182,20 +182,17 @@ impl BusDevice for Plic {
             .begin_node(&util::fdt_node_addr_helper("plic", PLIC_BASE))
             .unwrap();
         fdt.property_u32("phandle", PLIC_PHANDLE).unwrap();
-        fdt.property_u32("riscv,ndev", 0x60).unwrap();
+        fdt.property_u32("riscv,ndev", 0x35).unwrap();
         fdt.property_array_u32("reg", &[0x00, PLIC_BASE, 0x00, PLIC_SIZE])
             .unwrap();
         fdt.property_array_u32(
             "interrupts-extended",
-            &[CPU_INTC_PHANDLE, 0x0b, CPU_INTC_PHANDLE, 0x09],
-        )
-        .unwrap();
-        fdt.property_string_list(
-            "compatible",
-            vec!["sifive,plic-1.0.0".into(), "riscv,plic0".into()],
+            &[CPU_INTC_PHANDLE, 0xb, CPU_INTC_PHANDLE, 0x9],
         )
         .unwrap();
         fdt.property_null("interrupt-controller").unwrap();
+        fdt.property_string("compatible", "riscv,plic0".into())
+            .unwrap();
         fdt.property_u32("#interrupt-cells", 0x01).unwrap();
         fdt.property_u32("#address-cells", 0x00).unwrap();
         fdt.end_node(plic_node).unwrap();

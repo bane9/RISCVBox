@@ -10,12 +10,21 @@ build = "build.rs"
 winapi = { version = "0.3.9", features = ["winuser", "memoryapi", "wincon", "processenv", "handleapi", "winbase", "dwmapi"] }
 microseh = "1.0.3"
 
-[build-dependencies]
+[target.'cfg(windows)'.build-dependencies]
 embed-resource = "2.4.2"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.153"
 termios = "0.3.3"
+
+[dependencies]
+minifb = { git = "https://github.com/emoon/rust_minifb.git", rev = "633e6cd4f8f55fd9cbedc461976dde0f408bea35" }
+crossbeam = "0.8.4"
+lazy_static = "1.4.0"
+hashbrown = "0.14.3"
+vm-fdt = "0.3.0"
+rand = {version = "0.8.5", features = ["small_rng"]}
+clap = {version = "4.5.4", features = ["derive"]}
 
 [[bin]]
 name = "RISCVBox"
@@ -25,18 +34,9 @@ path = "src/main.rs"
 name = "test_riscv_isa"
 path = "src/test_riscv_isa.rs"
 
+[profile.release]
+lto = true
+
 [features]
 # default = ["tlb"]
 # tlb = []
-
-[profile.release.package.minifb]
-opt-level = 0 # For some reason (at least on Windows) minifb only shows a white screen when compiled with optimizations
-
-[dependencies]
-minifb = "0.25.0"
-crossbeam = "0.8.4"
-lazy_static = "1.4.0"
-hashbrown = "0.14.3"
-vm-fdt = "0.3.0"
-rand = {version = "0.8.5", features = ["small_rng"]}
-clap = {version = "4.5.4", features = ["derive"]}

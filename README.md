@@ -4,7 +4,7 @@
 
 Welcome to the RISCVBox repository! It hosts the source code for the RISC-V box emulator—a rv32ima systems emulator enabling Linux boot by translating the environment to x86_64 assembly.
 
-https://github.com/bane9/RISCVBox/assets/29211832/b21eadb5-bdf1-4c87-a118-d95cf3041788
+https://github.com/bane9/RISCVBox/assets/29211832/e49739dc-0118-4edd-86a2-2df8a5d6a672
 
 ## Table of contents
 - [Features](#features)
@@ -57,6 +57,7 @@ Options:
       --nographic        Disable the graphical output (only output to console)
   -w, --width <WIDTH>    Width of the graphical output in pixels [default: 800]
   -h, --height <HEIGHT>  Height of the graphical output in pixels [default: 600]
+  -s, --scale <SCALE>    Scale factor for the graphical output (1, 2, 4, 8, 16, 32) [default: 1]
   -h, --help             Print help
   -V, --version          Print version
 ```
@@ -66,9 +67,7 @@ This reposotory provides Buildroot configuration files to enable building of the
 
 To utilize them, do the following (Linux only):
 ```bash
-sudo apt install autoconf automake autotools-dev curl libmpc-dev libmpfr-dev libgmp-dev \
-                 gawk build-essential bison flex texinfo gperf libtool patchutils bc \
-                 zlib1g-dev libexpat-dev git
+sudo apt install -y git build-essential wget cpio unzip rsync bc libncurses5-dev screen bison file flex
 
 cd linux
 ./build.sh

@@ -7,7 +7,10 @@ use crate::{
 };
 use cpu::{Exception, Interrupt};
 
-use super::{csr::MppMode, CpuReg};
+use super::{
+    csr::{CsrType, MppMode},
+    CpuReg,
+};
 
 pub fn are_interrupts_enabled(cpu: &mut cpu::Cpu) -> bool {
     match cpu.mode {
@@ -18,7 +21,7 @@ pub fn are_interrupts_enabled(cpu: &mut cpu::Cpu) -> bool {
         }
         csr::MppMode::Supervisor => {
             if !cpu.csr.read_bit_sstatus(csr::bits::SIE) {
-                return false;
+                return true; // For some reason, SIE is always false
             }
         }
         csr::MppMode::User => {}
@@ -32,22 +35,30 @@ pub fn has_pending_interrupt(cpu: &mut cpu::Cpu) -> Option<Interrupt> {
         return None;
     }
 
-    if cpu
-        .has_pending_interrupt
-        .load(std::sync::atomic::Ordering::Acquire)
-        == 1
-    {
-        let pending = cpu.pending_interrupt;
-        cpu.has_pending_interrupt
-            .store(0, std::sync::atomic::Ordering::Release);
-
-        cpu.pending_interrupt = None;
-
-        return pending;
-    }
-
     let mie = cpu.csr.read(csr::register::MIE);
-    let mip = cpu.csr.read(csr::register::MIP);
+    let mut mip = cpu.csr.read(csr::register::MIP);
+
+    match cpu.pending_interrupt {
+        Some(Interrupt::MachineExternal) => {
+            mip |= csr::bits::MEIP as CsrType;
+        }
+        Some(Interrupt::MachineSoftware) => {
+            mip |= csr::bits::MSIP as CsrType;
+        }
+        Some(Interrupt::MachineTimer) => {
+            mip |= csr::bits::MTIP as CsrType;
+        }
+        Some(Interrupt::SupervisorExternal) => {
+            mip |= csr::bits::SEIP as CsrType;
+        }
+        Some(Interrupt::SupervisorSoftware) => {
+            mip |= csr::bits::SSIP as CsrType;
+        }
+        Some(Interrupt::SupervisorTimer) => {
+            mip |= csr::bits::STIP as CsrType;
+        }
+        _ => {}
+    }
 
     let pending = (mie & mip) as usize;
 
@@ -74,12 +85,12 @@ pub fn has_pending_interrupt(cpu: &mut cpu::Cpu) -> Option<Interrupt> {
         irq = Some(Interrupt::MachineTimer);
     } else if (pending & csr::bits::SEIP) != 0 {
         cpu.csr
-            .write_bit(csr::register::MIP, csr::bits::SSIP_BIT, false);
+            .write_bit(csr::register::MIP, csr::bits::SEIP_BIT, false);
 
         irq = Some(Interrupt::SupervisorExternal);
     } else if (pending & csr::bits::SSIP) != 0 {
         cpu.csr
-            .write_bit(csr::register::MIP, csr::bits::SEIP_BIT, false);
+            .write_bit(csr::register::MIP, csr::bits::SSIP_BIT, false);
 
         irq = Some(Interrupt::SupervisorSoftware);
     } else if (pending & csr::bits::STIP) != 0 {
@@ -89,13 +100,6 @@ pub fn has_pending_interrupt(cpu: &mut cpu::Cpu) -> Option<Interrupt> {
         irq = Some(Interrupt::SupervisorTimer);
     } else {
         irq = None;
-    }
-
-    if irq.is_some() {
-        cpu.has_pending_interrupt
-            .store(1, std::sync::atomic::Ordering::Release);
-
-        cpu.pending_interrupt = irq;
     }
 
     irq

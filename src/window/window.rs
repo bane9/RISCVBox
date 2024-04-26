@@ -34,13 +34,23 @@ pub struct Window {
 }
 
 impl Window {
-    pub fn new(fb_ptr: *mut u8, width: usize, height: usize) -> Self {
-        let options = minifb::WindowOptions::default();
+    pub fn new(fb_ptr: *mut u8, width: usize, height: usize, scale: usize) -> Self {
+        let mut options = minifb::WindowOptions::default();
+        options.topmost = true;
+        options.scale = match scale {
+            1 => minifb::Scale::X1,
+            2 => minifb::Scale::X2,
+            4 => minifb::Scale::X4,
+            8 => minifb::Scale::X8,
+            16 => minifb::Scale::X16,
+            32 => minifb::Scale::X32,
+            _ => panic!("Invalid framebuffer scale"),
+        };
 
         let mut window = minifb::Window::new("RISCVBox", width, height, options)
             .expect("Failed to create window");
 
-        window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
+        window.set_target_fps(60);
 
         let fb_slice =
             unsafe { std::slice::from_raw_parts(fb_ptr as *const u32, width * height + 1) };

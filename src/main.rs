@@ -179,6 +179,14 @@ struct Args {
         help = "Height of the graphical output in pixels"
     )]
     height: usize,
+
+    #[arg(
+        short,
+        long,
+        default_value_t = 1,
+        help = "Scale factor for the graphical output (1, 2, 4, 8, 16, 32)"
+    )]
+    scale: usize,
 }
 
 fn main() {
@@ -224,7 +232,8 @@ fn main() {
     let exec_thread_pool = ExecCoreThreadPool::new(RAM_BEGIN_ADDR, 1);
 
     if using_fb {
-        let mut window = window::window::Window::new(RAMFB_BEGIN_ADDR as *mut u8, width, height);
+        let mut window =
+            window::window::Window::new(RAMFB_BEGIN_ADDR as *mut u8, width, height, args.scale);
 
         window.event_loop();
     }

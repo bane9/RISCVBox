@@ -22,7 +22,7 @@ const MTIMECMP_END: BusType = MTIMECMP + INSN_SIZE as BusType;
 const MTIME: BusType = CLINT_ADDR + 0xbff8;
 const MTIME_END: BusType = MTIME + INSN_SIZE as BusType;
 
-const CLINT_IRQN: usize = 0;
+pub const CLINT_IRQN: u32 = 0;
 
 pub struct ClintData {
     pub msip: BusType,
@@ -69,22 +69,23 @@ impl Clint {
         let mtime = util::timebase_since_program_start() as BusType;
 
         if (clint_data.msip & 1) != 0 {
-            cpu.csr
-                .write_bit(csr::register::MIP, csr::bits::MSIP_BIT, true);
+            cpu.pending_interrupt = Some(cpu::Interrupt::MachineSoftware);
+            cpu.has_pending_interrupt
+                .store(1, std::sync::atomic::Ordering::Release);
+
+            cpu.pending_interrupt_number = CLINT_IRQN as CpuReg;
 
             return true;
         }
 
-        if clint_data.mtimecmp != 0 && mtime >= clint_data.mtimecmp {
-            cpu.csr
-                .write_bit(csr::register::MIP, csr::bits::MTIP_BIT, true);
+        if mtime >= clint_data.mtimecmp && false {
+            cpu.pending_interrupt = Some(cpu::Interrupt::MachineTimer);
+            cpu.has_pending_interrupt
+                .store(1, std::sync::atomic::Ordering::Release);
 
             cpu.pending_interrupt_number = CLINT_IRQN as CpuReg;
             return true;
         }
-
-        cpu.csr
-            .write_bit(csr::register::MIP, csr::bits::MTIP_BIT, false);
 
         false
     }
@@ -115,7 +116,6 @@ impl BusDevice for Clint {
             },
             MTIME..=MTIME_END => unsafe {
                 let mtime = util::timebase_since_program_start() as BusType;
-                println!("mtime: {}\n\n\n", mtime);
                 let src = &mtime as *const BusType as *const u8;
                 std::ptr::copy_nonoverlapping(
                     src,
@@ -197,16 +197,18 @@ impl BusDevice for Clint {
             .unwrap();
         fdt.property_array_u32(
             "interrupts-extended",
-            &[CPU_INTC_PHANDLE, PLIC_PHANDLE, CPU_INTC_PHANDLE, 0x07],
+            &[
+                CPU_INTC_PHANDLE,
+                PLIC_PHANDLE,
+                CPU_INTC_PHANDLE,
+                0x7 as BusType,
+            ],
         )
         .unwrap();
         fdt.property_array_u32("reg", &[0x00, CLINT_ADDR, 0x00, CLINT_SIZE])
             .unwrap();
-        fdt.property_string_list(
-            "compatible",
-            vec!["sifive,clint0".into(), "riscv,clint0".into()],
-        )
-        .unwrap();
+        fdt.property_string("compatible", "riscv,clint0".into())
+            .unwrap();
         fdt.end_node(clint_node).unwrap();
     }
 }
