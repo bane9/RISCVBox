@@ -36,7 +36,7 @@ pub struct Window {
 impl Window {
     pub fn new(fb_ptr: *mut u8, width: usize, height: usize, scale: usize) -> Self {
         let mut options = minifb::WindowOptions::default();
-        options.topmost = true;
+
         options.scale = match scale {
             1 => minifb::Scale::X1,
             2 => minifb::Scale::X2,
