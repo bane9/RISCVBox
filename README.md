@@ -66,9 +66,7 @@ This reposotory provides Buildroot configuration files to enable building of the
 
 To utilize them, do the following (Linux only):
 ```bash
-sudo apt install autoconf automake autotools-dev curl libmpc-dev libmpfr-dev libgmp-dev \
-                 gawk build-essential bison flex texinfo gperf libtool patchutils bc \
-                 zlib1g-dev libexpat-dev git
+sudo apt install -y git build-essential wget cpio unzip rsync bc libncurses5-dev screen bison file flex 
 
 cd linux
 ./build.sh
