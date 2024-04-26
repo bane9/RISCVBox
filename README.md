@@ -4,7 +4,7 @@
 
 Welcome to the RISCVBox repository! It hosts the source code for the RISC-V box emulator—a rv32ima systems emulator enabling Linux boot by translating the environment to x86_64 assembly.
 
-https://github.com/bane9/RISCVBox/assets/29211832/e49739dc-0118-4edd-86a2-2df8a5d6a672
+https://github.com/bane9/RISCVBox/assets/29211832/e95d687d-2992-41cb-93c1-27553269122a
 
 ## Table of contents
 - [Features](#features)
