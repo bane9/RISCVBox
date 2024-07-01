@@ -124,7 +124,7 @@ The full list is: `test_rvi test_rvm test_rva test_rvmi test_rvsi`
 |-----------------|------------|------------------------------------|
 | Windows amd64   | ✅         |                                    |
 | Ubuntu amd64    | ✅         | Currenly untested                  |
-| MacOS amd64     | ⚠️         | Currenly incombatible, requires minor modifications                  |
+| MacOS amd64     | ❌         | Compiles, but MAP_FIXED seems to be unsupported on newer MacOS'                  |
 
 ## License
 
