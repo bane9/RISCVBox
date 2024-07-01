@@ -86,6 +86,7 @@ extern "C" fn sigaction_handler(signum: c_int, _info: *mut siginfo_t, context: *
         _ => RETURN_NOT_OK,
     };
 
+    #[cfg(target_os = "linux")]
     unsafe {
         let context = context as *const libc::ucontext_t;
 
@@ -117,6 +118,42 @@ extern "C" fn sigaction_handler(signum: c_int, _info: *mut siginfo_t, context: *
 
         EXCEPTION_ADDR
             .with(|addr_cell| *addr_cell.borrow_mut() = host_regs[libc::REG_RIP as usize] as usize);
+    }
+
+    #[cfg(target_os = "macos")]
+    unsafe {
+        let context = context as *const libc::ucontext_t;
+
+        let host_regs = (*context).uc_mcontext;
+        let host_regs = &(*host_regs).__ss;
+
+        let regs = Registers::new_from_slice(&[
+            host_regs.__rax as usize,
+            host_regs.__rcx as usize,
+            host_regs.__rdx as usize,
+            host_regs.__rbx as usize,
+            host_regs.__rsp as usize,
+            host_regs.__rbp as usize,
+            host_regs.__rsi as usize,
+            host_regs.__rdi as usize,
+            host_regs.__r8 as usize,
+            host_regs.__r9 as usize,
+            host_regs.__r10 as usize,
+            host_regs.__r11 as usize,
+            host_regs.__r12 as usize,
+            host_regs.__r13 as usize,
+            host_regs.__r14 as usize,
+            host_regs.__r15 as usize,
+            host_regs.__rip as usize,
+        ]);
+
+        REGISTERS.with(|regs_cell| {
+            *regs_cell.borrow_mut() = regs;
+        });
+
+        EXCEPTION_ADDR.with(|addr_cell| {
+            *addr_cell.borrow_mut() = host_regs.__rip as usize;
+        });
     }
 
     unsafe {

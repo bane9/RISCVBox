@@ -165,7 +165,6 @@ struct Args {
     nographic: bool,
 
     #[arg(
-        short,
         long,
         default_value_t = 800,
         help = "Width of the graphical output in pixels"
@@ -173,7 +172,6 @@ struct Args {
     width: usize,
 
     #[arg(
-        short,
         long,
         default_value_t = 600,
         help = "Height of the graphical output in pixels"

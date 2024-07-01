@@ -206,11 +206,16 @@ pub mod posix_page_allocator {
 
     pub fn allocate_pages_at(address: usize, npages: usize) -> Result<*mut u8, AllocationError> {
         let ptr = unsafe {
+            let flags = libc::MAP_PRIVATE | libc::MAP_ANON | libc::MAP_FIXED;
+
+            #[cfg(target_os = "macos")]
+            let flags = flags | libc::MAP_JIT;
+
             libc::mmap(
                 address as *mut _,
                 npages * PAGE_SIZE,
                 libc::PROT_READ | libc::PROT_WRITE,
-                libc::MAP_PRIVATE | libc::MAP_ANON | libc::MAP_FIXED,
+                flags,
                 -1,
                 0,
             )
