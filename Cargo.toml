@@ -37,6 +37,3 @@ path = "src/test_riscv_isa.rs"
 [profile.release]
 lto = true
 
-[features]
-# default = ["tlb"]
-# tlb = []

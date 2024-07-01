@@ -140,20 +140,6 @@ pub trait Mmu {
             return Ok(addr);
         }
 
-        #[cfg(feature = "tlb")]
-        let mut pte = if let Some(pte_entry) = self.get_tlb_entry(addr) {
-            pte_entry
-        } else {
-            let pte = self.get_pte(addr, access_type);
-
-            if pte.is_err() {
-                return Self::create_exeption(addr, access_type);
-            }
-
-            pte.unwrap()
-        };
-
-        #[cfg(not(feature = "tlb"))]
         let mut pte = {
             let pte = self.get_pte(addr, access_type);
 
@@ -217,13 +203,7 @@ pub trait Mmu {
                 unsafe { std::mem::transmute(pte.pte_addr as u64) };
 
             pte_atomic.store(pte.pte, std::sync::atomic::Ordering::Release);
-
-            #[cfg(feature = "tlb")]
-            self.update_entry(addr, pte);
         }
-
-        #[cfg(feature = "tlb")]
-        self.put_tlb_entry(addr, pte);
 
         Ok(pte.phys_base | (addr & RV_PAGE_OFFSET_MASK as BusType))
     }
