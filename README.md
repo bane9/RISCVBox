@@ -126,6 +126,10 @@ The full list is: `test_rvi test_rvm test_rva test_rvmi test_rvsi`
 | Ubuntu amd64    | ✅         | Currenly untested                  |
 | MacOS amd64     | ❌         | Compiles, but MAP_FIXED seems to be unsupported on newer MacOS'                  |
 
+## Note
+
+This emulator lacks internal safeguards against potential malicious payloads that could result in arbitrary code execution. It is strongly recommended to run only trusted software.
+
 ## License
 
 This repository is under GNU GPLv3 license.
