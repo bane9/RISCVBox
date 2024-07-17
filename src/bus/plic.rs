@@ -44,14 +44,14 @@ impl Plic {
     }
 
     pub fn update_pending(&mut self, irq: u64) {
-        let index = irq.wrapping_div(WORD_SIZE.into());
+        let index = irq / WORD_SIZE as u64;
         self.pending[index as usize] = self.pending[index as usize] | (1 << irq);
 
         self.update_claim(irq);
     }
 
     fn clear_pending(&mut self, irq: u64) {
-        let index = irq.wrapping_div(WORD_SIZE.into());
+        let index = irq / WORD_SIZE as u64;
         self.pending[index as usize] = self.pending[index as usize] & !(1 << irq);
 
         self.update_claim(0);
@@ -64,8 +64,8 @@ impl Plic {
     }
 
     fn is_enabled(&self, context: u64, irq: u64) -> bool {
-        let index = (irq.wrapping_rem(SOURCE_NUM.into())).wrapping_div((WORD_SIZE * 8).into());
-        let offset = (irq.wrapping_rem(SOURCE_NUM.into())).wrapping_rem((WORD_SIZE * 8).into());
+        let index = (irq % SOURCE_NUM as u64) / (WORD_SIZE as u64 * 8);
+        let offset = (irq % SOURCE_NUM as u64) % (WORD_SIZE as u64 * 8);
         return ((self.enable[(context * 32 + index) as usize] >> offset) & 1) == 1;
     }
 }
@@ -78,28 +78,19 @@ impl BusDevice for Plic {
 
         match addr {
             SOURCE_PRIORITY..=SOURCE_PRIORITY_END => {
-                if (addr - SOURCE_PRIORITY).wrapping_rem(WORD_SIZE) != 0 {
-                    return Err(Exception::LoadAccessFault(addr));
-                }
-                let index = (addr - SOURCE_PRIORITY).wrapping_div(WORD_SIZE);
+                let index = (addr - SOURCE_PRIORITY) / WORD_SIZE;
                 Ok(self.priority[index as usize] as BusType)
             }
             PENDING..=PENDING_END => {
-                if (addr - PENDING).wrapping_rem(WORD_SIZE) != 0 {
-                    return Err(Exception::LoadAccessFault(addr));
-                }
-                let index = (addr - PENDING).wrapping_div(WORD_SIZE);
+                let index = (addr - PENDING) / WORD_SIZE;
                 Ok(self.pending[index as usize] as BusType)
             }
             ENABLE..=ENABLE_END => {
-                if (addr - ENABLE).wrapping_rem(WORD_SIZE) != 0 {
-                    return Err(Exception::LoadAccessFault(addr));
-                }
-                let index = (addr - ENABLE).wrapping_div(WORD_SIZE);
+                let index = (addr - ENABLE) / WORD_SIZE;
                 Ok(self.enable[index as usize] as BusType)
             }
             THRESHOLD_AND_CLAIM..=THRESHOLD_AND_CLAIM_END => {
-                let context = (addr - THRESHOLD_AND_CLAIM).wrapping_div(CONTEXT_OFFSET);
+                let context = (addr - THRESHOLD_AND_CLAIM) / CONTEXT_OFFSET;
                 let offset = addr - (THRESHOLD_AND_CLAIM + CONTEXT_OFFSET * context);
                 if offset == 0 {
                     Ok(self.threshold[context as usize] as BusType)
@@ -120,28 +111,19 @@ impl BusDevice for Plic {
 
         match addr {
             SOURCE_PRIORITY..=SOURCE_PRIORITY_END => {
-                if (addr - SOURCE_PRIORITY).wrapping_rem(WORD_SIZE) != 0 {
-                    return Err(Exception::StoreAccessFault(addr));
-                }
-                let index = (addr - SOURCE_PRIORITY).wrapping_div(WORD_SIZE);
+                let index = (addr - SOURCE_PRIORITY) / WORD_SIZE;
                 self.priority[index as usize] = data as u32;
             }
             PENDING..=PENDING_END => {
-                if (addr - PENDING).wrapping_rem(WORD_SIZE) != 0 {
-                    return Err(Exception::StoreAccessFault(addr));
-                }
-                let index = (addr - PENDING).wrapping_div(WORD_SIZE);
+                let index = (addr - PENDING) / WORD_SIZE;
                 self.pending[index as usize] = data as u32;
             }
             ENABLE..=ENABLE_END => {
-                if (addr - ENABLE).wrapping_rem(WORD_SIZE) != 0 {
-                    return Err(Exception::StoreAccessFault(addr));
-                }
-                let index = (addr - ENABLE).wrapping_div(WORD_SIZE);
+                let index = (addr - ENABLE) / WORD_SIZE;
                 self.enable[index as usize] = data as u32;
             }
             THRESHOLD_AND_CLAIM..=THRESHOLD_AND_CLAIM_END => {
-                let context = (addr - THRESHOLD_AND_CLAIM).wrapping_div(CONTEXT_OFFSET);
+                let context = (addr - THRESHOLD_AND_CLAIM) / CONTEXT_OFFSET;
                 let offset = addr - (THRESHOLD_AND_CLAIM + CONTEXT_OFFSET * context);
                 if offset == 0 {
                     self.threshold[context as usize] = data as u32;
