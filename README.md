@@ -55,8 +55,8 @@ Options:
   -k, --kernel <KERNEL>  Path to Linux kernel image [default: ]
   -m, --memory <MEMORY>  Memory size in MiB [default: 64]
       --nographic        Disable the graphical output (only output to console)
-  -w, --width <WIDTH>    Width of the graphical output in pixels [default: 800]
-  -h, --height <HEIGHT>  Height of the graphical output in pixels [default: 600]
+      --width <WIDTH>    Width of the graphical output in pixels [default: 800]
+      --height <HEIGHT>  Height of the graphical output in pixels [default: 600]
   -s, --scale <SCALE>    Scale factor for the graphical output (1, 2, 4, 8, 16, 32) [default: 1]
   -h, --help             Print help
   -V, --version          Print version
