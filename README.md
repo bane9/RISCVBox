@@ -43,7 +43,7 @@ cargo b --release
 
 This repository holds prebuilt Linux and OpenSBI binaries you can test out. To run them, do the following
 ```bash
-cargo r --release -- --bios linux/prebuilt/fw_jump.bin --Image linux/prebuilt/Image
+cargo r --release -- --bios linux/prebuilt/fw_jump.bin --kernel linux/prebuilt/Image
 ```
 
 ## Usage
