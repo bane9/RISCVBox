@@ -111,6 +111,7 @@ fn main() {
         timeout_thread();
     }
 
+    util::init();
     init_backend_csr();
 
     init_bus(rom.clone(), ram_size);
@@ -237,6 +238,5 @@ fn test_rvmi() {
 
 #[test]
 fn test_rvsi() {
-    // Dirty bit generally won't always be set because of the TLB
-    run_tests_from_directory("testbins/rv32si/bin/", &["dirty"]);
+    run_tests_from_directory("testbins/rv32si/bin/", NOSKIP);
 }
