@@ -12,7 +12,7 @@ use crate::frontend::exec_core::{INSN_SIZE, RV_PAGE_SHIFT, RV_PAGE_SIZE};
 use crate::*;
 use bus::tlb::get_current_tlb;
 use common::*;
-use frontend::exec_core::RV_PAGE_MASK;
+use frontend::exec_core::RV_PAGE_OFFSET_MASK;
 
 use super::core::FastmemAccessType;
 
@@ -185,11 +185,7 @@ fn emit_bus_access(
 }
 
 extern "C" fn c_load_mmu_translate_cb(addr: usize, gpfn_offset: usize) -> usize {
-    let phys = get_current_tlb().get_ppn_entry(addr as CpuReg) as usize;
-
-    if phys != 0 {
-        return (phys & (addr & RV_PAGE_MASK)) as usize;
-    }
+    tlb_fetch_load!(addr);
 
     let cpu = cpu::get_cpu();
 
@@ -285,11 +281,7 @@ fn emit_load(
 }
 
 extern "C" fn c_store_mmu_translate_cb(addr: usize, gpfn_offset: usize) -> usize {
-    let phys = get_current_tlb().get_ppn_entry(addr as CpuReg) as usize;
-
-    if phys != 0 {
-        return (phys & (addr & RV_PAGE_MASK)) as usize;
-    }
+    tlb_fetch_store!(addr);
 
     let cpu = cpu::get_cpu();
 

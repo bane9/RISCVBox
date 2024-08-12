@@ -14,6 +14,33 @@ pub struct TLBAsidEntry {
     tlb: [TlbEntry; TLB_ENTRIES],
 }
 
+#[macro_export]
+macro_rules! tlb_fetch_load {
+    ($addr:expr) => {
+        let phys = get_current_tlb().get_ppn_entry($addr as CpuReg) as usize;
+
+        if phys != 0 {
+            let phys = phys & !1;
+
+            return (phys | ($addr & RV_PAGE_OFFSET_MASK)) as usize;
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! tlb_fetch_store {
+    ($addr:expr) => {
+        let phys = get_current_tlb().get_ppn_entry($addr as CpuReg) as usize;
+
+        let is_write = (phys & 1) != 0;
+        if phys != 0 && is_write {
+            let phys = phys & !1;
+
+            return (phys | ($addr & RV_PAGE_OFFSET_MASK)) as usize;
+        }
+    };
+}
+
 impl TLBAsidEntry {
     pub fn new() -> TLBAsidEntry {
         TLBAsidEntry {
@@ -49,7 +76,6 @@ impl TLBAsidEntry {
     }
 }
 
-#[thread_local]
 static mut TLB: *mut TLBAsidEntry = std::ptr::null_mut();
 
 pub fn tlb_init() {

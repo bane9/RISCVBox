@@ -148,7 +148,13 @@ pub trait Mmu {
             pte_atomic.store(pte.pte, std::sync::atomic::Ordering::Release);
         }
 
-        get_current_tlb().set_ppn_entry(addr, pte.phys_base);
+        let phys_flags = if write {
+            pte.phys_base | 0x1
+        } else {
+            pte.phys_base
+        };
+
+        get_current_tlb().set_ppn_entry(addr, phys_flags);
 
         Ok(pte.phys_base | (addr & RV_PAGE_OFFSET_MASK as BusType))
     }
