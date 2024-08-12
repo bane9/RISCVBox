@@ -12,7 +12,7 @@ mod xmem;
 use clap::Parser;
 
 use backend::csr::init_backend_csr;
-use bus::{ram::RAM_BEGIN_ADDR, ramfb::RAMFB_BEGIN_ADDR};
+use bus::{ram::RAM_BEGIN_ADDR, ramfb::RAMFB_BEGIN_ADDR, tlb::tlb_init};
 use cpu::{CPU_INTC_PHANDLE, CPU_TIMEBASE_FREQ};
 use frontend::exec_core::ExecCoreThreadPool;
 
@@ -218,6 +218,7 @@ fn main() {
 
     util::init();
     init_backend_csr();
+    tlb_init();
 
     window::ConsoleSettings::set_interactive_console();
 

@@ -2,6 +2,7 @@ use crate::cpu::*;
 use crate::frontend::exec_core::{RV_PAGE_OFFSET_MASK, RV_PAGE_SIZE};
 use crate::{cpu::csr::*, util::read_bit};
 
+use super::tlb::get_current_tlb;
 use super::{bus, BusType};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -147,6 +148,8 @@ pub trait Mmu {
             pte_atomic.store(pte.pte, std::sync::atomic::Ordering::Release);
         }
 
+        get_current_tlb().set_ppn_entry(addr, pte.phys_base);
+
         Ok(pte.phys_base | (addr & RV_PAGE_OFFSET_MASK as BusType))
     }
 
@@ -252,6 +255,10 @@ impl Mmu for Sv32Mmu {
         self.ppn = (satp & 0x3fffff) * RV_PAGE_SIZE as CpuReg;
 
         self.enabled = read_bit(satp, 31);
+
+        if self.enabled {
+            get_current_tlb().flush();
+        }
     }
 
     fn get_levels(&self) -> BusType {
