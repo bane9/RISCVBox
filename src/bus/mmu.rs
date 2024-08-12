@@ -1,8 +1,9 @@
 use crate::cpu::*;
 use crate::frontend::exec_core::{RV_PAGE_OFFSET_MASK, RV_PAGE_SIZE};
+use crate::util::read_bits;
 use crate::{cpu::csr::*, util::read_bit};
 
-use super::tlb::get_current_tlb;
+use super::tlb::{asid_tlb_set, get_current_tlb};
 use super::{bus, BusType};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -262,9 +263,10 @@ impl Mmu for Sv32Mmu {
 
         self.enabled = read_bit(satp, 31);
 
-        if self.enabled {
-            get_current_tlb().flush();
-        }
+        let asid = read_bits(satp, 30, 22);
+
+        asid_tlb_set(asid as usize);
+        get_current_tlb().flush();
     }
 
     fn get_levels(&self) -> BusType {

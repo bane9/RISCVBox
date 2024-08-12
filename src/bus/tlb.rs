@@ -1,7 +1,7 @@
 use crate::bus::bus::*;
 use crate::frontend::exec_core::RV_PAGE_SHIFT;
 
-const TLB_ENTRIES: usize = 16;
+const TLB_ENTRIES: usize = 64;
 const MAX_ASID_ENTRIES: usize = 16;
 
 #[derive(Debug, Clone, Copy)]
@@ -51,7 +51,7 @@ impl TLBAsidEntry {
     #[inline]
     pub fn get_ppn_entry(&self, virt: BusType) -> BusType {
         let vpn = (virt >> RV_PAGE_SHIFT) as BusType;
-        
+
         let tlb_entry = &self.tlb[vpn as usize % TLB_ENTRIES];
 
         if tlb_entry.virt == vpn {
@@ -78,15 +78,71 @@ impl TLBAsidEntry {
 
 static mut TLB: *mut TLBAsidEntry = std::ptr::null_mut();
 
-pub fn tlb_init() {
-    unsafe {
-        TLB = Box::into_raw(Box::new(TLBAsidEntry::new()));
-    }
-}
-
 pub fn get_current_tlb() -> &'static mut TLBAsidEntry {
-    unsafe {
-        &mut *TLB
+    unsafe { &mut *TLB }
+}
+
+pub struct AsidAllocator {
+    asid: [usize; MAX_ASID_ENTRIES],
+    lru: [usize; MAX_ASID_ENTRIES],
+    counter: usize,
+}
+
+impl AsidAllocator {
+    pub fn new() -> AsidAllocator {
+        AsidAllocator {
+            asid: [0; MAX_ASID_ENTRIES],
+            lru: [0; MAX_ASID_ENTRIES],
+            counter: 0,
+        }
+    }
+
+    pub fn set_asid(&mut self, asid: usize) {
+        let mut empty_index: Option<usize> = None;
+        let mut lru_index = 0;
+
+        for i in 0..MAX_ASID_ENTRIES {
+            if self.asid[i] == asid {
+                self.lru[i] = self.counter;
+                self.counter += 1;
+                return;
+            }
+
+            if self.asid[i] == 0 && empty_index.is_none() {
+                empty_index = Some(i);
+            }
+
+            if self.lru[i] < self.lru[lru_index] {
+                lru_index = i;
+            }
+        }
+
+        let target_index = if let Some(index) = empty_index {
+            index
+        } else {
+            lru_index
+        };
+
+        self.asid[target_index] = asid;
+        self.lru[target_index] = self.counter;
+        self.counter += 1;
+        unsafe {
+            TLB = &self.asid[target_index] as *const usize as *mut TLBAsidEntry;
+        }
     }
 }
 
+static mut ASID_ALLOCATOR: *mut AsidAllocator = std::ptr::null_mut();
+
+pub fn asid_tlb_init() {
+    unsafe {
+        ASID_ALLOCATOR = Box::into_raw(Box::new(AsidAllocator::new()));
+        TLB = &(*ASID_ALLOCATOR).asid[0] as *const usize as *mut TLBAsidEntry;
+    }
+}
+
+pub fn asid_tlb_set(asid: usize) {
+    unsafe {
+        (*ASID_ALLOCATOR).set_asid(asid);
+    }
+}
