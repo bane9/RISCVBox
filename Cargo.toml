@@ -1,6 +1,6 @@
 [package]
 name = "RISCVBox"
-version = "1.2.0"
+version = "1.2.5"
 edition = "2021"
 default-run = "RISCVBox"
 rust-version = "1.77.2"
@@ -11,7 +11,7 @@ winapi = { version = "0.3.9", features = ["winuser", "memoryapi", "wincon", "pro
 microseh = "1.0.3"
 
 [target.'cfg(windows)'.build-dependencies]
-embed-resource = "2.4.2"
+embed-resource = "2.4.3"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.155"
@@ -23,7 +23,7 @@ crossbeam = "0.8.4"
 lazy_static = "1.5.0"
 hashbrown = "0.14.5"
 vm-fdt = "0.3.0"
-clap = {version = "4.5.9", features = ["derive"]}
+clap = {version = "4.5.16", features = ["derive"]}
 
 [[bin]]
 name = "RISCVBox"
