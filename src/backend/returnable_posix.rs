@@ -1,9 +1,10 @@
 pub use crate::backend::returnable::*;
 use std::cell::RefCell;
+use std::backtrace::Backtrace;
 use std::ffi::{c_int, c_void};
 
 extern crate libc;
-use libc::{exit, sigaction, siginfo_t};
+use libc::{sigaction, siginfo_t, pthread_getname_np, pthread_self};
 
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -71,20 +72,45 @@ extern "C" {
 const JUMP_BUF_SIZE: usize = 256;
 type JmpBuf = [u8; JUMP_BUF_SIZE];
 
-extern "C" fn sigaction_handler(signum: c_int, _info: *mut siginfo_t, context: *mut c_void) {
-    let in_jit_block = IN_JIT_BLOCK.with(|in_jit_block| *in_jit_block.borrow());
-
-    if !in_jit_block {
-        println!("Signal received outside of JIT block: {}", signum);
-        unsafe { exit(1) };
+fn signum_to_str(signum: c_int) -> &'static str {
+    match signum {
+        1 => "SIGHUP",
+        2 => "SIGINT",
+        3 => "SIGQUIT",
+        4 => "SIGILL",
+        5 => "SIGTRAP",
+        6 => "SIGABRT",
+        7 => "SIGBUS",
+        8 => "SIGFPE",
+        9 => "SIGKILL",
+        10 => "SIGUSR1",
+        11 => "SIGSEGV",
+        12 => "SIGUSR2",
+        13 => "SIGPIPE",
+        14 => "SIGALRM",
+        15 => "SIGTERM",
+        16 => "SIGSTKFLT",
+        17 => "SIGCHLD",
+        18 => "SIGCONT",
+        19 => "SIGSTOP",
+        20 => "SIGTSTP",
+        21 => "SIGTTIN",
+        22 => "SIGTTOU",
+        23 => "SIGURG",
+        24 => "SIGXCPU",
+        25 => "SIGXFSZ",
+        26 => "SIGVTALRM",
+        27 => "SIGPROF",
+        28 => "SIGWINCH",
+        29 => "SIGIO",
+        30 => "SIGPWR",
+        31 => "SIGSYS",
+        _ => "Unknown signal",
     }
+}
 
-    let jmp_buf = JUMP_BUF.with(|buf| (*buf.borrow()).as_ptr());
-
-    let jmp_sig = match signum {
-        11 => RETURN_ACCESS_VIOLATION,
-        _ => RETURN_NOT_OK,
-    };
+extern "C" fn sigaction_handler(signum: c_int, _info: *mut siginfo_t, context: *mut c_void) {
+    let exception_addr: usize;
 
     #[cfg(target_os = "linux")]
     unsafe {
@@ -116,8 +142,10 @@ extern "C" fn sigaction_handler(signum: c_int, _info: *mut siginfo_t, context: *
             *regs_cell.borrow_mut() = regs;
         });
 
+        exception_addr = host_regs[libc::REG_RIP as usize] as usize;
+
         EXCEPTION_ADDR
-            .with(|addr_cell| *addr_cell.borrow_mut() = host_regs[libc::REG_RIP as usize] as usize);
+            .with(|addr_cell| *addr_cell.borrow_mut() = exception_addr);
     }
 
     #[cfg(target_os = "macos")]
@@ -151,10 +179,37 @@ extern "C" fn sigaction_handler(signum: c_int, _info: *mut siginfo_t, context: *
             *regs_cell.borrow_mut() = regs;
         });
 
+        exception_addr = host_regs.__rip  as usize;
+
         EXCEPTION_ADDR.with(|addr_cell| {
-            *addr_cell.borrow_mut() = host_regs.__rip as usize;
+            *addr_cell.borrow_mut() = exception_addr as usize;
         });
     }
+
+    let in_jit_block = IN_JIT_BLOCK.with(|in_jit_block| *in_jit_block.borrow());
+
+    let mut name = [0u8; 16]; // Max length for thread name
+    let thread = unsafe { pthread_self() };
+    let result = unsafe { pthread_getname_np(thread, name.as_mut_ptr() as *mut libc::c_char, name.len())};
+
+    if !in_jit_block {
+        if result != 0 {
+            println!("Signal received outside of JIT block: {} ({}) at {:#x} in unknown thread", signum_to_str(signum), signum, exception_addr);
+        } else {
+            let name = std::str::from_utf8(&name).unwrap();
+            println!("Signal received outside of JIT block: {} ({}) at {:#x} in thread {}", signum_to_str(signum), signum, exception_addr, name);
+        }
+
+        println!("{:?}", Backtrace::force_capture());
+        std::process::exit(1);
+    }
+
+    let jmp_buf = JUMP_BUF.with(|buf| (*buf.borrow()).as_ptr());
+
+    let jmp_sig = match signum {
+        11 => RETURN_ACCESS_VIOLATION,
+        _ => RETURN_NOT_OK,
+    };
 
     unsafe {
         longjmp(jmp_buf as *mut c_void, jmp_sig);

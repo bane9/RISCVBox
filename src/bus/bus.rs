@@ -16,7 +16,10 @@ macro_rules! ptr_direct_load {
                 8 => *(($ptr) as *const u8) as u32,
                 16 => *(($ptr) as *const u16) as u32,
                 32 => *(($ptr) as *const u32) as u32,
-                _ => panic!("Invalid size"),
+                _ =>  {
+                    println!("Invalid size: {}", $size);
+                    std::process::exit(1);
+                },
             }
         }
     };
@@ -30,7 +33,10 @@ macro_rules! ptr_direct_store {
                 8 => *(($ptr) as *mut u8) = $data as u8,
                 16 => *(($ptr) as *mut u16) = $data as u16,
                 32 => *(($ptr) as *mut u32) = $data as u32,
-                _ => panic!("Invalid size"),
+                _ => {
+                    println!("Invalid size: {}", $size);
+                    std::process::exit(1);
+                },
             }
         }
     };

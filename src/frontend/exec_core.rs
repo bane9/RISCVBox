@@ -51,8 +51,14 @@ impl ExecCore {
             cpu.current_gpfn = cpu.next_pc >> RV_PAGE_SHIFT as CpuReg;
             cpu.current_guest_page = cpu.next_pc & RV_PAGE_MASK as CpuReg;
 
-            bus.translate(cpu.next_pc, &mut cpu.mmu, AccessType::Fetch)
-                .expect("Failed to translate pc after exception")
+            let addr = bus.translate(cpu.next_pc, &mut cpu.mmu, AccessType::Fetch);
+            
+            if addr.is_err() {
+                println!("Failed to translate pc {:#x}", cpu.next_pc);
+                std::process::exit(1);
+            }
+
+            addr.unwrap()
         } else {
             next_phys_pc.unwrap()
         };
@@ -125,10 +131,11 @@ impl ExecCore {
                     }
 
                     if guest_exception_pc.is_none() {
-                        panic!(
+                        println!(
                             "Failed to find guest pc for host ptr {:#x}",
                             ret.exception_address
                         );
+                        std::process::exit(1);
                     }
 
                     let guest_exception_pc = guest_exception_pc.unwrap();
@@ -157,7 +164,8 @@ impl ExecCore {
                     }
                 }
                 _ => {
-                    panic!("Unhandled host exception during guest execution")
+                    println!("Unhandled host exception during guest execution");
+                    std::process::exit(1);
                 }
             }
 
@@ -221,7 +229,8 @@ impl ExecCore {
             }
             cpu::Exception::Mret | cpu::Exception::Sret => {}
             cpu::Exception::None => {
-                unreachable!("Exiting jit block without setting an exception is invalid");
+                println!("Exiting jit block without setting an exception is invalid");
+                std::process::exit(1);
             }
             _ => {
                 trap::handle_exception(cpu);

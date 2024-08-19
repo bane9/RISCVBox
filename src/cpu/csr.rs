@@ -210,7 +210,10 @@ impl Csr {
             0 => MppMode::User,
             1 => MppMode::Supervisor,
             3 => MppMode::Machine,
-            _ => panic!("Invalid MPP mode"),
+            _ => {
+                println!("Invalid size: {}", val);
+                std::process::exit(1);
+            },
         }
     }
 

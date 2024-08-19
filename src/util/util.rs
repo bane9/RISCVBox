@@ -92,7 +92,7 @@ pub fn timebase_since_program_start() -> u64 {
     let now = SystemTime::now();
     let duration_since_start = now
         .duration_since(*START_TIME)
-        .expect("Time went backwards");
+        .unwrap_or_else(|_| std::time::Duration::new(0, 0));
 
     let millis_since_start = duration_since_start.as_millis() as u64;
     let time_since_start = (millis_since_start * CPU_TIMEBASE_FREQ as u64) / 1_000;
