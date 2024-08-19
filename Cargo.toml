@@ -35,3 +35,6 @@ path = "src/test_riscv_isa.rs"
 
 [profile.release]
 lto = true
+
+[profile.dev]
+overflow-checks = false

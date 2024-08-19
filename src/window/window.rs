@@ -72,9 +72,8 @@ impl Window {
     }
 
     pub fn event_loop(&mut self) {
-        while self.window.is_open() && !self.window.is_key_down(minifb::Key::Escape) {
+        while self.window.is_open() {
             // Convert ABGR to BGR0
-
             for i in 0..self.width * self.height {
                 let pixel = self.fb_slice[i];
 

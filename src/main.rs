@@ -20,7 +20,7 @@ use crate::bus::BusDevice;
 
 use vm_fdt::FdtWriter;
 
-fn create_dtb(ram_origin: u32, ram_size: u32) -> Vec<u8> {
+fn create_dtb(ram_origin: u32, ram_size: u32, has_fb: bool) -> Vec<u8> {
     let mut fdt: FdtWriter = FdtWriter::new().unwrap();
 
     let root_node = fdt.begin_node("").unwrap();
@@ -30,11 +30,15 @@ fn create_dtb(ram_origin: u32, ram_size: u32) -> Vec<u8> {
     fdt.property_string("model", "riscv-virtio,qemu").unwrap();
 
     let chosen_node = fdt.begin_node("chosen").unwrap();
-    fdt.property_string(
-        "bootargs",
-        "earlycon=sbi fbcon=nodefer fbcon=map:0 console=ttyS0",
-    )
-    .unwrap();
+
+    let bootargs = if has_fb {
+        "fbcon=nodefer fbcon=map:0"
+    } else {
+        "earlycon=sbi console=ttyS0"
+    };
+
+    fdt.property_string("bootargs", bootargs).unwrap();
+
     fdt.end_node(chosen_node).unwrap();
 
     let fdt_memory_node = fdt
@@ -138,7 +142,7 @@ fn init_bus(
 
     bus.add_device(Box::new(clint));
 
-    let dtb = create_dtb(RAM_BEGIN_ADDR, ram_size as u32);
+    let dtb = create_dtb(RAM_BEGIN_ADDR, ram_size as u32, using_fb);
 
     let dtb = bus::dtb::Dtb::new(&dtb);
 

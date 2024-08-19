@@ -211,6 +211,7 @@ impl BusDevice for Ns16550 {
             DOOM_FLUSH => {
                 charkbd_flush();
                 self.lol = true;
+
                 Ok(())
             }
             _ => Err(Exception::StoreAccessFault(addr)),

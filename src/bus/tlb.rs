@@ -1,7 +1,7 @@
 use crate::bus::bus::*;
 use crate::frontend::exec_core::RV_PAGE_SHIFT;
 
-const TLB_ENTRIES: usize = 64;
+const TLB_ENTRIES: usize = 32;
 const MAX_ASID_ENTRIES: usize = 16;
 
 #[derive(Debug, Clone, Copy)]
@@ -17,7 +17,7 @@ pub struct TLBAsidEntry {
 #[macro_export]
 macro_rules! tlb_fetch_load {
     ($addr:expr) => {
-        let phys = get_current_tlb().get_ppn_entry($addr as CpuReg) as usize;
+        let phys = get_current_tlb().get_phys_entry($addr as CpuReg) as usize;
 
         if phys != 0 {
             let phys = phys & !1;
@@ -30,7 +30,7 @@ macro_rules! tlb_fetch_load {
 #[macro_export]
 macro_rules! tlb_fetch_store {
     ($addr:expr) => {
-        let phys = get_current_tlb().get_ppn_entry($addr as CpuReg) as usize;
+        let phys = get_current_tlb().get_phys_entry($addr as CpuReg) as usize;
 
         let is_write = (phys & 1) != 0;
         if phys != 0 && is_write {
@@ -49,7 +49,7 @@ impl TLBAsidEntry {
     }
 
     #[inline]
-    pub fn get_ppn_entry(&self, virt: BusType) -> BusType {
+    pub fn get_phys_entry(&self, virt: BusType) -> BusType {
         let vpn = (virt >> RV_PAGE_SHIFT) as BusType;
 
         let tlb_entry = &self.tlb[vpn as usize % TLB_ENTRIES];
@@ -62,7 +62,7 @@ impl TLBAsidEntry {
     }
 
     #[inline]
-    pub fn set_ppn_entry(&mut self, virt: BusType, phys: BusType) {
+    pub fn set_phys_entry(&mut self, virt: BusType, phys: BusType) {
         let virt = (virt >> RV_PAGE_SHIFT) as BusType;
 
         self.tlb[virt as usize % TLB_ENTRIES] = TlbEntry { virt, phys };

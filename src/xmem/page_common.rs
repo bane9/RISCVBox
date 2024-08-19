@@ -1,4 +1,4 @@
-use crate::{util, xmem::PageAllocator};
+use crate::xmem::PageAllocator;
 
 pub struct CodePage {
     ptr: *mut u8,
@@ -7,13 +7,15 @@ pub struct CodePage {
     state: PageState,
 }
 
+const INITIAL_NPAGES: usize = 16;
+
 impl CodePage {
     pub fn new() -> Self {
-        let ptr = PageAllocator::allocate_pages(32).unwrap();
+        let ptr = PageAllocator::allocate_pages(INITIAL_NPAGES).unwrap();
 
         CodePage {
             ptr,
-            npages: 32,
+            npages: INITIAL_NPAGES,
             offset: 0,
             state: PageState::ReadWrite,
         }
@@ -23,15 +25,17 @@ impl CodePage {
         let page_size = PageAllocator::get_page_size();
 
         if self.offset + data.len() > self.npages * page_size {
-            let npages = std::cmp::max(
-                util::align_up(self.offset + data.len(), page_size) / page_size,
-                self.npages * 2, // A logarithmic growth strategy may be better
-            );
+            panic!("CodePage: Resize not supported");
 
-            let new_ptr = PageAllocator::realloc_pages(self.ptr, self.npages, npages).unwrap();
+            // let npages = std::cmp::max(
+            //     util::align_up(self.offset + data.len(), page_size) / page_size,
+            //     self.npages * 2, // A logarithmic growth strategy may be better
+            // );
 
-            self.ptr = new_ptr;
-            self.npages = npages;
+            // let new_ptr = PageAllocator::realloc_pages(self.ptr, self.npages, npages).unwrap();
+
+            // self.ptr = new_ptr;
+            // self.npages = npages;
         }
 
         unsafe {

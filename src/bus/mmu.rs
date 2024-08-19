@@ -134,13 +134,14 @@ pub trait Mmu {
         }
 
         let accessed = PteBitTest!(pte.pte, PteBitVal::Accessed);
-        let dirty = PteBitTest!(pte.pte, PteBitVal::Dirty);
+        let mut dirty = PteBitTest!(pte.pte, PteBitVal::Dirty);
 
         if !accessed || (access_type == AccessType::Store && !dirty) {
             pte.pte |= PteBit!(PteBitVal::Accessed);
 
             if access_type == AccessType::Store {
                 pte.pte |= PteBit!(PteBitVal::Dirty);
+                dirty = true;
             }
 
             let pte_atomic: &std::sync::atomic::AtomicU32 =
@@ -149,13 +150,13 @@ pub trait Mmu {
             pte_atomic.store(pte.pte, std::sync::atomic::Ordering::Release);
         }
 
-        let phys_flags = if write {
+        let phys_flags = if write && dirty {
             pte.phys_base | 0x1
         } else {
             pte.phys_base
         };
 
-        get_current_tlb().set_ppn_entry(addr, phys_flags);
+        get_current_tlb().set_phys_entry(addr, phys_flags);
 
         Ok(pte.phys_base | (addr & RV_PAGE_OFFSET_MASK as BusType))
     }
