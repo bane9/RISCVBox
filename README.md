@@ -124,7 +124,7 @@ The full list is: `test_rvi test_rvm test_rva test_rvmi test_rvsi`
 | Platform        | Compatible | Comments                           |
 |-----------------|------------|------------------------------------|
 | Windows amd64   | ✅         |                                    |
-| Ubuntu amd64    | ✅         | Currenly untested                  |
+| Ubuntu amd64    | ✅         | Currently functioning, with intentional memory leakage applied as a temporary workaround.                  |
 | MacOS amd64     | ❌         | Compiles, but MAP_FIXED seems to be unsupported on newer MacOS'                  |
 
 ## Note
