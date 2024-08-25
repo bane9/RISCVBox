@@ -226,7 +226,7 @@ impl ExecCore {
                 // the jit block. Epsecially for cases where infinite loops are used,
                 // we need to make sure we periodiaclly exit the jit block to check
                 // for interrupts
-                cpu.next_pc += cpu.c_exception_pc as CpuReg + INSN_SIZE as CpuReg;
+                cpu.next_pc = cpu.c_exception_pc as CpuReg + INSN_SIZE as CpuReg;
             }
             cpu::Exception::Mret | cpu::Exception::Sret => {}
             cpu::Exception::None => {
