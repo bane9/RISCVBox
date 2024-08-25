@@ -65,29 +65,21 @@ impl Clint {
         Clint {}
     }
 
-    pub fn tick(clint_data: &mut ClintData, cpu: &mut cpu::Cpu) -> bool {
+    pub fn tick(clint_data: &mut ClintData, cpu: &mut cpu::Cpu) -> Option<u32> {
         let mtime = util::timebase_since_program_start() as BusType;
 
         if (clint_data.msip & 1) != 0 {
-            cpu.pending_interrupt = Some(cpu::Interrupt::MachineSoftware);
-            cpu.has_pending_interrupt
-                .store(1, std::sync::atomic::Ordering::Release);
-
             cpu.pending_interrupt_number = CLINT_IRQN as CpuReg;
 
-            return true;
+            return Some(csr::bits::MSIP_BIT as u32);
         }
 
         if mtime >= clint_data.mtimecmp && false {
-            cpu.pending_interrupt = Some(cpu::Interrupt::MachineTimer);
-            cpu.has_pending_interrupt
-                .store(1, std::sync::atomic::Ordering::Release);
-
             cpu.pending_interrupt_number = CLINT_IRQN as CpuReg;
-            return true;
+            return Some(csr::bits::MTIP_BIT as u32);
         }
 
-        false
+        None
     }
 }
 
@@ -181,14 +173,9 @@ impl BusDevice for Clint {
     fn tick_from_main_thread(&mut self) {}
 
     fn tick_async(&mut self, cpu: &mut cpu::Cpu) -> Option<u32> {
-        // This mandates syncrhonization/atomics but I'll hope it'll be fine for now
         let clint = get_clint(cpu.core_id as usize);
 
-        if Self::tick(clint, cpu) {
-            Some(CLINT_IRQN as u32)
-        } else {
-            None
-        }
+        Self::tick(clint, cpu)
     }
 
     fn describe_fdt(&self, fdt: &mut vm_fdt::FdtWriter) {

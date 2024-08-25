@@ -52,7 +52,7 @@ impl ExecCore {
             cpu.current_guest_page = cpu.next_pc & RV_PAGE_MASK as CpuReg;
 
             let addr = bus.translate(cpu.next_pc, &mut cpu.mmu, AccessType::Fetch);
-            
+
             if addr.is_err() {
                 println!("Failed to translate pc {:#x}", cpu.next_pc);
                 std::process::exit(1);
@@ -104,12 +104,12 @@ impl ExecCore {
             match ret.return_status {
                 ReturnStatus::ReturnOk => {
                     if cpu.c_exception == cpu::Exception::None.to_cpu_reg() as usize
+                        && cpu.exception == cpu::Exception::None
                         && cpu
                             .has_pending_interrupt
                             .load(std::sync::atomic::Ordering::Acquire)
                             == 1
                     {
-                        cpu.c_exception = cpu::Exception::None.to_cpu_reg() as usize;
                         cpu.exception = cpu::Exception::BookkeepingRet;
                     }
                 }
@@ -225,7 +225,7 @@ impl ExecCore {
                 // the jit block. Epsecially for cases where infinite loops are used,
                 // we need to make sure we periodiaclly exit the jit block to check
                 // for interrupts
-                cpu.next_pc = cpu.c_exception_pc as CpuReg;
+                cpu.next_pc += cpu.c_exception_pc as CpuReg + INSN_SIZE as CpuReg;
             }
             cpu::Exception::Mret | cpu::Exception::Sret => {}
             cpu::Exception::None => {
@@ -251,7 +251,7 @@ pub fn exec_core_thread(cpu_core_idx: usize, initial_pc: CpuReg) {
         let cpu = unsafe { &mut *(cpu as *mut cpu::Cpu) };
 
         loop {
-            std::thread::sleep(std::time::Duration::from_millis(25));
+            std::thread::sleep(std::time::Duration::from_millis(5));
 
             bus.tick_async(cpu);
         }

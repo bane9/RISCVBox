@@ -6,6 +6,7 @@ use super::ram::RAM_BEGIN_ADDR;
 
 pub type BusType = u32;
 
+use csr::CsrType;
 use vm_fdt::FdtWriter;
 
 #[macro_export]
@@ -16,10 +17,10 @@ macro_rules! ptr_direct_load {
                 8 => *(($ptr) as *const u8) as u32,
                 16 => *(($ptr) as *const u16) as u32,
                 32 => *(($ptr) as *const u32) as u32,
-                _ =>  {
+                _ => {
                     println!("Invalid size: {}", $size);
                     std::process::exit(1);
-                },
+                }
             }
         }
     };
@@ -36,7 +37,7 @@ macro_rules! ptr_direct_store {
                 _ => {
                     println!("Invalid size: {}", $size);
                     std::process::exit(1);
-                },
+                }
             }
         }
     };
@@ -237,14 +238,20 @@ impl Bus {
         }
     }
 
-    pub fn tick_async(&mut self, cpu: &mut cpu::Cpu) -> Option<u32> {
+    pub fn tick_async(&mut self, cpu: &mut cpu::Cpu) {
+        let mut new_mip: CsrType = 0;
+
         for device in &mut self.devices {
-            if let Some(irqn) = device.tick_async(cpu) {
-                return Some(irqn);
+            if let Some(irq) = device.tick_async(cpu) {
+                new_mip |= 1 << irq;
             }
         }
 
-        None
+        if new_mip != 0 {
+            cpu.csr.or_mip_atomic(new_mip);
+            cpu.has_pending_interrupt
+                .store(1, std::sync::atomic::Ordering::Release);
+        }
     }
 
     pub fn get_ptr(&mut self, addr: BusType) -> Result<*mut u8, Exception> {

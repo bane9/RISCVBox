@@ -1,9 +1,11 @@
 use crate::bus::bus::BusType;
 use crate::util::util;
 use std::cell::RefCell;
+use std::sync::atomic::AtomicU32;
 
 pub const CSR_COUNT: usize = 4096;
 pub type CsrType = BusType;
+pub type CsrAtomicType = AtomicU32;
 
 // Constants
 
@@ -140,7 +142,7 @@ impl Csr {
         match addr {
             register::SSTATUS => self.regs[register::MSTATUS] & SSTATUS as CsrType,
             register::SIE => self.regs[register::MIE] & self.regs[register::MIDELEG],
-            register::SIP => self.regs[register::MIP] & self.regs[register::MIDELEG],
+            register::SIP => self.fetch_mip_atomic() & self.regs[register::MIDELEG],
             register::CYCLE => std::cmp::max(util::timebase_since_program_start() as CsrType, 1),
             register::TIME => std::cmp::max(util::timebase_since_program_start() as CsrType, 1),
             _ => self.regs[addr],
@@ -162,7 +164,7 @@ impl Csr {
             register::SIP => {
                 let mask = self.regs[register::MIDELEG as usize] & bits::SSIP as u32;
                 let val = (self.regs[register::MIP as usize] & !mask) | (data & mask);
-                self.regs[register::MIP as usize] = val;
+                self.store_mip_atomic(val);
             }
             _ => {
                 self.regs[addr as usize] = data;
@@ -213,7 +215,7 @@ impl Csr {
             _ => {
                 println!("Invalid size: {}", val);
                 std::process::exit(1);
-            },
+            }
         }
     }
 
@@ -223,6 +225,46 @@ impl Csr {
 
     pub fn write_bit_sstatus(&mut self, bit: usize, bit_value: bool) {
         self.write_bit(register::SSTATUS, bit, bit_value);
+    }
+
+    pub fn and_mip_atomic(&mut self, val: CsrType) {
+        let mip_as_atomic =
+            unsafe { &mut *(self.regs.as_mut_ptr().add(register::MIP) as *mut CsrAtomicType) };
+
+        mip_as_atomic.fetch_and(val, std::sync::atomic::Ordering::Release);
+    }
+
+    pub fn or_mip_atomic(&mut self, val: CsrType) {
+        let mip_as_atomic =
+            unsafe { &mut *(self.regs.as_mut_ptr().add(register::MIP) as *mut CsrAtomicType) };
+
+        mip_as_atomic.fetch_or(val, std::sync::atomic::Ordering::Release);
+    }
+
+    pub fn fetch_mip_atomic(&self) -> CsrType {
+        let mip_as_atomic =
+            unsafe { &*(self.regs.as_ptr().add(register::MIP) as *const CsrAtomicType) };
+
+        mip_as_atomic.load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    pub fn store_mip_atomic(&mut self, val: CsrType) {
+        let mip_as_atomic =
+            unsafe { &mut *(self.regs.as_mut_ptr().add(register::MIP) as *mut CsrAtomicType) };
+
+        mip_as_atomic.store(val, std::sync::atomic::Ordering::Release);
+    }
+
+    pub fn load_mip_atomic(&self) -> CsrType {
+        let mip_as_atomic =
+            unsafe { &*(self.regs.as_ptr().add(register::MIP) as *const CsrAtomicType) };
+
+        mip_as_atomic.load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    pub fn clear_bit_mip_atomic(&mut self, bit: usize) {
+        let val = 1 << bit;
+        self.and_mip_atomic(!val);
     }
 }
 

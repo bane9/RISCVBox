@@ -5,7 +5,7 @@ use lazy_static::lazy_static;
 
 use crate::{
     bus::bus::*,
-    cpu::{self, Exception, CPU_TIMEBASE_FREQ},
+    cpu::{self, csr, Exception, CPU_TIMEBASE_FREQ},
     util,
 };
 
@@ -178,6 +178,7 @@ impl BusDevice for Ns16550 {
         match adj_addr as BusType {
             THR => {
                 let c = data as u8 as char;
+
                 if c.is_ascii() && !self.lol {
                     print!("{}", c);
                     let _ = std::io::stdout().flush();
@@ -237,22 +238,17 @@ impl BusDevice for Ns16550 {
     }
 
     fn tick_async(&mut self, cpu: &mut cpu::Cpu) -> Option<u32> {
-        if charbuf_has_data() {
+        if charbuf_has_data() && !self.lol {
             self.lsr |= LSR_DR;
             cpu.pending_interrupt_number = UART_IRQN;
-            cpu.pending_interrupt = Some(cpu::Interrupt::SupervisorExternal);
-            cpu.has_pending_interrupt
-                .store(1, std::sync::atomic::Ordering::Release);
 
-            return Some(UART_IRQN as u32);
+            return Some(csr::bits::SEIP_BIT as u32);
         }
 
         if dispatch_irq(self) {
             cpu.pending_interrupt_number = UART_IRQN;
-            cpu.pending_interrupt = Some(cpu::Interrupt::SupervisorExternal);
-            cpu.has_pending_interrupt
-                .store(1, std::sync::atomic::Ordering::Release);
-            return Some(UART_IRQN as u32);
+
+            return Some(csr::bits::SEIP_BIT as u32);
         }
 
         None
