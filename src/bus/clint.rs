@@ -58,6 +58,12 @@ fn get_clint(thread_id: usize) -> &'static mut ClintData {
     }
 }
 static mut ATOMIC_CNT: AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+fn get_time() -> BusType {
+    let mtime = util::timebase_since_program_start();
+
+    mtime as BusType
+}
 pub struct Clint;
 
 impl Clint {
@@ -66,7 +72,7 @@ impl Clint {
     }
 
     pub fn tick(clint_data: &mut ClintData, cpu: &mut cpu::Cpu) -> Option<u32> {
-        let mtime = util::timebase_since_program_start() as BusType;
+        let mtime = get_time();
 
         if (clint_data.msip & 1) != 0 {
             cpu.pending_interrupt_number = CLINT_IRQN as CpuReg;
@@ -107,7 +113,7 @@ impl BusDevice for Clint {
                 );
             },
             MTIME..=MTIME_END => unsafe {
-                let mtime = util::timebase_since_program_start() as BusType;
+                let mtime = get_time();
                 let src = &mtime as *const BusType as *const u8;
                 std::ptr::copy_nonoverlapping(
                     src,
@@ -194,8 +200,11 @@ impl BusDevice for Clint {
         .unwrap();
         fdt.property_array_u32("reg", &[0x00, CLINT_ADDR, 0x00, CLINT_SIZE])
             .unwrap();
-        fdt.property_string("compatible", "riscv,clint0".into())
-            .unwrap();
+        fdt.property_string_list(
+            "compatible",
+            vec!["sifive,clint0".into(), "riscv,clint0".into()],
+        )
+        .unwrap();
         fdt.end_node(clint_node).unwrap();
     }
 }

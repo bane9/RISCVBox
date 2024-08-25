@@ -173,7 +173,7 @@ impl BusDevice for Plic {
         )
         .unwrap();
         fdt.property_null("interrupt-controller").unwrap();
-        fdt.property_string("compatible", "riscv,plic0".into())
+        fdt.property_string("compatible", "sifive,plic-1.0.0".into())
             .unwrap();
         fdt.property_u32("#interrupt-cells", 0x01).unwrap();
         fdt.property_u32("#address-cells", 0x00).unwrap();

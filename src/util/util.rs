@@ -1,4 +1,5 @@
 use lazy_static::lazy_static;
+use std::cmp::max;
 use std::fs::File;
 use std::io::{self, Read};
 use std::time::SystemTime;
@@ -98,6 +99,12 @@ pub fn timebase_since_program_start() -> u64 {
     let time_since_start = (millis_since_start * CPU_TIMEBASE_FREQ as u64) / 1_000;
 
     time_since_start
+}
+
+pub fn timebase_estimate_cycles() -> u64 {
+    let timebase = timebase_since_program_start();
+
+    max(timebase * CPU_TIMEBASE_FREQ as u64, 1)
 }
 
 pub fn fdt_node_addr_helper(name: &str, addr: u32) -> String {

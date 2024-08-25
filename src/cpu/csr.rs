@@ -42,8 +42,9 @@ pub mod register {
     pub const MTVAL: usize = 0x343;
     pub const MIP: usize = 0x344;
     pub const CYCLE: usize = 0xc00;
+    pub const CYCLEH: usize = 0xc80;
     pub const TIME: usize = 0xc01;
-    pub const TIMEMS: usize = 0xc10;
+    pub const TIMEH: usize = 0xc81;
     pub const TDATA1: usize = 0x7a1;
     pub const MVENDORID: usize = 0xf11;
     pub const MARCHID: usize = 0xf12;
@@ -143,8 +144,10 @@ impl Csr {
             register::SSTATUS => self.regs[register::MSTATUS] & SSTATUS as CsrType,
             register::SIE => self.regs[register::MIE] & self.regs[register::MIDELEG],
             register::SIP => self.fetch_mip_atomic() & self.regs[register::MIDELEG],
-            register::CYCLE => std::cmp::max(util::timebase_since_program_start() as CsrType, 1),
-            register::TIME => std::cmp::max(util::timebase_since_program_start() as CsrType, 1),
+            register::CYCLE => util::timebase_estimate_cycles() as CsrType,
+            register::CYCLEH => (util::timebase_estimate_cycles() >> 32) as CsrType,
+            register::TIME => util::timebase_since_program_start() as CsrType,
+            register::TIMEH => (util::timebase_since_program_start() >> 32) as CsrType,
             _ => self.regs[addr],
         }
     }
