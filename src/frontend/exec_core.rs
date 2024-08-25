@@ -5,7 +5,7 @@ use crate::backend::{
 use crate::bus::dtb::DTB_BEGIN_ADDR;
 use crate::bus::mmu::{AccessType, Mmu};
 use crate::bus::{self, BusType};
-use crate::cpu::{self, CpuReg};
+use crate::cpu::{self, csr, CpuReg};
 use crate::cpu::{trap, RegName};
 pub use crate::frontend::parse_core::*;
 use crate::xmem::PageState;
@@ -219,6 +219,7 @@ impl ExecCore {
                 std::thread::sleep(std::time::Duration::from_millis(1));
 
                 cpu.next_pc = cpu.c_exception_pc as CpuReg + INSN_SIZE as CpuReg;
+                cpu.csr.write_bit_sstatus(csr::bits::SIE, true); // For some reason Linux is doing WFI inside compat_sys_ppoll_time64 where interrupts are disabled, no idea why
             }
             cpu::Exception::BookkeepingRet => {
                 // There may be a pending exception but that cannot checked unless we exit

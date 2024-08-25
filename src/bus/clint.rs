@@ -82,7 +82,10 @@ impl Clint {
 
         if mtime >= clint_data.mtimecmp && false {
             cpu.pending_interrupt_number = CLINT_IRQN as CpuReg;
+
             return Some(csr::bits::MTIP_BIT as u32);
+        } else {
+            cpu.csr.clear_bit_mip_atomic(csr::bits::MTIP_BIT);
         }
 
         None

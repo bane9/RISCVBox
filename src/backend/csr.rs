@@ -113,7 +113,7 @@ extern "C" fn csr_handler_cb(csr_reg: usize, rd_rhs: usize, op: usize, pc: usize
         _ => {
             println!("Invalid CSR operation: {}", op);
             std::process::exit(1);
-        },
+        }
     };
 
     let rd_val = unsafe { CSR_HANDLERS[csr_reg](csr_reg, new_csr_val) };

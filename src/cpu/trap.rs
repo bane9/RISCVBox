@@ -18,7 +18,7 @@ pub fn are_interrupts_enabled(cpu: &mut cpu::Cpu) -> bool {
         }
         csr::MppMode::Supervisor => {
             if !cpu.csr.read_bit_sstatus(csr::bits::SIE) {
-                return true; // For some reason, SIE is always false
+                return false;
             }
         }
         csr::MppMode::User => {}

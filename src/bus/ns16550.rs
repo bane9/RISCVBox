@@ -5,7 +5,7 @@ use lazy_static::lazy_static;
 
 use crate::{
     bus::bus::*,
-    cpu::{self, csr, Exception, CPU_TIMEBASE_FREQ},
+    cpu::{self, csr, Exception},
     util,
 };
 
@@ -260,8 +260,7 @@ impl BusDevice for Ns16550 {
             .unwrap();
         fdt.property_u32("interrupts", UART_IRQN).unwrap();
         fdt.property_u32("interrupt-parent", PLIC_PHANDLE).unwrap();
-        fdt.property_u32("clock-frequency", CPU_TIMEBASE_FREQ)
-            .unwrap();
+        fdt.property_u32("clock-frequency", 0x384000).unwrap();
         fdt.property_array_u32("reg", &[0x00, UART_ADDR, 0x00, UART_SIZE])
             .unwrap();
         fdt.property_string("compatible", "ns16550a").unwrap();
