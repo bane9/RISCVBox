@@ -80,7 +80,7 @@ impl Clint {
             return Some(csr::bits::MSIP_BIT as u32);
         }
 
-        if mtime >= clint_data.mtimecmp && false {
+        if mtime >= clint_data.mtimecmp {
             cpu.pending_interrupt_number = CLINT_IRQN as CpuReg;
 
             return Some(csr::bits::MTIP_BIT as u32);
@@ -93,65 +93,33 @@ impl Clint {
 }
 
 impl BusDevice for Clint {
-    fn load(&mut self, addr: BusType, size: BusType) -> Result<BusType, Exception> {
+    fn load(&mut self, addr: BusType, _size: BusType) -> Result<BusType, Exception> {
         let clint = get_clint(cpu::get_cpu().core_id as usize);
 
-        let mut out = 0 as BusType;
-
         match addr {
-            MSIP..=MSIP_END => unsafe {
-                let src = &clint.msip as *const BusType as *const u8;
-                std::ptr::copy_nonoverlapping(
-                    src,
-                    &mut out as *mut u32 as *mut u8,
-                    size as usize / 8,
-                );
-            },
-            MTIMECMP..=MTIMECMP_END => unsafe {
-                let src = &clint.mtimecmp as *const BusType as *const u8;
-                std::ptr::copy_nonoverlapping(
-                    src,
-                    &mut out as *mut u32 as *mut u8,
-                    size as usize / 8,
-                );
-            },
-            MTIME..=MTIME_END => unsafe {
-                let mtime = get_time();
-                let src = &mtime as *const BusType as *const u8;
-                std::ptr::copy_nonoverlapping(
-                    src,
-                    &mut out as *mut u32 as *mut u8,
-                    size as usize / 8,
-                );
-            },
+            MSIP..=MSIP_END => {
+                return Ok(clint.msip);
+            }
+            MTIMECMP..=MTIMECMP_END => {
+                return Ok(clint.mtimecmp);
+            }
+            MTIME..=MTIME_END => {
+                return Ok(get_time());
+            }
             _ => return Err(Exception::LoadAccessFault(addr)),
         };
-
-        Ok(out)
     }
 
-    fn store(&mut self, addr: BusType, data: BusType, size: BusType) -> Result<(), Exception> {
+    fn store(&mut self, addr: BusType, data: BusType, _size: BusType) -> Result<(), Exception> {
         let clint = get_clint(cpu::get_cpu().core_id as usize);
 
         match addr {
-            MSIP..=MSIP_END => unsafe {
-                clint.msip = 0;
-                let dst = &mut clint.msip as *mut BusType as *mut u8;
-                std::ptr::copy_nonoverlapping(
-                    &data as *const u32 as *const u8,
-                    dst,
-                    size as usize / 8,
-                );
-            },
-            MTIMECMP..=MTIMECMP_END => unsafe {
-                clint.mtimecmp = 0;
-                let dst = &mut clint.mtimecmp as *mut BusType as *mut u8;
-                std::ptr::copy_nonoverlapping(
-                    &data as *const u32 as *const u8,
-                    dst,
-                    size as usize / 8,
-                );
-            },
+            MSIP..=MSIP_END => {
+                clint.msip = data;
+            }
+            MTIMECMP..=MTIMECMP_END => {
+                clint.mtimecmp = data;
+            }
             MTIME..=MTIME_END => {
                 println!("mtime store\n\n\n")
             }

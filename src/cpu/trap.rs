@@ -71,10 +71,6 @@ pub fn has_pending_interrupt(cpu: &mut cpu::Cpu) -> Option<Interrupt> {
         irq = None;
     }
 
-    if irq.is_some() {
-        //println!("Interrupt: {:?}", irq);
-    }
-
     irq
 }
 

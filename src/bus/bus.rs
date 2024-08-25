@@ -244,6 +244,7 @@ impl Bus {
         for device in &mut self.devices {
             if let Some(irq) = device.tick_async(cpu) {
                 new_mip |= 1 << irq;
+                break;
             }
         }
 
