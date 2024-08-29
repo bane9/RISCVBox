@@ -141,10 +141,10 @@ pub mod posix_page_allocator {
         }
     }
 
-    pub fn free_pages(_ptr: *mut u8, _npages: usize) {
-        // unsafe {
-        //     libc::munmap(ptr as *mut _, npages * PAGE_SIZE);
-        // }
+    pub fn free_pages(ptr: *mut u8, npages: usize) {
+        unsafe {
+            libc::munmap(ptr as *mut _, npages * PAGE_SIZE);
+        }
     }
 
     pub fn mark_page(

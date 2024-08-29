@@ -1,40 +1,50 @@
+use hashbrown::HashMap;
+
 use crate::backend::common::HostEncodedInsn;
 use crate::xmem::{self, AllocationError, PageState};
 
 pub struct CodePages {
-    xmem: Vec<xmem::CodePage>,
+    xmem: HashMap<usize, xmem::CodePage>,
+    idx: usize,
 }
 
 impl CodePages {
     pub fn new() -> CodePages {
-        CodePages { xmem: vec![] }
+        CodePages {
+            xmem: HashMap::new(),
+            idx: 0,
+        }
     }
 
     pub fn get_code_page(&mut self, idx: usize) -> &mut xmem::CodePage {
-        self.xmem.get_mut(idx).unwrap()
+        self.xmem.get_mut(&idx).unwrap()
     }
 
     pub fn alloc_code_page(&mut self) -> (&mut xmem::CodePage, usize) {
-        self.xmem.push(xmem::CodePage::new());
-        let idx = self.xmem.len() - 1;
-        (self.xmem.get_mut(idx).unwrap(), idx)
+        let idx = self.idx;
+        self.idx += 1;
+
+        let xmem = xmem::CodePage::new();
+        self.xmem.insert(idx, xmem);
+
+        (self.xmem.get_mut(&idx).unwrap(), idx)
     }
 
     pub fn apply_insn(&mut self, idx: usize, insn: HostEncodedInsn) -> Result<(), AllocationError> {
-        self.xmem[idx].push(insn.as_slice())
+        self.xmem.get_mut(&idx).unwrap().push(insn.as_slice())
     }
 
     pub fn remove_code_page(&mut self, idx: usize) {
-        self.xmem[idx].dealloc();
-        self.xmem.remove(idx);
+        self.xmem.get_mut(&idx).unwrap().dealloc();
+        self.xmem.remove(&idx);
     }
 
     pub fn mark_all_pages(&mut self, state: PageState) {
         for xmem in self.xmem.iter_mut() {
             match state {
-                PageState::ReadWrite => xmem.mark_rw().unwrap(),
-                PageState::ReadExecute => xmem.mark_rx().unwrap(),
-                PageState::Invalid => xmem.mark_invalid().unwrap(),
+                PageState::ReadWrite => xmem.1.mark_rw().unwrap(),
+                PageState::ReadExecute => xmem.1.mark_rx().unwrap(),
+                PageState::Invalid => xmem.1.mark_invalid().unwrap(),
             }
         }
     }
