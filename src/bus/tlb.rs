@@ -1,7 +1,7 @@
 use crate::bus::bus::*;
 use crate::frontend::exec_core::RV_PAGE_SHIFT;
 
-const TLB_ENTRIES: usize = 32;
+const TLB_ENTRIES: usize = 64;
 const MAX_ASID_ENTRIES: usize = 16;
 
 #[derive(Debug, Clone, Copy)]
@@ -10,6 +10,7 @@ pub struct TlbEntry {
     pub phys: BusType,
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct TLBAsidEntry {
     tlb: [TlbEntry; TLB_ENTRIES],
 }
@@ -85,6 +86,7 @@ pub fn get_current_tlb() -> &'static mut TLBAsidEntry {
 pub struct AsidAllocator {
     asid: [usize; MAX_ASID_ENTRIES],
     lru: [usize; MAX_ASID_ENTRIES],
+    tlb_cache: Vec<TLBAsidEntry>,
     counter: usize,
 }
 
@@ -93,6 +95,7 @@ impl AsidAllocator {
         AsidAllocator {
             asid: [0; MAX_ASID_ENTRIES],
             lru: [0; MAX_ASID_ENTRIES],
+            tlb_cache: vec![TLBAsidEntry::new(); MAX_ASID_ENTRIES],
             counter: 0,
         }
     }
@@ -127,7 +130,7 @@ impl AsidAllocator {
         self.lru[target_index] = self.counter;
         self.counter += 1;
         unsafe {
-            TLB = &self.asid[target_index] as *const usize as *mut TLBAsidEntry;
+            TLB = &mut self.tlb_cache[target_index] as *mut TLBAsidEntry;
         }
     }
 }
@@ -137,7 +140,7 @@ static mut ASID_ALLOCATOR: *mut AsidAllocator = std::ptr::null_mut();
 pub fn asid_tlb_init() {
     unsafe {
         ASID_ALLOCATOR = Box::into_raw(Box::new(AsidAllocator::new()));
-        TLB = &(*ASID_ALLOCATOR).asid[0] as *const usize as *mut TLBAsidEntry;
+        TLB = &mut (*ASID_ALLOCATOR).tlb_cache[0];
     }
 }
 
