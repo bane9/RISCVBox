@@ -25,6 +25,7 @@ https://github.com/user-attachments/assets/3bb1a43d-be90-40dc-ab9d-8ffb04ee7774
     - CLINT
     - NS16550A
     - RAMFB
+    - SYSCON
 
 ## Building
 First, install [rustup](https://rustup.rs/), then clone this project:

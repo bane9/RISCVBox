@@ -6,6 +6,7 @@ pub mod ns16550;
 pub mod plic;
 pub mod ram;
 pub mod ramfb;
+pub mod syscon;
 pub mod tlb;
 
 pub use bus::*;

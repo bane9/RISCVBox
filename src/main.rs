@@ -12,7 +12,12 @@ mod xmem;
 use clap::Parser;
 
 use backend::csr::init_backend_csr;
-use bus::{ram::RAM_BEGIN_ADDR, ramfb::RAMFB_BEGIN_ADDR, tlb::asid_tlb_init};
+use bus::{
+    ram::RAM_BEGIN_ADDR,
+    ramfb::RAMFB_BEGIN_ADDR,
+    syscon::{SYSCON_ADDR, SYSCON_POWEROFF, SYSCON_REBOOT, SYSCON_SIZE},
+    tlb::asid_tlb_init,
+};
 use cpu::{CPU_INTC_PHANDLE, CPU_TIMEBASE_FREQ};
 use frontend::exec_core::ExecCoreThreadPool;
 
@@ -63,6 +68,42 @@ fn create_dtb(ram_origin: u32, ram_size: u32, has_fb: bool) -> Vec<u8> {
     fdt.property_string("compatible", "riscv").unwrap();
     fdt.property_string("riscv,isa", "rv32imasu").unwrap();
     fdt.property_string("mmu-type", "riscv,sv32").unwrap();
+
+    // Begin syscon node
+    let syscon_regmap = &[0x00, SYSCON_ADDR, 0x00, SYSCON_SIZE];
+    let syscnon_node = fdt
+        .begin_node(&util::fdt_node_addr_helper("syscon", SYSCON_ADDR))
+        .unwrap();
+    fdt.property_u32("phandle", 0x4).unwrap();
+    fdt.property_array_u32("reg", syscon_regmap).unwrap();
+    fdt.property_string_list(
+        "compatible",
+        vec![
+            "sifive,test1".into(),
+            "sifive,test0".into(),
+            "syscon".into(),
+        ],
+    )
+    .unwrap();
+    fdt.end_node(syscnon_node).unwrap();
+
+    let poweroff_node = fdt
+        .begin_node(&util::fdt_node_addr_helper("poweroff", SYSCON_POWEROFF))
+        .unwrap();
+    fdt.property_u32("offset", 0).unwrap();
+    fdt.property_array_u32("regmap", syscon_regmap).unwrap();
+    fdt.property_string("compatible", "syscon-poweroff")
+        .unwrap();
+    fdt.end_node(poweroff_node).unwrap();
+
+    let reboot_node = fdt
+        .begin_node(&util::fdt_node_addr_helper("reboot", SYSCON_REBOOT))
+        .unwrap();
+    fdt.property_u32("offset", 0).unwrap();
+    fdt.property_array_u32("regmap", syscon_regmap).unwrap();
+    fdt.property_string("compatible", "syscon-reboot").unwrap();
+    fdt.end_node(reboot_node).unwrap();
+    // End syscon node
 
     // Begin interrupt controller node
     let cpu0_intc_node = fdt.begin_node("cpu0_intc").unwrap();
@@ -147,6 +188,10 @@ fn init_bus(
     let dtb = bus::dtb::Dtb::new(&dtb);
 
     bus.add_device(Box::new(dtb));
+
+    let syscon = bus::syscon::Syscon::new();
+
+    bus.add_device(Box::new(syscon));
 }
 
 #[derive(Parser)]
