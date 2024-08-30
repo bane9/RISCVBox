@@ -1,7 +1,7 @@
 use crate::bus::bus::*;
 use crate::frontend::exec_core::RV_PAGE_SHIFT;
 
-const TLB_ENTRIES: usize = 64;
+const TLB_ENTRIES: usize = 256;
 const MAX_ASID_ENTRIES: usize = 16;
 
 #[derive(Debug, Clone, Copy)]
