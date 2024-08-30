@@ -62,6 +62,7 @@ pub struct Ns16550 {
     lol: bool,
 
     read_thread: Option<std::thread::JoinHandle<()>>,
+    stdout_flush_thread: Option<std::thread::JoinHandle<()>>,
 }
 
 lazy_static! {
@@ -102,6 +103,13 @@ fn read_thread() {
     }
 }
 
+fn stdout_flush_thread() {
+    loop {
+        std::io::stdout().flush().unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+}
+
 impl Ns16550 {
     pub fn new() -> Self {
         let mut this = Self {
@@ -119,9 +127,12 @@ impl Ns16550 {
             lol: false,
 
             read_thread: None,
+            stdout_flush_thread: None,
         };
 
         this.read_thread = Some(std::thread::spawn(read_thread));
+
+        this.stdout_flush_thread = Some(std::thread::spawn(stdout_flush_thread));
 
         this
     }
@@ -180,13 +191,9 @@ impl BusDevice for Ns16550 {
                 let c = data as u8 as char;
 
                 if c.is_ascii() && !self.lol {
-                    print!("{}", c);
-                    let _ = std::io::stdout().flush();
+                    std::io::stdout().write_all(&[c as u8]).unwrap();
                 }
-                // println!("printing u8: {} as char: {}", data as u8, c);
-                if c == '\n' && !self.lol {
-                    let _ = std::io::stdout().flush();
-                }
+
                 Ok(())
             }
             IER => {
