@@ -4,7 +4,7 @@ use crate::backend::{
 };
 use crate::bus::dtb::DTB_BEGIN_ADDR;
 use crate::bus::mmu::{AccessType, Mmu};
-use crate::bus::{self, BusType};
+use crate::bus::{self, tlb, BusType};
 use crate::cpu::{self, csr, CpuReg};
 use crate::cpu::{trap, RegName};
 pub use crate::frontend::parse_core::*;
@@ -188,6 +188,7 @@ impl ExecCore {
         match cpu.exception {
             cpu::Exception::MmuStateUpdate => {
                 cpu.next_pc = cpu.c_exception_pc as CpuReg + INSN_SIZE as CpuReg;
+                tlb::get_current_tlb().flush();
             }
             cpu::Exception::BlockExit => {
                 cpu.next_pc = cpu.c_exception_pc as CpuReg;

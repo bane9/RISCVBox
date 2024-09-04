@@ -271,7 +271,6 @@ impl Mmu for Sv32Mmu {
         let asid = read_bits(satp, 30, 22);
 
         asid_tlb_set(asid as usize);
-        get_current_tlb().flush();
     }
 
     fn get_levels(&self) -> BusType {
