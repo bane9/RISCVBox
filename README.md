@@ -4,7 +4,7 @@
 
 Welcome to the RISCVBox repository! It hosts the source code for the RISC-V box emulator—a rv32ima systems emulator enabling Linux boot by translating the environment to x86_64 assembly.
 
-https://github.com/user-attachments/assets/3bb1a43d-be90-40dc-ab9d-8ffb04ee7774
+https://github.com/user-attachments/assets/d7f1de3c-6000-446b-b712-9fc4c8e2bc29
 
 ## Table of contents
 - [Features](#features)
@@ -127,10 +127,6 @@ The full list is: `test_rvi test_rvm test_rva test_rvmi test_rvsi`
 | Windows amd64   | ✅         |                                    |
 | Ubuntu amd64    | ✅         |                                    |
 | MacOS amd64     | ❌         | Compiles, but MAP_FIXED seems to be unsupported on newer MacOS' |
-
-## Note
-
-This emulator lacks internal safeguards against potential malicious payloads that could result in arbitrary code execution. It is strongly recommended to run only trusted software.
 
 ## License
 
