@@ -150,11 +150,15 @@ pub trait Mmu {
             pte_atomic.store(pte.pte, std::sync::atomic::Ordering::Release);
         }
 
-        let phys_flags = if write && dirty {
-            pte.phys_base | 0x1
-        } else {
-            pte.phys_base
-        };
+        let mut phys_flags = pte.phys_base;
+
+        if write && dirty {
+            phys_flags |= 1;
+        }
+
+        if execute {
+            phys_flags |= 2;
+        }
 
         get_current_tlb().set_phys_entry(addr, phys_flags);
 

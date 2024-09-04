@@ -1,5 +1,6 @@
 use crate::bus::bus::*;
-use crate::frontend::exec_core::RV_PAGE_SHIFT;
+use crate::cpu::CpuReg;
+use crate::frontend::exec_core::{RV_PAGE_OFFSET_MASK, RV_PAGE_SHIFT};
 
 const TLB_ENTRIES: usize = 256;
 const MAX_ASID_ENTRIES: usize = 16;
@@ -21,7 +22,7 @@ macro_rules! tlb_fetch_load {
         let phys = get_current_tlb().get_phys_entry($addr as CpuReg) as usize;
 
         if phys != 0 {
-            let phys = phys & !1;
+            let phys = phys & !3;
 
             return (phys | ($addr & RV_PAGE_OFFSET_MASK)) as usize;
         }
@@ -35,11 +36,52 @@ macro_rules! tlb_fetch_store {
 
         let is_write = (phys & 1) != 0;
         if phys != 0 && is_write {
-            let phys = phys & !1;
+            let phys = phys & !3;
 
             return (phys | ($addr & RV_PAGE_OFFSET_MASK)) as usize;
         }
     };
+}
+
+pub fn tlb_fetch_instr(addr: BusType) -> Option<BusType> {
+    let phys = get_current_tlb().get_phys_entry(addr as CpuReg) as usize;
+
+    let is_exec = (phys & 2) != 0;
+    if phys != 0 && is_exec {
+        let phys = phys & !3;
+
+        let offset = addr & (RV_PAGE_OFFSET_MASK as BusType);
+        return Some(phys as BusType | offset);
+    }
+
+    None
+}
+
+pub fn tlb_fetch_load(addr: BusType) -> Option<BusType> {
+    let phys = get_current_tlb().get_phys_entry(addr as CpuReg) as usize;
+
+    if phys != 0 {
+        let phys = phys & !3;
+
+        let offset = addr & (RV_PAGE_OFFSET_MASK as BusType);
+        return Some(phys as BusType | offset);
+    }
+
+    None
+}
+
+pub fn tlb_fetch_store(addr: BusType) -> Option<BusType> {
+    let phys = get_current_tlb().get_phys_entry(addr as CpuReg) as usize;
+
+    let is_write = (phys & 1) != 0;
+    if phys != 0 && is_write {
+        let phys = phys & !3;
+
+        let offset = addr & (RV_PAGE_OFFSET_MASK as BusType);
+        return Some(phys as BusType | offset);
+    }
+
+    None
 }
 
 impl TLBAsidEntry {

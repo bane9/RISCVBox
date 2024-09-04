@@ -3,6 +3,7 @@ use crate::cpu::*;
 
 use super::plic::{Plic, PLIC_BASE};
 use super::ram::RAM_BEGIN_ADDR;
+use super::tlb::{tlb_fetch_instr, tlb_fetch_load, tlb_fetch_store};
 
 pub type BusType = u32;
 
@@ -117,7 +118,11 @@ impl Bus {
             return self.load_nommu(addr, size);
         }
 
-        let phys_addr = self.translate(addr, mmu, AccessType::Load)?;
+        let phys_addr = if let Some(phys_addr) = tlb_fetch_load(addr) {
+            phys_addr
+        } else {
+            self.translate(addr, mmu, AccessType::Load)?
+        };
 
         let res = self.load_nommu(phys_addr, size);
 
@@ -138,7 +143,11 @@ impl Bus {
             return self.fetch_nommu(addr, size);
         }
 
-        let phys_addr = self.translate(addr, mmu, AccessType::Fetch)?;
+        let phys_addr = if let Some(phys_addr) = tlb_fetch_instr(addr) {
+            phys_addr
+        } else {
+            self.translate(addr, mmu, AccessType::Fetch)?
+        };
 
         let res = self.load_nommu(phys_addr, size);
 
@@ -164,7 +173,11 @@ impl Bus {
             return self.store_nommu(addr, data, size);
         }
 
-        let phys_addr = self.translate(addr, mmu, AccessType::Store)?;
+        let phys_addr = if let Some(phys_addr) = tlb_fetch_store(addr) {
+            phys_addr
+        } else {
+            self.translate(addr, mmu, AccessType::Store)?
+        };
 
         let res = self.store_nommu(phys_addr, data, size);
 
