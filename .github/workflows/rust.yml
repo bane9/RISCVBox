@@ -72,33 +72,13 @@ jobs:
           name: RISCVBox-windows-latest.zip
           path: build-windows
 
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.DEPLOY_SECRET }}
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
+          token: ${{ secrets.DEPLOY_SECRET }}
           prerelease: false
-
-      - name: Upload Release Asset (Ubuntu)
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.DEPLOY_SECRET }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} 
-          asset_path: build-ubuntu/RISCVBox.zip
-          asset_name: RISCVBox-Ubuntu.zip
-          asset_content_type: application/octet-stream
-
-      - name: Upload Release Asset (Windows)
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.DEPLOY_SECRET }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} 
-          asset_path: build-windows/RISCVBox.zip
-          asset_name: RISCVBox-Windows.zip
-          asset_content_type: application/octet-stream
+          draft: false
+          make_latest: true
+          files: |
+            build-ubuntu/RISCVBox-ubuntu-latest.zip
+            build-windows/RISCVBox-windows-latest.zip
