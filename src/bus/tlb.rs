@@ -191,3 +191,9 @@ pub fn asid_tlb_set(asid: usize) {
         (*ASID_ALLOCATOR).set_asid(asid);
     }
 }
+
+pub fn cleanup_asid_tlb() {
+    unsafe {
+        let _ = Box::from_raw(ASID_ALLOCATOR);
+    }
+}

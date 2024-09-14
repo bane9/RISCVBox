@@ -5,7 +5,8 @@ pub mod win32_page_allocator {
     use std::ptr;
     use winapi::um::memoryapi::{VirtualAlloc, VirtualFree, VirtualProtect};
     use winapi::um::winnt::{
-        MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_EXECUTE_READ, PAGE_NOACCESS, PAGE_READWRITE,
+        MEM_COMMIT, MEM_DECOMMIT, MEM_FREE, MEM_RELEASE, MEM_RESERVE, PAGE_EXECUTE_READ,
+        PAGE_NOACCESS, PAGE_READWRITE,
     };
 
     const PAGE_SIZE: usize = 4096;
@@ -51,7 +52,7 @@ pub mod win32_page_allocator {
         let size = npages * PAGE_SIZE;
 
         unsafe {
-            VirtualFree(ptr as *mut _, size, MEM_RELEASE);
+            VirtualFree(ptr as *mut _, size, MEM_RELEASE | MEM_DECOMMIT | MEM_FREE);
         }
     }
 

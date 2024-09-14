@@ -52,4 +52,12 @@ impl CodePages {
     pub fn count(&self) -> usize {
         self.xmem.len()
     }
+
+    pub fn cleanup(&mut self) {
+        for xmem in self.xmem.iter_mut() {
+            xmem.1.dealloc();
+        }
+
+        self.xmem.clear();
+    }
 }

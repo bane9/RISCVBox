@@ -226,4 +226,8 @@ impl ParseCore {
             PageState::Invalid => panic!("Invalid page state"),
         }
     }
+
+    pub fn cleanup(&mut self) {
+        self.code_pages.cleanup();
+    }
 }

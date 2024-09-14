@@ -169,11 +169,13 @@ impl ExecCore {
                 }
             }
 
-            self.handle_guest_exception();
+            if self.handle_guest_exception() {
+                return;
+            }
         }
     }
 
-    fn handle_guest_exception(&mut self) {
+    fn handle_guest_exception(&mut self) -> bool {
         let cpu = cpu::get_cpu();
 
         if cpu.c_exception != cpu::Exception::None.to_cpu_reg() as usize {
@@ -230,6 +232,9 @@ impl ExecCore {
                 cpu.next_pc = cpu.c_exception_pc as CpuReg + INSN_SIZE as CpuReg;
             }
             cpu::Exception::Mret | cpu::Exception::Sret => {}
+            cpu::Exception::Reboot => {
+                return true;
+            }
             cpu::Exception::None => {
                 println!("Exiting jit block without setting an exception is invalid");
                 std::process::exit(1);
@@ -238,6 +243,8 @@ impl ExecCore {
                 trap::handle_exception(cpu);
             }
         }
+
+        false
     }
 }
 
@@ -248,11 +255,11 @@ pub fn exec_core_thread(cpu_core_idx: usize, initial_pc: CpuReg) {
 
     let cpu = cpu::get_cpu() as *mut cpu::Cpu as usize;
 
-    std::thread::spawn(move || {
+    let join = std::thread::spawn(move || {
         let bus = bus::get_bus();
         let cpu = unsafe { &mut *(cpu as *mut cpu::Cpu) };
 
-        loop {
+        while !bus::syscon::should_reboot() {
             std::thread::sleep(std::time::Duration::from_millis(5));
 
             bus.tick_async(cpu);
@@ -260,6 +267,10 @@ pub fn exec_core_thread(cpu_core_idx: usize, initial_pc: CpuReg) {
     });
 
     exec_core.exec_loop(cpu_core_idx as CpuReg, initial_pc);
+
+    join.join().unwrap();
+
+    exec_core.parse_core.cleanup();
 }
 
 pub struct ExecCoreThreadPool {

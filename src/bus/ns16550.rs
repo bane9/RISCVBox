@@ -60,9 +60,6 @@ pub struct Ns16550 {
     scr: u8,
     val: u8,
     lol: bool,
-
-    read_thread: Option<std::thread::JoinHandle<()>>,
-    stdout_flush_thread: Option<std::thread::JoinHandle<()>>,
 }
 
 lazy_static! {
@@ -96,8 +93,21 @@ fn charbuf_has_data() -> bool {
 
 fn read_thread() {
     loop {
+        static mut CTRL_A_PRESSED: bool = false;
+
         let mut input = [0u8];
         std::io::stdin().read(&mut input).unwrap();
+
+        unsafe {
+            if input[0] == 1 {
+                CTRL_A_PRESSED = true;
+                continue;
+            } else if (input[0] == 'X' as u8 || input[0] == 'x' as u8) && CTRL_A_PRESSED {
+                std::process::exit(0);
+            } else {
+                CTRL_A_PRESSED = false;
+            }
+        }
 
         write_char_cb(input[0]);
     }
@@ -110,9 +120,18 @@ fn stdout_flush_thread() {
     }
 }
 
+fn init_threads_once() {
+    static INIT: std::sync::Once = std::sync::Once::new();
+
+    INIT.call_once(|| {
+        let _ = std::thread::spawn(read_thread);
+        let _ = std::thread::spawn(stdout_flush_thread);
+    });
+}
+
 impl Ns16550 {
     pub fn new() -> Self {
-        let mut this = Self {
+        let this = Self {
             dll: 0,
             dlm: 0,
             isr: 0,
@@ -125,14 +144,9 @@ impl Ns16550 {
             scr: 0,
             val: 0,
             lol: false,
-
-            read_thread: None,
-            stdout_flush_thread: None,
         };
 
-        this.read_thread = Some(std::thread::spawn(read_thread));
-
-        this.stdout_flush_thread = Some(std::thread::spawn(stdout_flush_thread));
+        init_threads_once();
 
         this
     }

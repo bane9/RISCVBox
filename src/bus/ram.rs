@@ -1,3 +1,5 @@
+use xmem::PageState;
+
 use crate::bus::bus::*;
 use crate::xmem::PageAllocator;
 
@@ -6,30 +8,43 @@ use crate::*;
 pub const RAM_BEGIN_ADDR: BusType = 0x80000000;
 
 pub struct Ram {
-    pub mem: *mut u8,
     len: usize,
 }
 
-impl Ram {
-    pub fn new(mem_data: Vec<u8>) -> Self {
-        let mem = PageAllocator::allocate_pages_at(
+static mut RAM: *mut u8 = std::ptr::null_mut();
+
+fn init_ram_once(mem_data: Vec<u8>) {
+    unsafe {
+        if !RAM.is_null() {
+            PageAllocator::mark_page(
+                RAM,
+                mem_data.len() / PageAllocator::get_page_size(),
+                PageState::ReadWrite,
+            )
+            .unwrap();
+
+            std::ptr::copy_nonoverlapping(mem_data.as_ptr(), RAM, mem_data.len());
+
+            return;
+        }
+
+        RAM = PageAllocator::allocate_pages_at(
             RAM_BEGIN_ADDR as usize,
             mem_data.len() / PageAllocator::get_page_size(),
         )
         .unwrap();
 
-        unsafe {
-            std::ptr::copy_nonoverlapping(
-                mem_data.as_ptr(),
-                mem as *mut u8,
-                mem_data.len() * std::mem::size_of::<u8>(),
-            );
-        }
+        std::ptr::copy_nonoverlapping(mem_data.as_ptr(), RAM, mem_data.len());
+    }
+}
 
-        Self {
-            mem,
-            len: mem_data.len(),
-        }
+impl Ram {
+    pub fn new(mem_data: Vec<u8>) -> Self {
+        let len = mem_data.len();
+
+        init_ram_once(mem_data);
+
+        Self { len }
     }
 }
 

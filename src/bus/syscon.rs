@@ -1,4 +1,8 @@
-use crate::{bus::bus::*, cpu};
+use crate::{
+    backend::{ReturnableHandler, ReturnableImpl},
+    bus::bus::*,
+    cpu,
+};
 
 pub const SYSCON_ADDR: BusType = 0x11100000;
 pub const SYSCON_SIZE: BusType = 0x1000;
@@ -12,6 +16,24 @@ impl Syscon {
     pub fn new() -> Self {
         Self {}
     }
+}
+
+static mut SHOULD_REBOOT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+fn set_should_reboot() {
+    unsafe {
+        SHOULD_REBOOT.store(true, std::sync::atomic::Ordering::Release);
+    }
+}
+
+pub fn clear_should_reboot() {
+    unsafe {
+        SHOULD_REBOOT.store(false, std::sync::atomic::Ordering::Release);
+    }
+}
+
+pub fn should_reboot() -> bool {
+    unsafe { SHOULD_REBOOT.load(std::sync::atomic::Ordering::Acquire) }
 }
 
 impl BusDevice for Syscon {
@@ -28,7 +50,9 @@ impl BusDevice for Syscon {
         if data == SYSCON_POWEROFF {
             std::process::exit(0);
         } else if data == SYSCON_REBOOT {
-            std::process::exit(0);
+            set_should_reboot();
+            cpu::get_cpu().exception = cpu::Exception::Reboot;
+            ReturnableImpl::throw();
         }
 
         Ok(())

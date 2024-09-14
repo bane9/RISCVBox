@@ -64,6 +64,8 @@ Options:
   -V, --version          Print version
 ```
 
+To quickly exit the emulator in nographic mode, press `LEFT-CTRL + A, then X` (just like in QEMU).
+
 ## Building RISC-V Linux
 This reposotory provides Buildroot configuration files to enable building of the Linux kernel and OpenSBI bootloader with configuration that are compatible with this emulator.
 

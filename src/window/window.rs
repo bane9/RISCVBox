@@ -1,4 +1,7 @@
-use crate::bus::ns16550::{write_char_cb, write_char_kbd};
+use crate::bus::{
+    self,
+    ns16550::{write_char_cb, write_char_kbd},
+};
 use minifb::{self, Key};
 
 struct UartCB;
@@ -72,7 +75,7 @@ impl Window {
     }
 
     pub fn event_loop(&mut self) {
-        while self.window.is_open() {
+        while self.window.is_open() && !bus::syscon::should_reboot() {
             // Convert ABGR to BGR0
             for i in 0..self.width * self.height {
                 let pixel = self.fb_slice[i];
@@ -87,7 +90,9 @@ impl Window {
                 .unwrap();
         }
 
-        std::process::exit(0);
+        if !self.window.is_open() {
+            std::process::exit(0);
+        }
     }
 
     #[cfg(windows)]

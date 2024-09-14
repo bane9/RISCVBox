@@ -16,9 +16,9 @@ use bus::{
     ram::RAM_BEGIN_ADDR,
     ramfb::RAMFB_BEGIN_ADDR,
     syscon::{SYSCON_ADDR, SYSCON_POWEROFF, SYSCON_REBOOT, SYSCON_SIZE},
-    tlb::asid_tlb_init,
+    tlb::{self, asid_tlb_init},
 };
-use cpu::{CPU_INTC_PHANDLE, CPU_TIMEBASE_FREQ};
+use cpu::{csr, CPU_INTC_PHANDLE, CPU_TIMEBASE_FREQ};
 use frontend::exec_core::ExecCoreThreadPool;
 
 use crate::bus::BusDevice;
@@ -87,21 +87,19 @@ fn create_dtb(ram_origin: u32, ram_size: u32, has_fb: bool) -> Vec<u8> {
     .unwrap();
     fdt.end_node(syscnon_node).unwrap();
 
-    let poweroff_node = fdt
-        .begin_node(&util::fdt_node_addr_helper("poweroff", SYSCON_POWEROFF))
-        .unwrap();
-    fdt.property_u32("offset", 0).unwrap();
-    fdt.property_array_u32("regmap", syscon_regmap).unwrap();
+    let poweroff_node = fdt.begin_node("poweroff").unwrap();
     fdt.property_string("compatible", "syscon-poweroff")
         .unwrap();
-    fdt.end_node(poweroff_node).unwrap();
-
-    let reboot_node = fdt
-        .begin_node(&util::fdt_node_addr_helper("reboot", SYSCON_REBOOT))
-        .unwrap();
+    fdt.property_u32("value", SYSCON_POWEROFF).unwrap();
     fdt.property_u32("offset", 0).unwrap();
     fdt.property_array_u32("regmap", syscon_regmap).unwrap();
+    fdt.end_node(poweroff_node).unwrap();
+
+    let reboot_node = fdt.begin_node("reboot").unwrap();
     fdt.property_string("compatible", "syscon-reboot").unwrap();
+    fdt.property_u32("value", SYSCON_REBOOT).unwrap();
+    fdt.property_array_u32("regmap", syscon_regmap).unwrap();
+    fdt.property_u32("offset", 0).unwrap();
     fdt.end_node(reboot_node).unwrap();
     // End syscon node
 
@@ -236,9 +234,7 @@ struct Args {
     scale: usize,
 }
 
-fn main() {
-    let args = Args::parse();
-
+fn run_emulator(args: &Args) {
     let rom = util::read_file(&args.bios);
 
     if rom.is_err() {
@@ -287,4 +283,23 @@ fn main() {
     }
 
     exec_thread_pool.join();
+
+    bus::cleanup();
+    csr::cleanup_csr();
+    tlb::cleanup_asid_tlb();
+    cpu::remove_all_cpus();
+}
+
+fn main() {
+    let args = Args::parse();
+
+    loop {
+        run_emulator(&args);
+
+        if bus::syscon::should_reboot() {
+            bus::syscon::clear_should_reboot();
+        } else {
+            return;
+        }
+    }
 }

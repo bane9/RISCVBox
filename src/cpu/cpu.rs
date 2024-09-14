@@ -187,6 +187,7 @@ pub enum Exception {
     Wfi = 0x107,
     BookkeepingRet = 0x108,
     FastmemViolation = 0x109,
+    Reboot = 0x10a,
 }
 
 impl Exception {
@@ -217,6 +218,7 @@ impl Exception {
             0x107 => Exception::Wfi,
             0x108 => Exception::BookkeepingRet,
             0x109 => Exception::FastmemViolation,
+            0x10a => Exception::Reboot,
             _ => Exception::None,
         }
     }
@@ -248,6 +250,7 @@ impl Exception {
             Exception::Wfi => 0x107,
             Exception::BookkeepingRet => 0x108,
             Exception::FastmemViolation => 0x109,
+            Exception::Reboot => 0x10a,
         }
     }
 
@@ -278,6 +281,7 @@ impl Exception {
             Exception::Wfi => 0,
             Exception::BookkeepingRet => 0,
             Exception::FastmemViolation => 0,
+            Exception::Reboot => 0,
         };
 
         data
@@ -378,12 +382,26 @@ impl Cpu {
 #[thread_local]
 static mut CPU: *mut Cpu = std::ptr::null_mut();
 
+static mut PERCPU_LIST: Vec<*mut Cpu> = Vec::new();
+
 pub fn init_cpu() {
     unsafe {
         CPU = Box::into_raw(Box::new(Cpu::new()));
+
+        PERCPU_LIST.push(CPU);
     }
 }
 
 pub fn get_cpu() -> &'static mut Cpu {
     unsafe { &mut *CPU }
+}
+
+pub fn remove_all_cpus() {
+    unsafe {
+        for cpu in PERCPU_LIST.iter() {
+            let _ = Box::from_raw(*cpu);
+        }
+
+        PERCPU_LIST.clear();
+    }
 }

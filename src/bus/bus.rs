@@ -307,3 +307,9 @@ pub fn get_bus() -> &'static mut Bus {
         BUS.as_mut().unwrap()
     }
 }
+
+pub fn cleanup() {
+    unsafe {
+        BUS = None;
+    }
+}

@@ -278,3 +278,9 @@ thread_local! {
 pub fn get_csr() -> &'static mut Csr {
     CSR.with(|csr| unsafe { &mut *csr.as_ptr() })
 }
+
+pub fn cleanup_csr() {
+    CSR.with(|csr| {
+        *csr.borrow_mut() = Csr::new();
+    });
+}

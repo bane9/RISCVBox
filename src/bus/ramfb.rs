@@ -12,19 +12,37 @@ pub struct RamFB {
     bpp: usize,
 }
 
-impl RamFB {
-    pub fn new(width: usize, height: usize, bpp: usize, enabled: bool) -> Self {
+static mut RAMFB: *mut u8 = std::ptr::null_mut();
+
+fn init_ramfb_once(width: usize, height: usize, bpp: usize) {
+    unsafe {
+        if !RAMFB.is_null() {
+            for i in 0..width * height * (bpp / 8) {
+                std::ptr::write_volatile(RAMFB.offset(i as isize), 0);
+            }
+
+            return;
+        }
+
         let fb_len = width * height * (bpp / 8);
         let fb_len = util::align_up(fb_len, PageAllocator::get_page_size());
 
-        let mem = PageAllocator::allocate_pages_at(
+        RAMFB = PageAllocator::allocate_pages_at(
             RAMFB_BEGIN_ADDR as usize,
             fb_len / PageAllocator::get_page_size(),
         )
         .unwrap();
+    }
+}
+
+impl RamFB {
+    pub fn new(width: usize, height: usize, bpp: usize, enabled: bool) -> Self {
+        let fb_len = width * height * (bpp / 8);
+
+        init_ramfb_once(width, height, bpp);
 
         Self {
-            mem,
+            mem: unsafe { RAMFB },
             len: fb_len,
             enabled,
             width,
