@@ -47,7 +47,7 @@ jobs:
 
     - name: Upload build artifacts
       if: startsWith(github.ref, 'refs/tags/')
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: RISCVBox-${{ matrix.os }}.zip
         path: RISCVBox.zip
